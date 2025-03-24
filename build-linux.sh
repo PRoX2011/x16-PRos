@@ -11,4 +11,4 @@ dd if=boot.bin of=x16pros.img conv=notrunc
 dd if=kernel.bin of=x16pros.img bs=512 seek=1 conv=notrunc
 echo "Done."
 
-qemu-system-i386 -hda disk_img/x16pros.img
+qemu-system-i386 -hda x16pros.img
