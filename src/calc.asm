@@ -69,6 +69,8 @@ calc_cycle:
 	mov di, input_buffer
 	mov bx, num1
 	call convert_to_number
+        cmp al, 1   ;Проверка на ошибку
+        je .error
 	
 	mov al, [step]
 	inc al
@@ -90,6 +92,8 @@ calc_cycle:
 	mov di, input_buffer
 	mov bx, num2
 	call convert_to_number
+        cmp al, 1   ;Проверка на ошибку
+        je .error
 	
 	mov al, [step]
 	inc al
@@ -210,6 +214,11 @@ calc_cycle:
 	mov [step], al
 
 	jmp calc_cycle
+.error:
+        mov si, error_inp_msg
+        call print_string_red
+
+        jmp calc_cycle
 	
 print_message:
     mov bl, 0x1F
@@ -235,6 +244,7 @@ select_mode db "Select operation:", 10, 13
 			db 0
 
 error_mode_msg db "Unknown operation", 10, 13, 0
+error_inp_msg db "Wrong input, try again", 10, 13, 0
 
 mode resw 1
 step resw 1
