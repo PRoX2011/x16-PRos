@@ -1,5 +1,13 @@
 [BITS 16]
 [ORG 500h]
+%define NEWLINE 0x0A
+%define CR 0X0D
+%define PRINT 0x0E
+%define WHITE 0x0F
+%define CYAN 0x0B
+%define GREEN 0x0A
+%define BLACK 0x00
+%defibe MOVE_CURSOR 0x02
 
 start:
     cli
@@ -18,25 +26,25 @@ set_video_mode:
     ret
 
 move_cursor_to_top:
-    mov ah, 0x02
-    mov bh, 0x00
-    mov dx, 0x0000
+    mov ah, MOVE_CURSOR
+    mov bh, 0x00   ; Страница
+    mov dx, 0x0000 ; Ряд и столбец
     int 0x10
     ret
 
 set_background_color:
     mov ah, 0x06
     mov al, 0x00
-    mov bh, 0x00
+    mov bh, BLACK
     mov cx, 0x0000
     mov dx, 0x184F
     int 0x10
     ret
   
 print_string:
-    mov ah, 0x0E
-    mov bh, 0x00
-    mov bl, 0x0F
+    mov ah, PRINT
+    mov bh, 0x00   ; страница
+    mov bl, WHITE
 .print_char:
     lodsb
     cmp al, 0
@@ -47,10 +55,10 @@ print_string:
     ret
     
 print_newline:
-    mov ah, 0x0E
-    mov al, 0x0D
+    mov ah, PRINT
+    mov al, CR
     int 0x10
-    mov al, 0x0A
+    mov al, NEWLINE
     int 0x10
     ret
 
@@ -730,9 +738,9 @@ sector_number dw 0
 
 ; Зелёное на чёрном
 print_string_green:
-    mov ah, 0x0E
+    mov ah, PRINT
     mov bh, 0x00
-    mov bl, 0x0A
+    mov bl, GREEN
 .print_char:
     lodsb
     cmp al, 0
@@ -744,9 +752,9 @@ print_string_green:
     
 ; бирюзовый на чёрном
 print_string_cyan:
-    mov ah, 0x0E
+    mov ah, PRINT
     mov bh, 0x00
-    mov bl, 0x0B
+    mov bl, CYAN
 .print_char:
     lodsb
     cmp al, 0
@@ -758,7 +766,7 @@ print_string_cyan:
     
 ; красный на чёрном
 print_string_red:
-    mov ah, 0x0E
+    mov ah, PRINT
     mov bh, 0x00
     mov bl, 0x055FC
 .print_char:
