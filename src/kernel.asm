@@ -1,7 +1,7 @@
 [BITS 16]
 [ORG 500h]
 %define NEWLINE 0x0A
-%define CR 0X0D
+%define CR 0x0D
 %define PRINT 0x0E
 %define WHITE 0x0F
 %define CYAN 0x0B
