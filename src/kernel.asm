@@ -7,7 +7,7 @@
 %define CYAN 0x0B
 %define GREEN 0x0A
 %define BLACK 0x00
-%defibe MOVE_CURSOR 0x02
+%define MOVE_CURSOR 0x02
 
 start:
     cli
