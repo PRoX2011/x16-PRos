@@ -26,20 +26,20 @@
 ---
 
 ## 📋 Supported commands in x16 PRos terminal
-- **help** display list of commands
-- **info** brief system information
-- **cls** clear screen
-- **shut** shut down the system
-- **reboot** restart the system
-- **date** display date
-- **time** show time (UTC)
-- **CPU** CPU information
-- **load** load program from disk sector (0000x800h)
-- **writer** start writer program
-- **brainf** start brainf interpreter
-- **barchart** start barchart program
-- **snake** start Snake game
-- **calc** start calculator program
+- `help` - display list of commands
+- `info` - brief system information
+- `cls` - clear screen
+- `shut` - shut down the system
+- `reboot` - restart the system
+- `date` - display date
+- `time` - show time (UTC)
+- `cpu` - CPU information
+- `load` load program from disk sector (0000x800h)
+- `writer` - start writer program
+- `brainf` - start brainf interpreter
+- `barchart` - start barchart program
+- `snake` - start Snake game
+- `calc` - start calculator program
 
 ---
 
@@ -86,7 +86,7 @@ Basic x16 PRos software package includes:
 ---
   
 ## 🛠 Adding programs
-x16 PRos includes a small set of built-in programs. You can add your own program to the system image and then run it using the load command, specifying the disk sector number where you wrote the program as an argument.
+x16 PRos includes a small set of built-in programs. You can add your own program to the system image and then run it using the `load` command, specifying the disk sector number where you wrote the program as an argument.
 
 Here's how you can add a program:
 ```bash
@@ -99,16 +99,16 @@ You can read more about the software development process for x16-PRos on the pro
 ---
 
 ## 🛠 Compilation
-First, clone the reposytory:
+First, clone the repository:
 ```bash
 git clone https://github.com/PRoX2011/x16-PRos.git
 ```
 To compile the project you will only need NASM. 
-Example comand for Ubuntu:
+Example command for Debian-based systems:
 ```bash
 sudo apt install nasm
 ```
-And finaly:
+And finally:
 ```bash
 chmod +x build-linux.sh
 ./build-linux.sh
@@ -138,7 +138,7 @@ winget install nasm
 winget install qemu
 ```
 
-2. Add NASM and QEMU to System Path by running:
+2. Add NASM and QEMU to the system PATH by running:
 ```powershell
 setx PATH "%PATH%;C:\Program Files\NASM;C:\Program Files\qemu"
 ```
