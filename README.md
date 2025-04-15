@@ -113,6 +113,10 @@ And finaly:
 chmod +x build-linux.sh
 ./build-linux.sh
 ```
+Or:
+```bash
+make
+```
 ---
 
 ## 🚀 Launchng
