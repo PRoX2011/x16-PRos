@@ -30,12 +30,18 @@ convert_to_number:
     lodsb
     cmp al, 0         
     je .done_convert
-    sub al, '0'       
+    sub al, '0'
+    jb .error
+    cmp al, '9'
+    ja .error
     imul cx, 10       
     add cx, ax        
     jmp .convert_loop
 .done_convert:
     mov [bx], cx  
+    ret
+.error:
+    mov al, 1    ;Пометка об ошибке
     ret
 	
 	
