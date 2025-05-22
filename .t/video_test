@@ -1,0 +1,119 @@
+;
+;
+; This boot sector program invokes BIOS INT 10h AH=0Fh (get current video mode) and displays the results to the screen
+;
+;
+  ; Preliminary directives so fasm knows how to generate the machine code
+  ;
+    format binary                             ; this directive tells fasm to write the generated code as a flat binary file
+    use16                                     ; this directive tells fasm to generate 16-bit code
+    org 0x7C00                                ; org directive tells fasm that the program will be loaded at 0x7C00, where the BIOS hands over control to the bootstrap code
+;
+;
+  ; Get current video mode (INT 10h, function AH=0Fh)
+  ;
+    mov ah,0xF                                ; set AH to 0xF (AH=0Fh is the function for getting the current video mode)
+    int 0x10                                  ; invoke BIOS interrupt 10h, function AH=0Fh to get the current video mode
+;
+;
+  ; Display results to the screen
+  ;
+    ; Save the results for printing later
+    ;
+      mov dh,al                               ; save AL (the current video mode) to DH
+      push bx                                 ; save BH to the stack
+      push ax                                 ; save AH to the stack
+    ;
+    ; Display the value saved to DH (i.e. the current video mode, which was copied from AL to DH above)
+    ;
+      xor ax,ax                               ; set AX to 0 in order to set DS to 0
+      mov ds,ax                               ; DS = 0 (SI works with DS to point to the address created by DS:SI)
+      mov si,vid_mode_prompt                  ; set SI to point to the first character of the message to be printed
+      mov cx,12                               ; set the counter (CX) to match the number of characters to print
+      call print_string_procedure             ; save to the stack the address of the next instruction, then jump to the procedure called by this instruction
+      call procedure_for_printing_DH          ; save to the stack the address of the next instruction, then jump to the procedure called by this instruction
+    ;
+    ; Display the value for the number of character columns used by the current video mode (pushed onto the stack from AH)
+    ;
+      ;xor ax,ax                               ; set AX to 0 in order to set DS to 0 (commented out, because AX is not needed to set DS, since DS is probably already 0)
+      ;mov ds,ax                               ; DS = 0 (SI works with DS to point to the address created by DS:SI) (commented out, because DS is probably already 0)
+      mov si,num_col_prompt                   ; set SI to point to the first character of the message to be printed
+      mov cx,13                               ; set the counter (CX) to match the number of characters to print
+      call print_string_procedure             ; save to the stack the address of the next instruction, then jump to the procedure called by this instruction
+      pop dx                                  ; copy to DH the number of columns previously saved to the stack from AH
+      call procedure_for_printing_DH          ; save to the stack the address of the next instruction, then jump to the procedure called by this instruction
+    ;
+    ; Display the value for the active display page (pushed onto the stack from BH)
+    ;
+      ;xor ax,ax                               ; set AX to 0 in order to set DS to 0 (commented out, because AX is not needed to set DS, since DS is probably already 0)
+      ;mov ds,ax                               ; DS = 0 (SI works with DS to point to the address created by DS:SI) (commented out, because DS is probably already 0)
+      mov si,display_page_prompt              ; set SI to point to the first character of the message to be printed
+      mov cx,17                               ; set the counter (CX) to match the number of characters to print
+      call print_string_procedure             ; save to the stack the address of the next instruction, then jump to the procedure called by this instruction
+      pop dx                                  ; copy to DH the value of the active display page
+      call procedure_for_printing_DH          ; save to the stack the address of the next instruction, then jump to the procedure called by this instruction
+;
+;
+  ; End of program
+  ;
+    end_of_program:                           ; label for this section of code
+    hlt                                       ; stops instruction execution and places the processor in a halted state
+    jmp end_of_program                        ; jump to the label 'end_of_program'
+;
+;
+  ;
+  ;
+  ; Procedures called by the program
+  ;
+  ;
+    print_string_procedure:                   ; label for this section of code
+    ;pusha                                     ; save all 8 general registers to the stack (commented out, because it is not necessary to save the values of the general registers)
+    mov ah,0xE                                ; set AH to 0Eh (i.e. select teletype output)
+    xor bh,bh                                 ; set display page number to 0
+      start_of_print_loop:                    ; label for this section of code
+      lodsb                                   ; load string byte (i.e. copy the string element pointed to by DS:SI to AL)
+      int 0x10                                ; invoke BIOS interrupt 10h, function AH=0Eh to display the ASCII character stored in AL
+      loop start_of_print_loop                ; decrement CX by 1, then jump to the specified label until CX=0
+    ;popa                                      ; pop the contents of all eight general registers back from the stack (commented out, because popa corresponds with pusha, which has been commented out above)
+    ret                                       ; transfer control back to the program that invoked the procedure using the address that was stored on the stack by the call instruction
+  ;
+    procedure_for_printing_DH:                ; label for this section of code
+    ;pusha                                     ; save all 8 general registers to the stack (commented out, because it is not necessary to save the values of the general registers)
+    ;mov ah,0xE                                ; set AH to 0Eh (i.e. select teletype output) (commented out, because the value in AH is already 0Eh)
+    ;xor bh,bh                                 ; set display page number to 0 (commented out, because the value in BH is already 0)
+    mov cx,4                                  ; set the counter (CX) to match the number of characters to print
+    call start_print_DH_loop                  ; save to the stack the address of the next instruction, then jump to the procedure called by this instruction
+    mov al,0x20                               ; set AL to print a space (ASCII code for a space is 0x20)
+    int 0x10                                  ; invoke BIOS interrupt 10h, function AH=0Eh to display the ASCII character stored in AL
+    mov cx,4                                  ; set the counter (CX) to match the number of characters to print
+    call start_print_DH_loop                  ; save to the stack the address of the next instruction, then jump to the procedure called by this instruction
+    ;popa                                      ; pop the contents of all eight general registers back from the stack (commented out, because popa corresponds with pusha, which has been commented out above)
+    ret                                       ; transfer control back to the program that invoked the procedure using the address that was stored on the stack by the call instruction
+  ;
+    start_print_DH_loop:                      ; label for this section of code
+    shl dh,1                                  ; shifts the bits in the DH register to the left by one bit; the last exited bit will be stored to the CF flag
+    setc al                                   ; sets the AL register to match the value of the CF flag
+    add al,0x30                               ; convert the number in AL (0 or 1) to ASCII
+    int 0x10                                  ; invoke BIOS interrupt 10h, function AH=0Eh to display the ASCII character stored in AL
+    loop start_print_DH_loop                  ; decrement CX by 1, then jump to the specified label until CX=0
+    ret                                       ; transfer control back to the program that invoked the procedure using the address that was stored on the stack by the call instruction
+;
+;
+  ;
+  ;
+  ; Data used by the program
+  ;
+  ;
+    vid_mode_prompt:
+    db 'Video mode: '                         ; 12 characters
+    ;
+    num_col_prompt:
+    db 0xD,0xA,0xD,0xA,'Columns: '            ; 13 characters
+    ;
+    display_page_prompt:
+    db 0xD,0xA,0xD,0xA,'Active page: '        ; 17 characters
+;
+;
+  ; Padding and magic number
+    times 510-($-$$) db 0
+    dw 0xaa55
