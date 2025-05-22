@@ -5,8 +5,12 @@
 ; This is loaded from the second disk sector by boot.bin
 ; ==================================================================
 
+; %include "../fs.inc"
+
 [BITS 16]
 [ORG 500h]
+
+%include "fs.inc"
 
 start:
     cli
@@ -327,10 +331,10 @@ print_OS_info:
 start_writer:
     pusha
     mov ah, 0x02
-    mov al, 2
+    mov al, SIZE_WRITER
     mov ch, 0
     mov dh, 0
-    mov cl, 11
+    mov cl, START_WRITER
     mov bx, 800h
     int 0x13
     jc .disk_error
@@ -346,10 +350,10 @@ start_writer:
 start_brainf:
     pusha
     mov ah, 0x02
-    mov al, 2
+    mov al, SIZE_BRAINF
     mov ch, 0
     mov dh, 0
-    mov cl, 14
+    mov cl, START_BRAINF
     mov bx, 800h
     int 0x13
     jc .disk_error
@@ -365,10 +369,10 @@ start_brainf:
 start_barchart:
     pusha
     mov ah, 0x02
-    mov al, 1
+    mov al, SIZE_BARCHART
     mov ch, 0
     mov dh, 0
-    mov cl, 17
+    mov cl, START_BARCHART
     mov bx, 800h
     int 0x13
     jc .disk_error
@@ -384,10 +388,10 @@ start_barchart:
 start_snake:
     pusha
     mov ah, 0x02
-    mov al, 2
+    mov al, SIZE_SNAKE
     mov ch, 0
     mov dh, 0
-    mov cl, 18
+    mov cl, START_SNAKE
     mov bx, 800h
     int 0x13
     jc .disk_error
@@ -403,10 +407,10 @@ start_snake:
 start_calc:
     pusha
     mov ah, 0x02
-    mov al, 2
+    mov al, SIZE_CALC
     mov ch, 0
     mov dh, 0
-    mov cl, 20
+    mov cl, START_CALC
     mov bx, 800h
     int 0x13
     jc .disk_error
@@ -422,10 +426,10 @@ start_calc:
 start_disk_tools:
     push bx
     mov ah, 0x02
-    mov al, 4
+    mov al, SIZE_DISK_TOOLS
     mov ch, 0
     mov dh, 0
-    mov cl, 22
+    mov cl, START_DISK_TOOLS
     mov bx, 800h
     int 0x13
     jc .disk_error
@@ -464,10 +468,10 @@ start_mine:
     int 0x10
     pusha
     mov ah, 0x02
-    mov al, 1
+    mov al, SIZE_MINE
     mov ch, 0
     mov dh, 0
-    mov cl, 36
+    mov cl, START_MINE
     mov bx, 900h
     int 0x13
     jc .disk_error
@@ -485,10 +489,10 @@ start_memory:
     int 0x10
     pusha
     mov ah, 0x02
-    mov al, 1
+    mov al, SIZE_MEMORY
     mov ch, 0
     mov dh, 0
-    mov cl, 37
+    mov cl, START_MEMORY
     mov bx, 900h ; I use specical program offset. It doesn't work any other way. Idk why
     int 0x13
     jc .disk_error
@@ -504,10 +508,10 @@ start_memory:
 start_space:
     pusha
     mov ah, 0x02
-    mov al, 3
+    mov al, SIZE_SPACE
     mov ch, 0
     mov dh, 0
-    mov cl, 38
+    mov cl, START_SPACE
     mov bx, 900h
     int 0x13
     jc .disk_error
@@ -523,10 +527,10 @@ start_space:
 start_piano:
     pusha
     mov ah, 0x02
-    mov al, 4
+    mov al, SIZE_PIANO
     mov ch, 0
     mov dh, 0
-    mov cl, 41
+    mov cl, START_PIANO
     mov bx, 900h
     int 0x13
     jc .disk_error
@@ -1298,7 +1302,7 @@ menu db 0xC9, 47 dup(0xCD), 0xBB, 10, 13  ; ╔═══════════
      db 0xBA, '  memory - memory viewer program               ', 0xBA, 10, 13
      db 0xBA, '  space - space arcade game (by Qwez)          ', 0xBA, 10, 13
      db 0xBA, '  piano - simple piano program                 ', 0xBA, 10, 13
-     db 0xC0, 47 dup(0xCD), 0xBC, 10, 13  ; ╚═══════════════════════════════════════════════╝
+     db 0xC8, 47 dup(0xCD), 0xBC, 10, 13  ; ╚══════════════════════════════════════════════╝
      db 0
 
 ; ------ About OS ------
@@ -1306,13 +1310,13 @@ info db 10, 13
      db 0xC9, 46 dup(0xCD), 0xBB, 10, 13  ; ╔══════════════════════════════════════════════╗
      db 0xBA, '  x16 PRos is the simple 16 bit operating     ', 0xBA, 10, 13  ; ║ ... ║
      db 0xBA, '  system written in NASM for x86 PC`s         ', 0xBA, 10, 13
-     db 0xC3, 46 dup(0xC4), 0xB4, 10, 13  ; ╠══════════════════════════════════════════════╣
+     db 0xC7, 46 dup(0xC4), 0xB6, 10, 13  ; ╟──────────────────────────────────────────────╢
      db 0xBA, '  Autor: PRoX (https://github.com/PRoX2011)   ', 0xBA, 10, 13
      db 0xBA, '  Amount of disk sectors: 50                  ', 0xBA, 10, 13
      db 0xBA, '  Video mode: 0x12 (640x480; 16 colors)       ', 0xBA, 10, 13
      db 0xBA, '  License: MIT                                ', 0xBA, 10, 13
      db 0xBA, '  OS version: 0.3.7 (Graphic & Sound)         ', 0xBA, 10, 13
-     db 0xC0, 46 dup(0xCD), 0xBC, 10, 13  ; ╚══════════════════════════════════════════════╝
+     db 0xC8, 46 dup(0xCD), 0xBC, 10, 13  ; ╚══════════════════════════════════════════════╝
      db 0
 
 ; ------ Comands -------
