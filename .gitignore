@@ -1,4 +1,4 @@
 bin/
 build/
-.t/
 fs.inc
+.vscode
