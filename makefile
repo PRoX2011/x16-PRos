@@ -35,8 +35,8 @@ BIN_KERNEL=$(OBJ_KERNEL:.o=.bin)
 OBJ_BOOT=$(SRC_BOOT:%.asm=$(BUILD_DIR)/boot/%.o)
 BIN_BOOT=$(OBJ_BOOT:.o=.bin)
 
-OBJS_PROGS=$(SRCS_PROGS:%.asm=$(BUILD_DIR)/%.o)
-BINS_PROGS=$(OBJS_PROGS:.o=.bin)
+OBJS_PROGS=$(SRCS_PROGS:%.asm=$(BUILD_DIR)/%.o) $(BUILD_DIR)/ILM.o
+BINS_PROGS=$(OBJS_PROGS:.o=.bin) 
 
 
 
@@ -80,11 +80,16 @@ $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.o | $(FS_POINTS)
 	$(eval CURRENT_POINT = $(shell echo $$(($(SIZE) + $(CURRENT_POINT) ))))
 
 
-$(BUILD_DIR)/%.o: $(SRC_PROGS_DIR)/%.asm | align-file.sh
-	mkdir -p $(dir $@)
+$(BUILD_DIR)/ILM.o: bin/ILM.o | $(BUILD_DIR)
+	cp bin/ILM.o $(BUILD_DIR)/ILM.o
+
+$(BUILD_DIR)/%.o: $(SRC_PROGS_DIR)/%.asm | align-file.sh $(BUILD_DIR)
 	$(AS) $(ASFLAGS) -o $@ $<
 	./align-file.sh $@
 
+
+$(BUILD_DIR):
+	mkdir -p $@
 
 
 $(FS_POINTS):
@@ -96,7 +101,7 @@ run: $(IMG_PATH)
 
 
 clean: clean_img clean_bin
-	rm $(FS_POINTS)
+	rm -f $(FS_POINTS)
 
 clean_img:
 	rm -rf disk_img/x16pros.img

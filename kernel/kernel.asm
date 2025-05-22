@@ -447,10 +447,10 @@ start_BASIC:
     int 0x10
     pusha
     mov ah, 0x02
-    mov al, 9
+    mov al, SIZE_ILM
     mov ch, 0
     mov dh, 0
-    mov cl, 27
+    mov cl, START_ILM
     mov bx, 800h
     int 0x13
     jc .disk_error
