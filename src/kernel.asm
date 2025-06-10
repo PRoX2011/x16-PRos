@@ -1298,7 +1298,7 @@ menu db 0xC9, 47 dup(0xCD), 0xBB, 10, 13  ; ╔═══════════
      db 0xBA, '  memory - memory viewer program               ', 0xBA, 10, 13
      db 0xBA, '  space - space arcade game (by Qwez)          ', 0xBA, 10, 13
      db 0xBA, '  piano - simple piano program                 ', 0xBA, 10, 13
-     db 0xC0, 47 dup(0xCD), 0xBC, 10, 13  ; ╚═══════════════════════════════════════════════╝
+     db 0xC8, 47 dup(0xCD), 0xBC, 10, 13  ; ╚═══════════════════════════════════════════════╝
      db 0
 
 ; ------ About OS ------
@@ -1306,13 +1306,13 @@ info db 10, 13
      db 0xC9, 46 dup(0xCD), 0xBB, 10, 13  ; ╔══════════════════════════════════════════════╗
      db 0xBA, '  x16 PRos is the simple 16 bit operating     ', 0xBA, 10, 13  ; ║ ... ║
      db 0xBA, '  system written in NASM for x86 PC`s         ', 0xBA, 10, 13
-     db 0xC3, 46 dup(0xC4), 0xB4, 10, 13  ; ╠══════════════════════════════════════════════╣
+     db 0xC7, 46 dup(0xC4), 0xB6, 10, 13  ; ╠══════════════════════════════════════════════╣
      db 0xBA, '  Autor: PRoX (https://github.com/PRoX2011)   ', 0xBA, 10, 13
      db 0xBA, '  Amount of disk sectors: 50                  ', 0xBA, 10, 13
      db 0xBA, '  Video mode: 0x12 (640x480; 16 colors)       ', 0xBA, 10, 13
      db 0xBA, '  License: MIT                                ', 0xBA, 10, 13
      db 0xBA, '  OS version: 0.3.7 (Graphic & Sound)         ', 0xBA, 10, 13
-     db 0xC0, 46 dup(0xCD), 0xBC, 10, 13  ; ╚══════════════════════════════════════════════╝
+     db 0xC8, 46 dup(0xCD), 0xBC, 10, 13  ; ╚══════════════════════════════════════════════╝
      db 0
 
 ; ------ Comands -------
