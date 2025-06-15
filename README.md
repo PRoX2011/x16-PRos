@@ -6,7 +6,7 @@
   [![Version](https://img.shields.io/badge/version-0.4.9-blue.svg)](#)
   [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](#)
 
-  <img src="https://github.com/PRoX2011/x16-PRos/raw/main/preview.gif" width="65%">
+  <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/assets/preview.gif" width="65%">
   
 
   **x16-PRos**
@@ -133,7 +133,7 @@ Here's how you can add a program:
 mcopy -i disk_img/x16pros.img PROGRAM.BIN ::/
 ```
 
-Also, PRos has its own API for software developers. See **doc/API.md**
+Also, PRos has its own API for software developers. See **docs/API.md**
 
 You can read more about the software development process for x16-PRos on the project website:
 [x16-PRos website](https://x16-pros.netlify.app/)
