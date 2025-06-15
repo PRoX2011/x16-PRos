@@ -932,7 +932,7 @@ menu db 0xC9, 76 dup(0xCD), 0xBB, 10, 13
      db 0xBA, ' Information Commands:                                                      ', 0xBA, 10, 13
      db 0xBA, '   help          Display this command menu                                  ', 0xBA, 10, 13
      db 0xBA, '   info          Show system information                                    ', 0xBA, 10, 13
-     db 0xBA, '   ver           Display PRos version                                       ', 0xBA, 10, 13
+     db 0xBA, '   ver           Display PRos terminal version                              ', 0xBA, 10, 13
      db 0xBA, '   cpu           Display CPU details                                        ', 0xBA, 10, 13
      db 0xBA, '   date          Show current date (DD/MM/YY)                               ', 0xBA, 10, 13
      db 0xBA, '   time          Show current time (HH:MM:SS)                               ', 0xBA, 10, 13
