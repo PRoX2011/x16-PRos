@@ -17,17 +17,17 @@ start:
     mov ss, ax
     mov sp, 0xFFFE
 
-    call set_video_mode  ; Stting up videomode
+    call set_video_mode  ; Setting up videomode
 
     sti 
 
     cld
 
     mov ax, 2000h
-	mov ds, ax
-	mov es, ax
-	mov fs, ax
-	mov gs, ax
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
 
     ; Set up frequency (1193180 Hz / 1193 = ~1000 Hz)
     mov al, 0xB6
@@ -915,34 +915,37 @@ string_string_parse:
 %INCLUDE "src/kernel/features/api/api_string.asm"
 ; =================
 
-
 ; ===================== Data Section =====================
 
 ; ------ Header ------
 header db '============================= x16 PRos v0.4 ====================================', 0
 
 ; ------ Help menu ------
-menu db 0xC9, 47 dup(0xCD), 0xBB, 10, 13
-     db 0xBA, 'Commands:                                      ', 0xBA, 10, 13
-     db 0xBA, '  help - get list of the commands              ', 0xBA, 10, 13
-     db 0xBA, '  info - print system information              ', 0xBA, 10, 13
-     db 0xBA, '  ver - print PRos terminal version            ', 0xBA, 10, 13
-     db 0xBA, '  cls - clear terminal                         ', 0xBA, 10, 13
-     db 0xBA, '  shut - shutdown PC                           ', 0xBA, 10, 13
-     db 0xBA, '  reboot - restart system                      ', 0xBA, 10, 13
-     db 0xBA, '  date - print current date (DD/MM/YY)         ', 0xBA, 10, 13
-     db 0xBA, '  time - print current time (HH:MM:SS)         ', 0xBA, 10, 13
-     db 0xBA, '  cpu - print CPU info                         ', 0xBA, 10, 13
-     db 0xBA, '  dir - list files on disk                     ', 0xBA, 10, 13
-     db 0xBA, '  cat <filename> - display file contents       ', 0xBA, 10, 13
-     db 0xBA, '  del <filename> - delete a file               ', 0xBA, 10, 13
-     db 0xBA, '  copy <filename1> <filename2> - copy a file   ', 0xBA, 10, 13
-     db 0xBA, '  ren <filename1> <filename2> - rename a file  ', 0xBA, 10, 13
-     db 0xBA, '  size <filename> - get file size              ', 0xBA, 10, 13
-     db 0xBA, '  touch <filename> - create an empty file      ', 0xBA, 10, 13
-     db 0xBA, '  write <filename> <text> - write text to file ', 0xBA, 10, 13
-     db 0xBA, '  exit - exit to boot loader                   ', 0xBA, 10, 13
-     db 0xC0, 47 dup(0xCD), 0xBC, 10, 13, 0
+menu db 0xC9, 76 dup(0xCD), 0xBB, 10, 13
+     db 0xBA, ' x16 PRos Commands Manual   ', 48 dup(' '), 0xBA, 10, 13
+     db 0xC7, 76 dup(0xC4), 0xB6, 10, 13
+     db 0xBA, ' System Commands:                                                           ', 0xBA, 10, 13
+     db 0xBA, '   cls           Clear the terminal screen                                  ', 0xBA, 10, 13
+     db 0xBA, '   shut          Power off the system                                       ', 0xBA, 10, 13
+     db 0xBA, '   reboot        Restart the system                                         ', 0xBA, 10, 13
+     db 0xBA, '   exit          Return to boot loader                                      ', 0xBA, 10, 13
+     db 0xBA, ' Information Commands:                                                      ', 0xBA, 10, 13
+     db 0xBA, '   help          Display this command menu                                  ', 0xBA, 10, 13
+     db 0xBA, '   info          Show system information                                    ', 0xBA, 10, 13
+     db 0xBA, '   ver           Display PRos version                                       ', 0xBA, 10, 13
+     db 0xBA, '   cpu           Display CPU details                                        ', 0xBA, 10, 13
+     db 0xBA, '   date          Show current date (DD/MM/YY)                               ', 0xBA, 10, 13
+     db 0xBA, '   time          Show current time (HH:MM:SS)                               ', 0xBA, 10, 13
+     db 0xBA, ' File Operations:                                                           ', 0xBA, 10, 13
+     db 0xBA, '   dir           List files on disk                                         ', 0xBA, 10, 13
+     db 0xBA, '   cat <file>    Display file contents                                      ', 0xBA, 10, 13
+     db 0xBA, '   size <file>   Show file size in bytes                                    ', 0xBA, 10, 13
+     db 0xBA, '   touch <file>  Create an empty file                                       ', 0xBA, 10, 13
+     db 0xBA, '   del <file>    Delete a file                                              ', 0xBA, 10, 13
+     db 0xBA, '   ren <f1> <f2> Rename a file                                              ', 0xBA, 10, 13
+     db 0xBA, '   copy <f1> <f2> Copy a file                                               ', 0xBA, 10, 13
+     db 0xBA, '   write <file> <text> Write text to a file                                 ', 0xBA, 10, 13
+     db 0xC0, 76 dup(0xCD), 0xBC, 10, 13, 0
 
 ; ------ About OS ------
 info db 10, 13
