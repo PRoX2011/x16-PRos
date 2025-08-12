@@ -219,7 +219,7 @@ setx PATH "%PATH%;C:\Program Files\NASM;C:\Program Files\qemu"
 4. Run the build script:
 
 ```batch
-build-windows.bat
+build.ps1
 ```
 
 **Note**: Make sure to restart your terminal or IDE after modifying the PATH variable.
