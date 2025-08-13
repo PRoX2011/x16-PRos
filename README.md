@@ -179,7 +179,7 @@ To launch x16 PRos, use emulators such as **QEMU**,**Bochs** or online emulator 
 Example command for **QEMU**:
 
 ```bash
-qemu-system-i386 -audiodev pa,id=snd0 -machine pcspk-audiodev=snd0 -hda disk_img/x16pros.img
+qemu-system-x86_64 -audiodev pa,id=snd0 -machine pcspk-audiodev=snd0 -hda disk_img/x16pros.img
 ```
 
 or
@@ -189,6 +189,13 @@ or
 chmod +x run.sh
 ./run.sh
 ```
+
+> [!NOTE]  
+> To run the emulator with audio support in Arch Linux, install the `qemu-audio-pa` package for PulseAudio:
+> ```bash
+> sudo pacman -S qemu-audio-pa
+> ```
+
 
 You can also try running x16-PRos on a **real PC** (preferably with BIOS, not UEFI)
 
