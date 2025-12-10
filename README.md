@@ -271,3 +271,5 @@ For more details, refer to the full text of the MIT License (LICENSE.TXT).
 <a href="https://www.donationalerts.com/r/proxdev">
   <img src="https://img.shields.io/badge/Support%20me-blue.svg?style=for-the-badge&logoWidth=40&labelWidth=100&fontSize=20" height="35">
 </a>
+
+0.5 will be released soon: December 15th
