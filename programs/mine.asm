@@ -1,3 +1,10 @@
+; ==================================================================
+; x16-PRos -- MINE. Minesweeper game.
+; Copyright (C) 2025 PRoX2011
+;
+; Made by PRoX-dev
+; =================================================================
+
 [BITS 16]
 [ORG 0x8000]
 
@@ -17,6 +24,7 @@
 %assign Key.ScanCode.Right 0x4d
 %assign Key.ScanCode.Enter 0x1c
 %assign Key.Ascii.RestartGame 'r'
+%assign Key.Ascii.Esc 0x1b      ; Добавлен код ESC
 
 %define VgaChar(color, ascii) (((color) << 8) | (ascii))
 
@@ -30,11 +38,25 @@
 %assign BombFreq 0b111
 
 Mine:
+  mov ah, 0x01
+  mov si, help_msg
+  int 0x21
+
+  mov ah, 0x01
+  mov si, any_key_msg
+  int 0x21
+
+  mov ah, 0x05
+  int 0x21
+
+  mov ah, 0
+  int 16h
+
   ; Setting up videomode
-  xor ax, ax
+  mov ax, 0x01
   int 0x10
 
-  ; Setting up cursot
+  ; Setting up cursor
   mov ah, 0x01
   mov ch, 0x3f
   int 0x10
@@ -79,7 +101,7 @@ PopulateTextBuf:
   mov byte [di], '*'
 .LoopDir:
   push di
-  movsx ax, byte [bp + Dirs - 1]
+  movsx ax, byte [cs:bp + Dirs - 1] 
   add di, ax
   mov al, [di]
   cmp al, '*'
@@ -98,6 +120,10 @@ mov dl, Color.Veiled
 GameLoop:
   xor ax, ax
   int 0x16
+  
+  cmp al, Key.Ascii.Esc
+  je ExitGame
+
   call GetTextBufIndex
   mov [di + 1], dl
 
@@ -273,5 +299,25 @@ WaitRestart:
   xor ax, ax
   int 0x16
   cmp al, Key.Ascii.RestartGame
-  jne WaitRestart
-  jmp RunGame                                                                                        
+  je RunGame
+  cmp al, Key.Ascii.Esc
+  je ExitGame
+  jmp WaitRestart
+
+ExitGame:
+  mov ax, 0x12 
+  int 0x10
+  ret
+
+help_msg    db 0xC9, 51 dup(0xCD), 0xBB, 10, 13
+            db 0xBA, '  PRos minesweeper                                 ', 0xBA, 10, 13
+            db 0xC3, 51 dup(0xC4), 0xB4, 10, 13
+            db 0xBA, '  ARROWS   - move the cursor                       ', 0xBA, 10, 13
+            db 0xBA, '  SPACE    - open the cage on the field            ', 0xBA, 10, 13
+            db 0xBA, '  ENTER    - place a flag                          ', 0xBA, 10, 13
+            db 0xBA, '  R        - restart the game                      ', 0xBA, 10, 13
+            db 0xC3, 51 dup(0xC4), 0xB4, 10, 13
+            db 0xBA, '  Press ESC to quit                                ', 0xBA, 10, 13
+            db 0xC0, 51 dup(0xCD), 0xBC, 10, 13, 0
+
+any_key_msg db 'Press any key to start the game...', 10, 12, 0

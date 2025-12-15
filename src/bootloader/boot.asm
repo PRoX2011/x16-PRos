@@ -7,7 +7,7 @@
 ; ==================================================================
 
 [BITS 16]
-[ORG 0x0]
+[ORG 0x0000]
 
 start: jmp main
 
@@ -33,25 +33,25 @@ start: jmp main
 ; bsVolumeLabel        - 11-byte volume label
 ; bsFileSystem         - 8-byte filesystem type
 
-bpbOEM db "x16-PRos"
-bpbBytesPerSector DW 512
+bpbOEM               DB "x16-PROS"
+bpbBytesPerSector    DW 512
 bpbSectorsPerCluster DB 1
-bpbReservedSectors DW 1
-bpbNumberOfFATs DB 2
-bpbRootEntries DW 224
-bpbTotalSectors DW 2880
-bpbMedia DB 0xf0
-bpbSectorsPerFAT DW 9
-bpbSectorsPerTrack DW 18
-bpbHeadsPerCylinder DW 2
-bpbHiddenSectors DD 0
-bpbTotalSectorsBig DD 0
-bsDriveNumber DB 0
-bsUnused DB 0
-bsExtBootSignature DB 0x29
-bsSerialNumber DD 0xa0a1a2a3
-bsVolumeLabel DB "FLOPPY "
-bsFileSystem DB "FAT12   "
+bpbReservedSectors   DW 1
+bpbNumberOfFATs      DB 2
+bpbRootEntries       DW 224
+bpbTotalSectors      DW 2880
+bpbMedia             DB 0xf0
+bpbSectorsPerFAT     DW 9
+bpbSectorsPerTrack   DW 18
+bpbHeadsPerCylinder  DW 2
+bpbHiddenSectors     DD 0
+bpbTotalSectorsBig   DD 0
+bsDriveNumber        DB 0
+bsUnused             DB 0
+bsExtBootSignature   DB 0x29
+bsSerialNumber       DD 0x00000000
+bsVolumeLabel        DB "x16-PROS   "
+bsFileSystem         DB "FAT12   "
 
 ; ===================================================================
 
@@ -129,8 +129,8 @@ main:
     mov ax, 0x07C0
     mov ds, ax
     mov es, ax
-    mov fs, ax
-    mov gs, ax
+    ;mov fs, ax
+    ;mov gs, ax
     mov ax, 0x0000
     mov ss, ax
     mov sp, 0xFFFF

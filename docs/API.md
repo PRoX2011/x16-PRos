@@ -170,7 +170,7 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
   file count.
 - **Input**:
     - `AH` = 0x01
-    - `SI` = Pointer to buffer for storing the file list (comma-separated, null-terminated)
+    - `AX` = Pointer to buffer for storing the file list (comma-separated, null-terminated)
 - **Output**:
     - `BX` = Low word of total file size (in bytes)
     - `CX` = High word of total file size (32-bit size)
@@ -186,7 +186,7 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Description**: Loads a file from the disk into memory at a specified address.
 - **Input**:
     - `AH` = 0x02
-    - `SI` = Pointer to null-terminated filename (8.3 format)
+    - `AX` = Pointer to null-terminated filename (8.3 format)
     - `CX` = Memory address to load the file
 - **Output**:
     - `BX` = File size (in bytes)
@@ -201,7 +201,7 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Description**: Writes data from a memory buffer to a file, creating it if it doesn’t exist.
 - **Input**:
     - `AH` = 0x03
-    - `SI` = Pointer to null-terminated filename (8.3 format)
+    - `AX` = Pointer to null-terminated filename (8.3 format)
     - `BX` = Pointer to data buffer
     - `CX` = Size of data to write (in bytes)
 - **Output**: Carry flag set on error
@@ -214,7 +214,7 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Description**: Checks if a file exists in the root directory.
 - **Input**:
     - `AH` = 0x04
-    - `SI` = Pointer to null-terminated filename (8.3 format)
+    - `AX` = Pointer to null-terminated filename (8.3 format)
 - **Output**: Carry flag cleared if file exists, set if not found
 - **Preserves**: All registers
 - **Error Handling**: Sets CF if the file is not found or the filename is invalid
@@ -225,7 +225,7 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Description**: Creates an empty file in the root directory.
 - **Input**:
     - `AH` = 0x05
-    - `SI` = Pointer to null-terminated filename (8.3 format)
+    - `AX` = Pointer to null-terminated filename (8.3 format)
 - **Output**: Carry flag set on error
 - **Preserves**: All registers
 - **Error Handling**: Sets CF if the filename is invalid, the file already exists, or the root directory is full
@@ -236,7 +236,7 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Description**: Deletes a file by marking its directory entry as deleted and freeing its clusters.
 - **Input**:
     - `AH` = 0x06
-    - `SI` = Pointer to null-terminated filename (8.3 format)
+    - `AX` = Pointer to null-terminated filename (8.3 format)
 - **Output**: Carry flag set on error
 - **Preserves**: All registers
 - **Error Handling**: Sets CF if the file is not found or disk write fails
@@ -247,7 +247,7 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Description**: Renames a file by updating its directory entry.
 - **Input**:
     - `AH` = 0x07
-    - `SI` = Pointer to null-terminated old filename (8.3 format)
+    - `AX` = Pointer to null-terminated old filename (8.3 format)
     - `BX` = Pointer to null-terminated new filename (8.3 format)
 - **Output**: Carry flag set on error
 - **Preserves**: All registers
@@ -259,7 +259,7 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Description**: Retrieves the size of a file from its directory entry.
 - **Input**:
     - `AH` = 0x08
-    - `SI` = Pointer to null-terminated filename (8.3 format)
+    - `AX` = Pointer to null-terminated filename (8.3 format)
 - **Output**:
     - `BX` = File size (in bytes)
     - Carry flag set on error
@@ -505,5 +505,4 @@ information retrieval (time and date). It uses interrupt `0x23` and is initializ
 The x16-PRos operating system and its API are licensed under the MIT License. See the LICENSE.TXT for details.
 
 **Author**: PRoX (https://github.com/PRoX2011)  
-
 **Version**: 0.4  

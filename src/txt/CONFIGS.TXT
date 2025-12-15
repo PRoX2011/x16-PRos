@@ -1,0 +1,28 @@
+============================================================================
+
+In addition to regular files, PROS also contains configuration files. 
+They have the .CFG extension. The OS loads them at startup. 
+Deleting them is generally fine, but don't delete them anyway.
+
+  [USER.CFG]      - Stores a string with the username in encrypted form.
+
+  [PASSWORD.CFG]  - Stores a string containing the password. 
+                    This is an encrypted file. If you try to modify it, 
+                    the password will be incorrect during the login process. 
+                    If you want to change the password,
+                    re-run the SETUP.BIN program.
+
+  [PROMPT.CFG]    - Defines the command-line prompt style.
+                    Supports $username for username and 
+                    %XX for ASCII chars (e.g., %3E = ">").
+
+  [TIMEZONE.CFG]  - Stores UTC offset (e.g., "3" for UTC+3).
+
+  [FIRST_B.CFG]   - Tracks first boot ("1" = first, "0" = normal).
+                    
+  [THEME.CFG]     - Defines the RGB codes for every color in PRos Terminal
+                    and PRos programs
+
+
+
+============================================================================

@@ -1,0 +1,28 @@
+============================================================================
+
+  [AUTOEXEC.BIN] - A program that runs automatically when the OS starts
+  [WRITER.BIN]   - Simple editor for text files
+  [BCHART.BIN]   - Barchart software for creating simple diagrams
+  [BRAINF.BIN]   - Brainfuck interpreter
+  [HELLO.BIN]    - "hello, world" program
+  [MINE.BIN]     - Minesweeper game
+  [PIANO.BIN]    - Simple piano to play simple melodies using PC Speaker
+  [PROCENTC.BIN] - Precentages calculator
+  [SPACE.BIN]    - Space arcade game
+  [CALC.BIN]     - Simple calculator
+  [MEMORY.BIN]   - Memory viewer
+  [HEXEDIT.BIN]  - Hex editor
+  [PAINT.BIN]    - Paint program
+  [PONG.BIN]     - Pong game
+  [SNAKE.BIN]    - Snake game
+  [CREDITS.BIN]  - Special thanks
+  [FETCH.BIN]    - Print system fetch (I use PRos btw)
+  [IMFPLAY.BIN]  - IMf music player
+  [CLOCK.BIN]    - Clock
+
+You can create your own programs using NASM and PRos API. 
+
+Learn more: https://x16-pros.netlify.app/
+            https://github.com/PRoX2011/x16-PRos/blob/main/docs/API.md
+
+============================================================================

@@ -6,7 +6,7 @@
 ; -----------------------------
 ; Turns on PC speaker
 ; IN  : Nothing
-on_pc_speaker:
+turn_on_pc_speaker:
     pusha
     in al, 0x61
     or al, 0x03
@@ -17,7 +17,7 @@ on_pc_speaker:
 ; -----------------------------
 ; Turns off PC speaker
 ; IN  : Nothing
-off_pc_speaker:
+turn_off_pc_speaker:
     pusha
     in al, 0x61
     and al, 0xFC
@@ -37,9 +37,9 @@ play_melody:
     mov dx, [si+2]
     add si, 4
     call set_frequency
-    call on_pc_speaker
+    call turn_on_pc_speaker
     call delay_ms
-    call off_pc_speaker
+    call turn_off_pc_speaker
     jmp .next_note
 .done:
     popa

@@ -50,8 +50,8 @@ api_string_init:
 ; OUT : Per function (e.g., AX for string_length, DL/DH for get_cursor_pos)
 ; Preserves: All registers unless specified in function
 int23_handler:
-    pusha
     pushf                       ; Save flags (for carry flag)
+    pusha
     cmp ah, 0x00
     je .init
     cmp ah, 0x01
@@ -94,50 +94,34 @@ int23_handler:
     jmp .done
 
 .string_length:
-    mov word [.tmp_ax], ax      ; Save string pointer
     call string_string_length
-    mov word [.tmp_ax], ax      ; Save length
     jmp .done
 
 .string_uppercase:
-    mov word [.tmp_ax], ax      ; Save string pointer
     call string_string_uppercase
     jmp .done
 
 .string_copy:
-    mov word [.tmp_si], si      ; Save source
-    mov word [.tmp_di], di      ; Save destination
     call string_string_copy
     jmp .done
 
 .string_chomp:
-    mov word [.tmp_ax], ax      ; Save string pointer
     call string_string_chomp
     jmp .done
 
 .string_compare:
-    mov word [.tmp_si], si      ; Save string1
-    mov word [.tmp_di], di      ; Save string2
     call string_string_compare
     jmp .done
 
 .string_strincmp:
-    mov word [.tmp_si], si      ; Save string1
-    mov word [.tmp_di], di      ; Save string2
-    mov byte [.tmp_cl], cl      ; Save length
     call string_string_strincmp
     jmp .done
 
 .string_tokenize:
-    mov word [.tmp_si], si      ; Save string
-    mov byte [.tmp_al], al      ; Save delimiter
     call string_string_tokenize
-    mov word [.tmp_di], di      ; Save next token
-    mov word [.tmp_si], si      ; Save updated SI
     jmp .done
 
 .string_input:
-    mov word [.tmp_ax], ax      ; Save buffer
     call string_input_string
     jmp .done
 
@@ -146,72 +130,34 @@ int23_handler:
     jmp .done
 
 .get_time_string:
-    mov word [.tmp_bx], bx      ; Save buffer
     call string_get_time_string
     jmp .done
 
 .get_date_string:
-    mov word [.tmp_bx], bx      ; Save buffer
     call string_get_date_string
     jmp .done
 
 .bcd_to_int:
-    mov byte [.tmp_al], al      ; Save BCD
     call string_bcd_to_int
-    mov byte [.tmp_al], al      ; Save integer
     jmp .done
 
 .int_to_string:
-    mov word [.tmp_ax], ax      ; Save integer
     call string_int_to_string
-    mov word [.tmp_ax], ax      ; Save string pointer
     jmp .done
 
 .get_cursor_pos:
     call string_get_cursor_pos
-    mov byte [.tmp_dl], dl      ; Save column
-    mov byte [.tmp_dh], dh      ; Save row
     jmp .done
 
 .move_cursor:
-    mov byte [.tmp_dl], dl      ; Save column
-    mov byte [.tmp_dh], dh      ; Save row
     call string_move_cursor
     jmp .done
 
 .string_parse:
-    mov word [.tmp_si], si      ; Save string
     call string_string_parse
-    mov word [.tmp_ax], ax      ; Save token1
-    mov word [.tmp_bx], bx      ; Save token2
-    mov word [.tmp_cx], cx      ; Save token3
-    mov word [.tmp_dx], dx      ; Save token4
     jmp .done
 
 .done:
-    ; Restore return values
-    mov ax, word [.tmp_ax]
-    mov bx, word [.tmp_bx]
-    mov cx, word [.tmp_cx]
-    mov dx, word [.tmp_dx]
-    mov si, word [.tmp_si]
-    mov di, word [.tmp_di]
-    mov cl, byte [.tmp_cl]
-    mov al, byte [.tmp_al]
-    mov dl, byte [.tmp_dl]
-    mov dh, byte [.tmp_dh]
-    popf                        ; Restore flags (including carry)
     popa
+    popf                        ; Restore flags (including carry)
     iret
-
-; Temporary storage for register values
-.tmp_ax dw 0
-.tmp_bx dw 0
-.tmp_cx dw 0
-.tmp_dx dw 0
-.tmp_si dw 0
-.tmp_di dw 0
-.tmp_cl db 0
-.tmp_al db 0
-.tmp_dl db 0
-.tmp_dh db 0

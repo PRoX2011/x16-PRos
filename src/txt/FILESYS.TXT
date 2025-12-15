@@ -1,0 +1,28 @@
+============================================================================
+
+PRos uses the FAT12 file system. You can name your files in the 8.3 format:
+  [8] - file name
+  [3] - file extension
+The following characters cannot be used in file names: \ / : * ? " < > |
+The maximum file size for reading in PRos is 32768 bytes (32 KB)
+
+Supported file types:
+
+  [.BIN] - Executable files (programs). They are started by entering the 
+           name of the executable file with or without an extension into
+           the terminal.
+
+  [.TXT] - Text files. Contain plain text. Can be displayed using the 
+           CAT command.
+
+  [.BMP] - Raster image. Can be displayed using the VIEW command. 
+           Maximum resolution - [320x240]. 
+           Number of supported colors - [256]
+
+  [.IMF] - Music files. Can be played using the PLAY command. 
+           You need ADlib sound card to listen IMF files.
+
+
+
+
+============================================================================

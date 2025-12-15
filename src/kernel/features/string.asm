@@ -235,6 +235,8 @@ string_clear_screen:
     mov ax, 0x12
     int 0x10
     popa
+    ; Load and aply theme from THEME.CFG file
+    call load_and_apply_theme
     ret
 
 string_get_time_string:
@@ -419,3 +421,168 @@ string_int_to_string:
     ret
 
 .t times 7 db 0
+
+; -----------------------------
+; Convert string to integer
+; IN  : SI = string location
+; OUT : AX = number
+string_to_int:
+    push bx
+    push cx
+    push dx
+    push si
+    
+    xor ax, ax
+    xor bx, bx
+    xor cx, cx
+    
+.convert_loop:
+    lodsb
+    cmp al, 0
+    je .done
+    cmp al, '0'
+    jb .invalid
+    cmp al, '9'
+    ja .invalid
+    
+    sub al, '0'
+    mov cl, al
+    mov ax, bx
+    mov dx, 10
+    mul dx
+    add ax, cx
+    mov bx, ax
+    jmp .convert_loop
+    
+.invalid:
+    mov bx, -1
+    
+.done:
+    mov ax, bx
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    ret
+
+parse_prompt:
+    push ax
+    push bx
+    push si
+    push di
+
+.loop:
+    lodsb               
+    cmp al, 0              
+    je .done
+    cmp al, '$'        
+    je .check_username
+    cmp al, '%'             
+    je .check_hex
+.store:
+    stosb        
+    jmp .loop
+
+.check_username:
+    ; Check for $username (next 8 bytes: 'u','s','e','r','n','a','m','e')
+    mov ax, [si]
+    cmp ax, 0x7375           ; 'u' (0x75), 's' (0x73) -> 0x7375
+    jne .store_dollar
+    mov ax, [si+2]
+    cmp ax, 0x7265           ; 'e' (0x65), 'r' (0x72) -> 0x7265
+    jne .store_dollar
+    mov ax, [si+4]
+    cmp ax, 0x616E           ; 'n' (0x6E), 'a' (0x61) -> 0x616E
+    jne .store_dollar
+    mov ax, [si+6]
+    cmp ax, 0x656D           ; 'm' (0x6D), 'e' (0x65) -> 0x656D
+    jne .store_dollar
+    add si, 8
+    push si
+    mov si, user
+.copy_user:
+    lodsb
+    cmp al, 0
+    je .user_done
+    stosb
+    jmp .copy_user
+.user_done:
+    pop si
+    jmp .loop
+
+.store_dollar:
+    mov al, '$'
+    stosb
+    jmp .loop
+
+.check_hex:
+    mov al, [si]    
+    cmp al, 0                
+    je .store_percent
+    inc si
+    mov ah, [si]     
+    cmp ah, 0                
+    je .store_percent
+    inc si               
+
+    call hex_char_to_nibble
+    jc .store_percent        
+    mov bl, al
+    shl bl, 4             
+
+    mov al, ah
+    call hex_char_to_nibble
+    jc .store_percent        
+    or bl, al     
+
+    mov al, bl
+    stosb
+    jmp .loop
+
+.store_percent:
+    mov al, '%'
+    stosb
+    dec si     
+    cmp ah, 0       
+    je .loop
+    dec si
+    jmp .loop
+
+.done:
+    mov byte [di], 0     
+    pop di
+    pop si
+    pop bx
+    pop ax
+    ret
+
+hex_char_to_nibble:
+    cmp al, '0'
+    jb .invalid
+    cmp al, '9'
+    jbe .digit
+    cmp al, 'A'
+    jb .invalid
+    cmp al, 'F'
+    jbe .uppercase
+    cmp al, 'a'
+    jb .invalid
+    cmp al, 'f'
+    jbe .lowercase
+.invalid:
+    stc
+    ret
+.digit:
+    sub al, '0'
+    clc
+    ret
+.uppercase:
+    sub al, 'A'
+    add al, 10
+    clc
+    ret
+.lowercase:
+    sub al, 'a'
+    add al, 10
+    clc
+    ret

@@ -1,275 +1,462 @@
 <div align="center">
 
-  <h1>x16-PRos operating system</h1>
+<img src="docs/assets/baner.jpg" width=100%>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#)
-[![Version](https://img.shields.io/badge/version-0.4.9-blue.svg)](#)
-[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](#)
+<h1>x16-PRos Operating System</h1>
 
-  <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/assets/preview.gif" width="65%">
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
+[![Version](https://img.shields.io/badge/version-0.5.3-blue.svg)](#)
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](#contributing)
 
+**A minimalistic 16-bit operating system written in NASM for x86 architecture**
 
-**x16-PRos**
-is a minimalistic 16-bit operating system written in NASM for x86 architecture. It supports a text interface, loading
-programs from disk, and basic
-system functions such as displaying CPU information, time, and date.
+[Website](https://x16-pros.netlify.app/) • [Programs Repository](https://github.com/PRoX2011/programs4pros/) • [API Documentation](docs/API.md)
 
- <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/screenshots/1.png" width="75%">
- 
+<img src="docs/screenshots/terminal.png" width=75%>
+
 ---
 
-<div align="center">
- <a href="https://x16-pros.netlify.app/">
-  <img src="https://img.shields.io/badge/x16%20PRos-web%20site-blue.svg?style=for-the-badge&logoWidth=40&labelWidth=100&fontSize=20" height="50">
-</a>
- <br>
-<a href="https://github.com/PRoX2011/programs4pros/">
-  <img src="https://img.shields.io/badge/Programs%20for%20PRos-red.svg?style=for-the-badge&logoWidth=40&labelWidth=100&fontSize=20" height="50">
-</a>
 </div>
 
 
+**x16-PRos** is a lightweight real-mode operating system designed for the x86 architecture and written entirely in NASM assembly. It features a command-line interface, supports the FAT12 file system, and includes a large standard software suite. This OS demonstrates fundamental operating system design principles, including booting, file system management, interrupt handling, and hardware interaction.
+
+Designed for simplicity and educational value, x16-PRos provides a platform for low-level programming enthusiasts to explore bare-metal development on x86 systems.
+
+
+<div style="display: flex; flex-direction: row; gap: 20px">
+  <img src="docs/screenshots/setup.png" width=45%>
+  <img src="docs/screenshots/file_managment.png" width=45%>
 </div>
-
----
-
-## 📋 Supported commands in x16 PRos terminal
-
-- **help** display list of commands
-- **info** brief system information
-- **cls** clear screen
-- **shut** shut down the system
-- **reboot** restart the system
-- **date** display date
-- **time** show time (UTC)
-- **CPU** CPU information
-- **dir** List files on disk
-- **cat <filename>** Display file contents
-- **del <filename>** Delete a file
-- **copy <filename1> <filename2>** Copy a file
-- **ren <filename1> <filename2>** Rename a file
-- **size <filename>** Get file size
-- **touch <filename>** Create an empty file
-- **write <filename> <text>** Write text to a file
-
----
-
-## 📦 x16 PRos Software Package
-
-Basic x16 PRos software package includes:
-
-<div align="center">
-  <table>
-    <tr>
-      <td align="center">
-        <strong>Notepad</strong><br>
-        <em>for writing and saving texts to disk sectors</em><br>
-        <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/screenshots/3.png" width="85%">
-      </td>
-      <td align="center">
-        <strong>Brainf IDE</strong><br>
-        <em>for working with Brainf*ck language</em><br>
-        <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/screenshots/4.png" width="85%">
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <strong>Barchart</strong><br>
-        <em>program for creating simple diagrams</em><br>
-        <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/screenshots/5.png" width="85%">
-      </td>
-      <td align="center">
-        <strong>Snake</strong><br>
-        <em>classic Snake game</em><br>
-        <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/screenshots/6.png" width="95%">
-      </td>
-    </tr>
-    <tr>
-      <td colspan="2" align="center">
-        <strong>Calc</strong><br>
-        <em>help with simple mathematical calculations</em><br>
-        <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/screenshots/7.png" width="57.5%">
-      </td>
-    </tr>
-   <tr>
-      <td align="center">
-        <strong>memory</strong><br>
-        <em>to view memory in real time</em><br>
-        <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/screenshots/10.png" width="85%">
-      </td>
-      <td align="center">
-        <strong>mine</strong><br>
-        <em>classic minesweeper game</em><br>
-        <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/screenshots/11.png" width="85%">
-      </td>
-    </tr>
-   <tr>
-      <td align="center">
-        <strong>piano</strong><br>
-        <em>to play simple melodies using PC Speaker</em><br>
-        <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/screenshots/12.png" width="85%">
-      </td>
-      <td align="center">
-        <strong>space</strong><br>
-        <em>space arcade game</em><br>
-        <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/screenshots/13.png" width="85%">
-      </td>
-    </tr>
-   <tr>
-    <td colspan="2" align="center">
-        <strong>Percentages</strong><br>
-        <em>percentages calculator</em><br>
-        <img src="https://github.com/PRoX2011/x16-PRos/raw/main/docs/screenshots/14.png" width="57.5%">
-      </td>
-   </tr>
-  </table>
+<br>
+<div style="display: flex; flex-direction: row; gap: 20px">
+  <img src="docs/screenshots/view_comand.png" width=45%>
+  <img src="docs/screenshots/password_screen.png" width=45%>
 </div>
 
 ---
 
-## 🛠 Adding programs
 
-x16 PRos includes a small set of built-in programs. You can add your own program to the system image, and then run it by
-entering the filename of your program in the terminal.
+## Key Features
 
-Here's how you can add a program:
+- **Encrypted Password System**: XOR-based password encryption with custom key
+- **User Authentication**: Login system with configurable user account
+- **Password Protection**: Encrypted PASSWORD.CFG prevents plaintext password storage
+- **Customizable Prompts**: User-defined command prompt via PROMPT.CFG
+- **Username Support**: Personalized user sessions stored in USER.CFG
+- **Color Themes**: Multiple color palettes (DEFAULT, GROOVYBOX, UBUNTU) and fully customizable THEME.CFG if 3 standard themes are not enough for you
+- **First-Boot Setup**: Automated SETUP.BIN execution on initial startup
+- **Auto-Execution**: AUTOEXEC.BIN support for startup scripts
+- **Mouse Driver**: Full PS/2 and USB mouse support
+- **Directory Support**: Create, delete, and navigate directories (MKDIR, DELDIR, CD)
+- **File Management**: Complete CRUD operations on files
+- **File Operations**: COPY, REN, DEL, TOUCH, WRITE commands
+- **File Inspection**: CAT, SIZE, HEAD, TAIL, GREP utilities
+- **BMP Image Viewer**: 256-color BMP rendering with 2x upscaling support
+- **Parameter Passing**: Command-line argument support for applications
+- **API Access**: Comprehensive kernel API for file, string, and output operations
+- **Debugging Tools**: CPU info display, memory viewer, register inspection
 
-```bash
-mcopy -i disk_img/x16pros.img PROGRAM.BIN ::/
+
+---
+
+## 🖥️ PRos Terminal
+
+The system includes a powerful terminal - **PRos Terminal**. It not only allows you to launch programs but also offers a wide range of built-in commands and utilities.
+
+<div style="display: flex; flex-direction: row; gap: 20px">
+  <img src="docs/screenshots/dir.png" width=45%>
+  <img src="docs/screenshots/fetch.png" width=45%>
+</div>
+<br>
+<div style="display: flex; flex-direction: row; gap: 20px">
+  <img src="docs/screenshots/help_menu.png" width=45%>
+  <img src="docs/screenshots/cpu_comand.png" width=45%>
+</div>
+
+#### Basic Commands
+| Command | Description |
+|---------|-------------|
+| `help` | Display categorized command reference with navigation |
+| `info` | Show system information and OS details |
+| `cls` | Clear terminal screen |
+| `ver` | Display PRos terminal version |
+| `exit` | Exit to bootloader |
+
+#### System Information
+| Command | Description |
+|---------|-------------|
+| `cpu` | Display detailed CPU information (family, model, cores, cache) |
+| `date` | Show current date (DD/MM/YY format) |
+| `time` | Show current time (HH:MM:SS format, UTC) |
+
+#### File Operations
+| Command | Syntax | Description |
+|---------|--------|-------------|
+| `dir` | `dir` | List files in current directory with size info |
+| `cat` | `cat <filename>` | Display file contents |
+| `size` | `size <filename>` | Show file size in bytes |
+| `del` | `del <filename>` | Delete a file (kernel.bin protected) |
+| `copy` | `copy <source> <dest>` | Copy file (root directory only) |
+| `ren` | `ren <old> <new>` | Rename file (root directory only) |
+| `touch` | `touch <filename>` | Create empty file |
+| `write` | `write <file> <text>` | Write text to file |
+
+#### Text Processing
+| Command | Syntax | Description |
+|---------|--------|-------------|
+| `grep` | `grep <file> <text>` | Search for text in file with line/column highlighting |
+| `head` | `head <filename>` | Display first 10 lines of file |
+| `tail` | `tail <filename>` | Display last 10 lines of file |
+
+#### Directory Operations
+| Command | Syntax | Description |
+|---------|--------|-------------|
+| `cd` | `cd <dirname>` | Change directory (use `..` for parent, `/` for root) |
+| `mkdir` | `mkdir <dirname>` | Create new directory |
+| `deldir` | `deldir <dirname>` | Delete empty directory |
+
+#### Media & Display
+| Command | Syntax | Description |
+|---------|--------|-------------|
+| `view` | `view <file> [-upscale]` | Display BMP image with optional 2x scaling |
+| `chars` | `chars` | Display ASCII character table |
+| `theme` | `theme <name>` | Change color theme (DEFAULT/GROOVYBOX/UBUNTU) |
+
+#### Power Management
+| Command | Description |
+|---------|-------------|
+| `shut` | Shutdown system via APM |
+| `reboot` | Restart system |
+
+---
+
+## ⚙️ Configuration Files
+
+x16-PRos uses several configuration files in the root directory:
+
+| File | Purpose | Format |
+|------|---------|--------|
+| `FIRST_B.CFG` | First boot flag | `0` or `1` (triggers SETUP.BIN on `1`) |
+| `USER.CFG` | Username | Plain text (max 31 chars) |
+| `PASSWORD.CFG` | Encrypted password | XOR-encrypted password |
+| `PROMPT.CFG` | Command prompt format | Template string (max 63 chars)<br>Supports `$user` placeholder |
+| `THEME.CFG` | Active color theme |16 lines, each containing the RGB code for a particular terminal color. |
+| `TIMEZONE.CFG` | Timezone offset | Integer value (hours from UTC) |
+
+### Prompt Customization
+In the x16-PRos operating system, the command line prompt is configured using the PROMPT.CFG file, which is located in the root directory of the drive.
+
+By default, if the PROMPT.CFG file is missing, a prompt of the following format is used:
+`[$username@PRos] >`
+(where the `$username` is taken from the `USER.CFG` file created during the first boot via SETUP).
+
+#### How to create or edit a prompt
+
+1. Create (or edit an existing) file `PROMPT.CFG` in the root directory.
+2. Write a prompt string without the terminating null byte (plain text) into it.
+3. The maximum string length is 63 characters. Anything longer will be truncated.
+4. Reboot the OS.
+
+
+
+
+### Password Encryption
+Passwords are encrypted using XOR cipher with a custom key defined in `src/kernel/features/encrypt.asm`. To set a password:
+1. Use SETUP.BIN on first boot, or
+2. Manually create PASSWORD.CFG with encrypted content
+
+---
+
+## 📦 Standard Software Package
+
+x16-PRos includes a comprehensive collection of built-in applications:
+
+<table>
+<tr>
+<td width="33%" align="center">
+<img src="docs/screenshots/writer.png" width="100%"><br>
+<b>WRITER.BIN</b><br>
+Simple editor for text files
+</td>
+<td width="33%" align="center">
+<img src="docs/screenshots/bchart.png" width="100%"><br>
+<b>BCHART.BIN</b><br>
+Barchart software for creating simple diagrams
+</td>
+<td width="33%" align="center">
+<img src="docs/screenshots/brainf.png" width="100%"><br>
+<b>BRAINF.BIN</b><br>
+Brainfuck interpreter
+</td>
+</tr>
+
+<tr>
+<td width="33%" align="center">
+<img src="docs/screenshots/mine.png" width="100%"><br>
+<b>MINE.BIN</b><br>
+Minesweeper game
+</td>
+<td width="33%" align="center">
+<img src="docs/screenshots/piano.png" width="100%"><br>
+<b>PIANO.BIN</b><br>
+Simple piano to play melodies using PC Speaker
+</td>
+<td width="33%" align="center">
+<img src="docs/screenshots/procentc.png" width="100%"><br>
+<b>PROCENTC.BIN</b><br>
+Percentages calculator
+</td>
+</tr>
+
+<tr>
+<td width="33%" align="center">
+<img src="docs/screenshots/space.png" width="100%"><br>
+<b>SPACE.BIN</b><br>
+Space arcade game
+</td>
+<td width="33%" align="center">
+<img src="docs/screenshots/calc.png" width="100%"><br>
+<b>CALC.BIN</b><br>
+Simple calculator
+</td>
+<td width="33%" align="center">
+<img src="docs/screenshots/memory.png" width="100%"><br>
+<b>MEMORY.BIN</b><br>
+Memory viewer
+</td>
+</tr>
+
+<tr>
+<td width="33%" align="center">
+<img src="docs/screenshots/paint.png" width="100%"><br>
+<b>PAINT.BIN</b><br>
+Paint program
+</td>
+<td width="33%" align="center">
+<img src="docs/screenshots/pong.png" width="100%"><br>
+<b>PONG.BIN</b><br>
+Pong game
+</td>
+<td width="33%" align="center">
+<img src="docs/screenshots/fetch.png" width="100%"><br>
+<b>FETCH.BIN</b><br>
+Print system fetch (I use PRos btw)
+</td>
+</tr>
+
+<tr>
+<td width="33%" align="center">
+<img src="docs/screenshots/imfplay.png" width="100%"><br>
+<b>IMFPLAY.BIN</b><br>
+IMF music player
+</td>
+<td width="33%" align="center">
+<img src="docs/screenshots/clock.png" width="100%"><br>
+<b>CLOCK.BIN</b><br>
+Clock application
+</td>
+<td width="33%" align="center">
+<img src="docs/screenshots/hexedit.png" width="100%"><br>
+<b>HEXEDIT.BIN</b><br>
+Hex editor
+</td>
+</tr>
+<td width="33%" align="center">
+<br>
+<b>And more...</b><br>
+SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN
+</td>
+</tr>
+</table>
+
+**Developing Your Own Programs**
+
+You can create custom programs using NASM and the PRos API.
+
+
+---
+
+## 🛠️ Building from Source
+
+### Packages required for compilation
+
+- NASM
+- mtools
+- dosfstools
+- cdrtools (optional for OS ISO image)
+
+---
+#### Installing packages:
+
+##### Ubuntu/Debian
+```
+sudo apt install nasm mtools dosfstools genisoimage
 ```
 
-Also, PRos has its own API for software developers. See **docs/API.md**
+> [!NOTE]  
+> cdrtools (including the original mkisofs) is not included in the official Debian/Ubuntu repositories due to licensing issues. Genisoimage (a fork that provides compatibility with mkisofs via symlink) is used instead.
 
-You can read more about the software development process for x16-PRos on the project website:
-[x16-PRos website](https://x16-pros.netlify.app/)
+##### Arch Linux / Manjaro
+```
+sudo pacman -Syu nasm mtools dosfstools cdrtools
+```
 
+> [!NOTE]  
+> Arch has a native cdrtools package available, which provides mkisofs.
+
+##### Fedora / CentOS
+```
+sudo dnf install nasm mtools dosfstools genisoimage
+```
 
 ---
 
-## 🛠 Compilation
+### Compilation Steps
 
-First, clone the repository:
-
+1. **Clone the repository:**
 ```bash
 git clone https://github.com/PRoX2011/x16-PRos.git
 cd x16-PRos
 ```
 
-To compile the project, you will need NASM and some other pakages.
-Example command for Ubuntu:
-
+2. **Make build script executable:**
 ```bash
-sudo apt install nasm
-sudo apt install mtools
-sudo apt install dosfstools
+chmod +x build-linux.sh
 ```
 
-And finally:
-
+3. **Build the project:**
 ```bash
-chmod +x build.sh
-./build.sh
+./build-linux.sh
 ```
+
+### Build Output
+
+- `disk_img/x16pros.img` - Bootable floppy disk image (1.44MB)
+- `disk_img/x16pros.iso` - Bootable CD disk image (1.75MB)
+- `build/` - Compiled binaries and intermediate files
 
 ---
 
-## 🚀 Launching
+## 🚀 Running x16-PRos
 
-To launch x16 PRos, use emulators such as **QEMU**,**Bochs** or online emulator like [v86](https://copy.sh/v86/).
-Example command for **QEMU**:
+### QEMU (Recommended)
 
+Install QEMU:
 ```bash
-qemu-system-x86_64 -audiodev pa,id=snd0 -machine pcspk-audiodev=snd0 -hda disk_img/x16pros.img
+sudo apt install qemu-system-x86
 ```
 
-or
-
+Run with audio support:
 ```bash
-# qemu-system-x86
+qemu-system-x86_64 \
+    -display gtk \
+    -fda disk_img/x16pros.img \
+    -machine pcspk-audiodev=snd0 \
+    -device adlib,audiodev=snd0 \
+    -audiodev pa,id=snd0
+```
+
+Or use the provided script (recommended):
+```bash
 chmod +x run.sh
-./run.sh
+./run-linux.sh
 ```
+
+
+### Online Emulation
+
+Try x16-PRos in your browser using [v86 emulator](https://copy.sh/v86/):
+1. Upload `x16pros.img` as floppy or hard disk
+2. Boot the system
+
+### Real Hardware
+
+
+1. Write image to USB drive:
+```bash
+sudo dd if=disk_img/x16pros.img of=/dev/sdX bs=512
+```
+
+2. Boot from USB drive (BIOS mode)
+
+**UEFI Systems**: Enable "CSM Support" or "Legacy Boot" in BIOS settings
 
 > [!NOTE]  
-> To run the emulator with audio support in Arch Linux, install the `qemu-audio-pa` package for PulseAudio:
-> ```bash
-> sudo pacman -S qemu-audio-pa
-> ```
+> More detailed launch instructions are available on the project website: <https://x16-pros.netlify.app/>
+---
 
+## Development Team
 
-You can also try running x16-PRos on a **real PC** (preferably with BIOS, not UEFI)
+TODO
 
-If you still want to run x16-PRos on a UEFI PC, you will need to enable "CSM support" in your BIOS. It may be called
-slightly differently.
+### Contributors
+
+TODO
+
+We welcome contributions! Special thanks to all who have submitted:
+- Bug reports and fixes
+- Documentation improvements
+- Feature suggestions
+- Program development
 
 ---
 
-## ⚙ Running x16-PRos on windows
+## 🤝 Contributing
 
-### Installation Steps
+### How to Contribute
 
-1. Open PowerShell as Administrator and run:
+1. **Report Bugs**: Open an issue on [GitHub Issues](https://github.com/PRoX2011/x16-PRos/issues)
+2. **Suggest Features**: Discuss ideas in GitHub Issues
+3. **Submit Code**: Fork, develop, and create pull requests
+4. **Write Programs**: Develop applications using the [PRos API](docs/API.md)
+5. **Improve Docs**: Email suggestions to prox.dev.code@gmail.com
 
-```powershell
-winget install nasm
-winget install qemu
-```
+### Development Guidelines
 
-2. Add NASM and QEMU to System Path by running:
+- Follow existing code style (NASM assembly conventions)
+- Test changes in QEMU before submitting
+- Document new features in comments
+- Update README.md for user-facing changes
 
-```powershell
-setx PATH "%PATH%;C:\Program Files\NASM;C:\Program Files\qemu"
-```
+### Support the Project
 
-3. Reboot your PC for the PATH changes to take effect.
-
-4. Run the build script:
-
-```batch
-build.ps1
-```
-
-**Note**: Make sure to restart your terminal or IDE after modifying the PATH variable.
-
-### Troubleshooting
-
-- If commands are not recognized, verify the installation paths
-- Ensure PowerShell was run as Administrator during installation
-- Check if PATH was updated correctly by running `echo %PATH%`
-
----
-
-## 👨‍💻 x16-PRos Developers
-
-- **PRoX (Faddey Kabanov)** lead developer. Creator of the kernel, command interpreter, writer, brainf, snake programs.
-- **Loxsete** developer of the barchart program.
-- **Saeta** developer of the calculation logic in the program "Calculator."
-- **Qwez** developer of the "space arcade" game.
-- **Gabriel** developer of "Percentages" program.
-
----
-
-## 🤝 Contribute to the Project
-
-If you want to contribute to the development of x16 PRos, you can:
-
-- Report bugs via GitHub Issues.
-- Suggest improvements or new features on GitHub.
-- Help with documentation by emailing us at prox.dev.code@gmail.com.
-- Develop new programs for the system.
-
-## License
-
-The project is distributed under the **MIT** License. This permissive free software license allows users to freely use, **modify**, **distribute**, and **sublicense** the code, with the only requirement **being the inclusion of the original copyright notice and license text**.
-
-The license also applies to **all programs and components created by the OS developer**, unless explicitly stated otherwise. This means that any software built by the original author and included in the OS inherits the same open and flexible licensing terms.
-
-For more details, refer to the full text of the MIT License (LICENSE.TXT).
-
----
-
-<a href="https://www.donationalerts.com/r/proxdev">
-  <img src="https://img.shields.io/badge/Support%20me-blue.svg?style=for-the-badge&logoWidth=40&labelWidth=100&fontSize=20" height="35">
+<a href="https://dalink.to/proxdev">
+  <img src="https://img.shields.io/badge/Support%20Development-blue.svg?style=for-the-badge" height="35">
 </a>
 
-0.5 will be released soon: December 15th
+---
+
+## 📄 License
+
+x16-PRos is distributed under the **MIT License**.
+```
+Copyright (c) 2025 PRoX2011
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+<div align="center">
+
+**Made with ❤️ by PRoX**
+
+
+</div>

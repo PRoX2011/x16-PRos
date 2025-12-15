@@ -1,0 +1,432 @@
+----------------------- Key changes x16-PRos v0.5 ----------------------
+
+This update took over five months to develop. As a system developer, 
+it was quite a challenge. I had to fix over 20 bugs, learn a lot, 
+and develop numerous new features. But without my community,it would
+have been a much more difficult task. Thanks to everyone who helped 
+me and gave me advice! When you download my creation, be sure to 
+run the CREDITS.BIN program to see the names of everyone who helped me.
+                                        -- PRoX
+
+=======================================================================================
+
+1. Enhanced Boot Sequence and Setup System:
+1) Added first boot detection system via FIRST_B.CFG configuration file:
+   - Automatically detects if the system is booting for the first time.
+   - Executes SETUP.BIN on first boot for initial system configuration.
+   - Creates FIRST_B.CFG automatically if missing.
+2) Introduced AUTOEXEC.BIN support:
+   - Automatically executes AUTOEXEC.BIN on system startup if present.
+   - Allows users to run custom initialization programs.
+3) Added boot logo display feature:
+   - Displays LOGO.BMP image during boot sequence.
+   - Automatically switches to graphics mode (0x13) for logo display.
+   - Returns to standard VGA mode (0x12) after logo display.
+
+=======================================================================================
+
+2. User Authentication and Security:
+1) Implemented password protection system:
+   - Loads encrypted password from PASSWORD.CFG file.
+   - Prompts user for password on boot if configured.
+   - Decrypts and verifies password against user input.
+   - Displays error message for incorrect passwords with retry option.
+   - Allows empty passwords for no authentication.
+2) Added encryption/decryption system for secure password storage.
+   (An authentication system that works even in parking lots)
+3) Introduced user profile system:
+   - Stores username in USER.CFG file.
+   - Displays username in command prompt.
+   - Loads user configuration on boot.
+
+=======================================================================================
+
+3. Customizable Command Prompt:
+1) Added PROMPT.CFG configuration file support:
+   - Allows users to customize command prompt appearance.
+   - Supports prompt variables and formatting.
+   - Parses prompt configuration on system startup.
+2) Default prompt format: [username@PRos] >
+3) Prompt automatically updates to reflect current user.
+   This is, of course, not ZSH, but it is something
+
+=======================================================================================
+
+4. Theme System and Visual Customization:
+1) Introduced theme command with multiple color schemes:
+   - DEFAULT: Standard color palette.
+   - GROOVYBOX: Alternative color scheme.
+   - UBUNTU: Ubuntu-inspired color scheme.
+2) Added THEME.CFG file support:
+   - Automatically loads and applies saved theme on boot.
+   - Preserves theme settings across reboots.
+3) Theme system includes:
+   - set_default_palette: Sets standard VGA colors.
+   - set_groovybox_palette: Applies Groovybox theme colors.
+   - set_ubuntu_palette: Applies Ubuntu theme colors.
+   - load_and_apply_theme: Loads theme from configuration file.
+   RICING IN PROS! LET`S GO!
+
+=======================================================================================
+
+5. PS/2 Mouse Support:
+1) Added PS/2 mouse driver (ps2_mouse.asm):
+   - InitMouse: Initializes mouse hardware.
+   - EnableMouse: Enables mouse cursor and tracking.
+   - DisableMouse: Disables mouse during program execution.
+2) Mouse automatically initializes on boot and enables after authentication.
+3) Mouse temporarily disabled during binary program execution for compatibility.
+
+=======================================================================================
+
+6. Enhanced Help System:
+1) Redesigned help menu with paginated categories:
+   - Category 1: Basic Commands (help, info, ver, cls, shut, reboot, date, time, cpu).
+   - Category 2: File Operations (dir, size, cat, del, copy, ren, touch, write, view, grep, head, tail).
+   - Category 3: Directory Operations (cd, mkdir, deldir).
+   - Category 4: Image Operations (view with upscaling support).
+   - Category 5: Other Stuff (chars, theme, exit).
+   - Category 6: Programs (information about running .BIN files).
+2) Added keyboard navigation:
+   - Arrow keys (Up/Down/Left/Right) to navigate between categories.
+   - ESC key to exit help menu.
+3) Visual improvements with box-drawing characters and [X/6] page indicators.
+
+=======================================================================================
+
+7. New File Operations Commands:
+1) grep <filename> <search_string>:
+   - Searches for text within files.
+   - Displays line number and column position of matches.
+   - Highlights matched text in red.
+   - Case-insensitive search.
+   - Shows entire line containing the match.
+2) head <filename>:
+   - Displays first 10 lines of a text file.
+   - Filters non-printable characters.
+   - Handles newlines and carriage returns properly.
+3) tail <filename>:
+   - Displays last 10 lines of a text file.
+   - Scans file backwards to find last N lines.
+   - Filters non-printable characters.
+4) view <filename> [-upscale]:
+   - Displays BMP image files.
+   - Optional -upscale flag for 2x image scaling.
+   - Integrates with BMP rendering system.
+   This image viewer is real, unlike the GovnOS image viewer.
+
+=======================================================================================
+
+8. Directory Support:
+1) Added directory management commands:
+   - mkdir <dirname>: Creates new directories.
+   - deldir <dirname>: Deletes empty directories.
+   - cd <dirname>: Changes current directory.
+   - cd: Displays current directory path.
+   - cd ..: Navigates to parent directory.
+2) Directory system features:
+   - Automatic .DIR extension handling.
+   - Current directory tracking in current_directory buffer.
+   - Directory path display in dir command.
+   - Maximum directory name length: 8 characters.
+3) File system integration:
+   - fs_create_directory: Creates directory entries.
+   - fs_remove_directory: Removes empty directories.
+   - fs_change_directory: Changes working directory.
+   - fs_parent_directory: Navigates to parent directory.
+   - fs_is_directory: Checks if entry is directory.
+
+=======================================================================================
+
+9. Enhanced Directory Listing:
+1) Improved dir command output:
+   - Displays current directory path (A:/ for root or A:/dirname for subdirectories).
+   - Shows free disk space in KB.
+   - Shows used disk space in KB.
+   - Color-coded output (cyan for numbers, green for space information).
+   - Better formatting with proper spacing.
+2) Enhanced file count and disk usage information.
+
+=======================================================================================
+
+10. BMP Image Rendering System:
+1) Added complete BMP rendering support (bmp_rendering.asm):
+   - display_bmp: Main BMP rendering function.
+   - Supports standard BMP format with palette.
+   - Handles 256-color BMP images.
+   - Automatic VGA mode switching.
+   - 2x upscaling support via upscale_2x function.
+2) Image display features:
+   - Centers images on screen.
+   - Handles different image sizes.
+   - Preserves aspect ratio.
+   - Press any key to return from image view.
+
+=======================================================================================
+
+11. Improved CPU Information Display:
+1) Enhanced cpu command output:
+   - Added FLAGS register display.
+   - Added Control Register (CR0) display.
+   - Added segment registers (CS, DS, ES, SS).
+   - Added pointer registers (BP, SP).
+   - CPU family detection with lookup table:
+     * Intel Core (Family 6)
+     * Intel Pentium (Family 5)
+     * AMD Athlon (Family 15)
+     * AMD Ryzen (Family 21)
+   - Color-coded output (cyan for CPU information).
+2) Better organized register information display.
+
+=======================================================================================
+
+12. ASCII Character Table:
+1) Added chars command:
+   - Displays complete ASCII character table (0-255).
+   - Shows characters in rows of 10.
+   - Filters printable characters automatically.
+   - Useful for reference and debugging.
+
+=======================================================================================
+
+13. Enhanced File Operation Error Handling:
+1) Added kernel file protection:
+   - Cannot execute KERNEL.BIN directly.
+   - Cannot delete KERNEL.BIN with del command.
+   - Displays specific warning messages for kernel file operations.
+2) Improved error messages for file operations:
+   - "No filename or not enough filenames" for missing arguments.
+   - "File not found" for non-existent files.
+   - "Target file already exists!" for duplicate files.
+   - "Invalid filename or disk error" for creation failures.
+   - "Not a directory" for directory operation errors.
+   - "Directory not empty or disk error" for deletion failures.
+
+=======================================================================================
+
+14. Sound and Audio Enhancements:
+1) Improved startup melody:
+   - Updated note frequencies (4186 Hz, 3136 Hz, 2637 Hz, 2093 Hz).
+   - Adjusted timing for better sound quality.
+2) Shutdown melody plays before system shutdown.
+3) PC speaker integration via speaker.asm module.
+
+=======================================================================================
+
+15. Advanced Power Management:
+1) Enhanced shutdown procedure:
+   - Attempts APM (Advanced Power Management) initialization.
+   - Sets APM version 1.2.
+   - Powers off system via APM if supported.
+   - Displays error message if APM unavailable.
+   - Plays shutdown melody before powering off.
+
+=======================================================================================
+
+16. Improved System Startup:
+1) Better stack initialization:
+   - Stack segment set to 0x0000.
+   - Stack pointer set to 0x0FFFF for maximum stack space.
+2) Timer configuration:
+   - PC speaker timer frequency set to ~1000 Hz (700 divisor).
+   - Improves audio quality for startup melody.
+3) Segment register initialization:
+   - All segments (DS, ES) set to 0x2000.
+   - Consistent memory addressing throughout kernel.
+
+=======================================================================================
+
+17. Enhanced Visual Interface:
+1) Redesigned boot screen:
+   - ASCII art PRos logo.
+   - Copyright information display.
+   - Shell version information.
+   - Color blocks demonstration (15 colors).
+   - Helpful tip: "Type HELP to get list of the commands".
+2) Improved header with gradient effect using block characters.
+3) Better color scheme with cyan text for tips and information.
+
+=======================================================================================
+
+18. File System Improvements:
+1) Enhanced file existence checking before operations.
+2) Better file size validation.
+3) Improved directory entry handling.
+4) Support for subdirectories in file operations.
+5) File operation restrictions:
+   - copy and ren commands restricted to root directory only.
+   - Appropriate error messages for restricted operations.
+
+=======================================================================================
+
+19. Configuration File Management:
+1) Multiple configuration files support:
+   - FIRST_B.CFG: First boot flag.
+   - USER.CFG: Username storage.
+   - PASSWORD.CFG: Encrypted password storage.
+   - PROMPT.CFG: Custom prompt configuration.
+   - THEME.CFG: Theme settings.
+   - AUTOEXEC.BIN: Startup program.
+2) Automatic configuration file creation if missing.
+3) User-friendly error messages for missing configuration files.
+4) Press any key to continue after configuration errors.
+
+=======================================================================================
+
+20. Program Execution Enhancements:
+1) Improved binary execution:
+   - Automatic .BIN extension handling.
+   - Clears registers before program execution.
+   - Passes parameter list via SI register.
+   - Restores segment registers after execution.
+   - Reloads theme after program execution.
+2) Mouse state management during program execution:
+   - Disables mouse before running programs.
+   - Enables mouse after program completion.
+
+=======================================================================================
+
+21. Code Organization and Structure:
+1) Modularized kernel code with clear feature separation:
+   - Core kernel (kernel.asm)
+   - File system (fs.asm)
+   - String functions (string.asm)
+   - PC speaker (speaker.asm)
+   - BMP rendering (bmp_rendering.asm)
+   - Theme system (themes.asm)
+   - Encryption (encrypt.asm)
+   - PS/2 mouse driver (ps2_mouse.asm)
+2) Enhanced API structure:
+   - api_output.asm: Output operations.
+   - api_fs.asm: File system operations.
+   - api_string.asm: String manipulation.
+3) Better code comments and section organization.
+
+=======================================================================================
+
+22. Minor Improvements (Who cares about this section?):
+1) Updated version string.
+2) Updated OS version in info command.
+3) Removed unused definitions.
+4) Better memory management with consistent buffer usage.
+5) Better error handling throughout the system.
+
+=======================================================================================
+
+23. New Built-in Programs:
+1) setup (SETUP.BIN):
+   - Interactive first-boot configuration wizard.
+   - Guides users through initial system setup.
+   - Configures username, password, timezone, and command prompt style.
+   - Offers three installation profiles:
+     * Default: Installs all programs.
+     * Essential: Removes non-essential programs (games, demos).
+     * Minimal: Keeps only core utilities (calc, memory, writer).
+   - Automatically creates configuration files (USER.CFG, PASSWORD.CFG, TIMEZONE.CFG, PROMPT.CFG).
+   - Updates FIRST_B.CFG to prevent running on subsequent boots.
+2) clock (CLOCK.BIN):
+   - Real-time digital clock display with large seven-segment digits.
+   - Shows current time in HH:MM format with blinking separator dots.
+   - Displays current date below clock (DD.MM.YY format).
+   - Color customization:
+     * F key: Change foreground color (0-15).
+     * B key: Change background color (0-15).
+   - Toggle between 12-hour and 24-hour format with H key.
+   - Smooth updates with configurable refresh rate.
+   - ESC key to exit and return to shell.
+3) fetch (FETCH.BIN):
+   - Neofetch-like system information display tool.
+   - Shows PRos ASCII art logo.
+   - Displays system information:
+     * Username and hostname.
+     * OS name and version (x16-PRos x86_64).
+     * Kernel name (PRos Kernel).
+     * Shell name (PRos Terminal).
+     * CPU model and specifications.
+     * VESA support detection.
+     * Current screen resolution.
+   - Color-coded information (cyan for labels, colored for data).
+   - Shows 16-color palette at bottom.
+   - Automatically reads username from USER.CFG.
+   I use PRos btw
+4) credits (CREDITS.BIN):
+   - Scrolling credits sequence for x16-PRos.
+5) fnt_test (FNT_TEST.BIN):
+   - Custom 8x8 bitmap font demonstration.
+   - Tests custom font rendering in VGA mode 0x12.
+   - Displays sample text with custom font:
+     * Full alphabet (uppercase and lowercase).
+     * Numbers and special characters.
+     * Header text with custom styling.
+   - Shows multi-color text rendering capabilities.
+   - Demonstrates character-by-character drawing.
+   - Uses direct VGA memory manipulation.
+   - Includes complete ASCII character set (32-126).
+   You can use this font in your program :)
+6) imfplay (IMFPLAY.BIN):
+   - IMF (Id Music Format) music player.
+   - Plays IMF Type-1 format music files.
+   - Usage: imfplay <filename.imf>
+   - Features:
+     * Loads IMF files from disk.
+     * Plays through AdLib/OPL2 synthesizer.
+     * Real-time music playback.
+     * Press any key to stop playback.
+   - Configures PIT timer for accurate timing (~700 Hz).
+   - Resets all OPL2 registers before and after playback.
+   - Compatible with music converted by MID2IMF2 tool.
+   Leo-ono, thank you so much!
+7) hexedit (HEXEDIT.BIN):
+   - Full-featured hexadecimal file editor.
+   - Usage: hexedit <filename>
+   - Supports files up to 32KB.
+   - Dual-pane view:
+     * Left pane: Hexadecimal bytes.
+     * Right pane: ASCII representation.
+   - Navigation:
+     * Arrow keys to move cursor.
+     * 16 bytes per line display.
+     * Address column shows file offsets.
+   - Editing mode:
+     * Enter key to start editing byte.
+     * Type hex digits to modify values.
+     * Enter to confirm, ESC to cancel.
+   - File operations:
+     * F1: Save changes to file.
+     * F2: Discard changes and reload.
+     * F3: Show help information.
+   - Visual indicators:
+     * Green highlight for cursor position.
+     * Asterisk (*) in title when file modified.
+     * Shows file size and cursor position.
+   - Real-time ASCII preview updates.
+   - Non-printable characters shown as dots.
+8) paint (PAINT.BIN):
+   - Simple pixel art drawing program.
+   - Full-screen canvas in VGA graphics mode.
+   - PS/2 mouse support for drawing.
+   - Features:
+     * Freehand drawing with mouse.
+     * Adjustable brush size (1-9 pixels).
+     * 10 color palette options.
+   - Controls:
+     * Number keys (0-9): Select colors.
+       - 0: Black
+       - 1: White
+       - 2: Blue
+       - 3: Cyan
+       - 4: Green
+       - 5: Red
+       - 6: Purple
+       - 7: Yellow
+       - 8: Light gray
+       - 9: Dark gray
+     * W key: Increase brush size.
+     * S key: Decrease brush size.
+     * ESC key: Exit program.
+   - Real-time drawing with immediate visual feedback.
+   - Square brush shape with configurable size.
+
+=======================================================================================
+
+Copyright (C) 2024-2025 PRoX2011
