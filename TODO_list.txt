@@ -1,4 +1,0 @@
-1) create a simple file system   [DONE]
-2) mouse driver                  [IN PROGRESS]
-3) desktop                       [...]
-4) JIT compiler                  [...]
