@@ -19,6 +19,8 @@
 </div>
 
 
+## Overview
+
 **x16-PRos** is a lightweight real-mode operating system designed for the x86 architecture and written entirely in NASM assembly. It features a command-line interface, supports the FAT12 file system, and includes a large standard software suite. This OS demonstrates fundamental operating system design principles, including booting, file system management, interrupt handling, and hardware interaction.
 
 Designed for simplicity and educational value, x16-PRos provides a platform for low-level programming enthusiasts to explore bare-metal development on x86 systems.
@@ -386,13 +388,12 @@ sudo dd if=disk_img/x16pros.img of=/dev/sdX bs=512
 > More detailed launch instructions are available on the project website: <https://x16-pros.netlify.app/>
 ---
 
-## Development Team
-
-TODO
-
 ### Contributors
 
-TODO
+[<img src="https://wsrv.nl/?url=github.com/akbe2020.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="akbe2020" />](https://github.com/akbe2020)
+[<img src="https://wsrv.nl/?url=github.com/ilnarildarovuch2.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="ilnarildarovuch2" />](https://github.com/ilnarildarovuch2)
+[<img src="https://wsrv.nl/?url=github.com/realtomokokuroki.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="realtomokokuroki" />](https://github.com/realtomokokuroki)
+
 
 We welcome contributions! Special thanks to all who have submitted:
 - Bug reports and fixes
@@ -411,6 +412,9 @@ We welcome contributions! Special thanks to all who have submitted:
 3. **Submit Code**: Fork, develop, and create pull requests
 4. **Write Programs**: Develop applications using the [PRos API](docs/API.md)
 5. **Improve Docs**: Email suggestions to prox.dev.code@gmail.com
+
+> [!IMPORTANT]  
+> Please use English when commenting on code and describing changes. This project is designed to be multinational and accessible to everyone.
 
 ### Development Guidelines
 
