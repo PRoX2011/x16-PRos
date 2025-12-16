@@ -2,10 +2,10 @@
 
 <img src="docs/assets/baner.jpg" width=100%>
 
-<h1>x16-PRos Operating System</h1>
+<h1>x16-PRos Operating System (dev)</h1>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
-[![Version](https://img.shields.io/badge/version-0.5.3-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-dev-orange.svg)](#)
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](#contributing)
 
 **A minimalistic 16-bit operating system written in NASM for x86 architecture**
