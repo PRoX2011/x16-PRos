@@ -38,6 +38,9 @@ Designed for simplicity and educational value, x16-PRos provides a platform for 
 
 ---
 
+[![Stargazers over time](https://starchart.cc/PRoX2011/x16-PRos.svg?variant=adaptive)](https://starchart.cc/end-4/dots-hyprland)
+
+---
 
 ## Key Features
 
