@@ -397,6 +397,7 @@ sudo dd if=disk_img/x16pros.img of=/dev/sdX bs=512
 [<img src="https://wsrv.nl/?url=github.com/akbe2020.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="akbe2020" />](https://github.com/akbe2020)
 [<img src="https://wsrv.nl/?url=github.com/ilnarildarovuch2.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="ilnarildarovuch2" />](https://github.com/ilnarildarovuch2)
 [<img src="https://wsrv.nl/?url=github.com/realtomokokuroki.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="realtomokokuroki" />](https://github.com/realtomokokuroki)
+[<img src="https://wsrv.nl/?url=https://github.com/leonardo-ono.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="leo-ono" />](https://github.com/leonardo-ono)
 
 
 We welcome contributions! Special thanks to all who have submitted:
