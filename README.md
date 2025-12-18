@@ -408,10 +408,11 @@ We welcome contributions! Special thanks to all who have submitted:
 ### How to Contribute
 
 1. **Report Bugs**: Open an issue on [GitHub Issues](https://github.com/PRoX2011/x16-PRos/issues)
-2. **Suggest Features**: Discuss ideas in GitHub Issues
-3. **Submit Code**: Fork, develop, and create pull requests
-4. **Write Programs**: Develop applications using the [PRos API](docs/API.md)
-5. **Improve Docs**: Email suggestions to prox.dev.code@gmail.com
+2. **Submit Code**: Fork, develop, and create pull requests
+3. **Write Programs**: Develop applications using the [PRos API](docs/API.md)
+4. **Improve Docs**: Email suggestions to prox.dev.code@gmail.com
+
+**More about contributing:** [contributing guide](CONTRIBUTING.md)
 
 > [!IMPORTANT]  
 > Please use English when commenting on code and describing changes. This project is designed to be multinational and accessible to everyone.

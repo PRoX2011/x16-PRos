@@ -2940,7 +2940,7 @@ info db 10, 13
      db '  Video mode: 0x12 (640x480; 16 colors)', 10, 13
      db '  File system: FAT12', 10, 13
      db '  License: MIT', 10, 13
-     db '  OS version: 0.5.3', 10, 13
+     db '  OS version: 0.5.9', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.2', 10, 13, 0

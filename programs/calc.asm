@@ -1,246 +1,406 @@
+; ==================================================================
+; x16-PRos -- CALC.BIN. Calculator.
+; Copyright (C) 2025 litvincode, Saeta, PRoX2011
+;
+; Made by litvincode, Saeta and PRoX-dev
+; =================================================================
+
 [BITS 16]
 [ORG 0x8000]
 
-jmp start
-
-%include "programs/lib/io.inc"
-%include "programs/lib/utils.inc"
-
 start:
-        pusha
-        mov ax, 0x03
-        int 0x10
-        popa
+    mov ah, 0x05
+    int 0x21
+
+    mov ah, 0x01
+    mov si, welcome_msg
+    int 0x21
     
-        mov dl, 0
-        mov dh, 0
-        call set_cursor_pos
+main_loop:
+    mov ah, 0x01
+    mov si, prompt
+    int 0x21
+    
+    mov di, buffer
+    call read_string
+    
+    cmp byte [exit_flag], 1
+    je exit_program
 
-        mov bp, wmsg
-        mov cx, 80
-        call print_message
+    cmp byte [buffer], 0
+    je main_loop
+    
+    mov si, buffer
+    call parse_input
+    
+    cmp dword [error_flag], 0
+    jne .error
+    
+    call perform_operation
+    
+    mov ah, 0x01
+    mov si, result_msg
+    int 0x21
 
-    call print_newline
-    call calc_cycle
-    ret
-
-
-calc_cycle:
-    mov ax, [step]
-    cmp ax, 0
-    je .step0            ; input num 1
-    cmp ax, 1
-    je .step1            ; imput num 2
-    cmp ax, 2
-    je .step2            ; operation
-    cmp ax, 3
-    je .step3            ; print result
-
-    mov si, quit_msg
-    call print_string_green
-    call print_newline
-    ; check exit
-    mov ah, 10h
-    int 16h
-
-    cmp al, 1Bh
-    jz .end_cycle
-
-    mov al, 0
-    mov [step], al
-
-    jmp calc_cycle
-
-
-.end_cycle:
-    mov ax, 0x12
+    mov eax, [result]
+    test eax, eax
+    jns .positive
+    neg eax
+    push eax
+    mov ah, 0x0E
+    mov al, '-'
+    mov bh, 0
+    mov bl, 0x0F
     int 0x10
+    pop eax
+.positive:
+    call print_number
+    mov ah, 0x05
+    int 0x21
+    jmp main_loop
+    
+.error:
+    mov ah, 0x04
+    mov si, error_msg
+    int 0x21
+    mov ah, 0x05
+    int 0x21
+    jmp main_loop
+
+exit_program:
+    mov ah, 0x02
+    mov si, exit_msg
+    int 0x21
+    mov ah, 0x05
+    int 0x21
     ret
 
 
-; STEP0 - Number 1
-.step0:
-    mov si, inpn1
-    call print_string
+read_string:
+    xor cx, cx
+    mov byte [exit_flag], 0
+.read_char:
+    mov ah, 0
+    int 0x16
+    
+    cmp al, 0x1B
+    je .exit_pressed
 
-    mov si, input_buffer
-    mov bx, 4
-    call scan_string
-    call print_newline
+    cmp al, 0x08
+    je .backspace
+    
+    cmp al, 0x0D
+    je .done
+    
+    cmp al, '-'
+    je .valid_char
+    cmp al, '+'
+    je .valid_char
+    cmp al, '*'
+    je .valid_char
+    cmp al, '/'
+    je .valid_char
+    cmp al, '^'
+    je .valid_char
+    cmp al, ' '
+    je .valid_char
+    cmp al, '0'
+    jb .read_char
+    cmp al, '9'
+    ja .read_char    
+.valid_char:
+    mov ah, 0x0E
+    mov bh, 0
+    mov bl, 0x0F
+    int 0x10
+    
+    stosb
+    inc cx
+    cmp cx, 64
+    jae .done
+    jmp .read_char
+    
+.backspace:
+    test cx, cx
+    jz .read_char
+    dec di
+    dec cx
+    mov ah, 0x0E
+    mov bh, 0
+    mov bl, 0x0F
+    mov al, 0x08
+    int 0x10
+    mov al, ' '
+    int 0x10
+    mov al, 0x08
+    int 0x10
+    jmp .read_char
 
-    mov di, input_buffer
-    mov bx, num1
-    call convert_to_number
-
-    mov al, [step]
-    inc al
-    mov [step], al
-
-    jmp calc_cycle
-
-
-; STEP1 - Number 2
-.step1:
-    mov si, inpn2
-    call print_string
-
-    mov si, input_buffer
-    mov bx, 4
-    call scan_string
-    call print_newline
-
-    mov di, input_buffer
-    mov bx, num2
-    call convert_to_number
-
-    mov al, [step]
-    inc al
-    mov [step], al
-
-    jmp calc_cycle
-
-; STEP2 - Operation Select
-.step2:
-    mov si, select_mode
-    call print_string_green
-
-    mov si, input_buffer
-    mov bx, 4
-    call scan_string
-    call print_newline
-
-    mov di, input_buffer
-    mov bx, mode
-    call convert_to_number
-
-    mov al, [step]
-    inc al
-    mov [step], al
-
-    jmp calc_cycle
-
-
-; STEP3 - Result
-.step3:
-    mov si, result_prompt
-    call print_string
-
-    mov ax, [mode]
-    cmp ax, 1
-    je .mode_1
-    cmp ax, 2
-    je .mode_2
-    cmp ax, 3
-    je .mode_3
-    cmp ax, 4
-    je .mode_4
-
-    jmp .mode_err
-
-.mode_1:
-    mov ax, [num1]
-    mov bx, [num2]
-    add ax, bx
-    mov di, result_str
-    call convert_to_string
-
-    mov si, result_str
-    call print_string
-    call print_newline
-    mov si, idk
-    call print_string_green
-    call print_newline
-    jmp .step3_end
-
-.mode_2:
-    mov ax, [num1]
-    mov bx, [num2]
-    sub ax, bx
-    mov di, result_str
-    call convert_to_string
-
-    mov si, result_str
-    call print_string
-    call print_newline
-    mov si, idk
-    call print_string_green
-    call print_newline
-    jmp .step3_end
-
-.mode_3:
-    mov ax, [num1]
-    mov bx, [num2]
-    mul bx
-    mov di, result_str
-    call convert_to_string
-
-    mov si, result_str
-    call print_string
-    call print_newline
-    mov si, idk
-    call print_string_green
-    call print_newline
-    jmp .step3_end
-
-
-.mode_4:
-    xor dx, dx
-    mov ax, [num1]
-    mov bx, [num2]
-    div bx
-    mov di, result_str
-    call convert_to_string
-
-    mov si, result_str
-    call print_string_cyan
-    call print_newline
-    mov si, idk
-    call print_string_green
-    call print_newline
-    jmp .step3_end
-
-
-.mode_err:
-    mov si, error_mode_msg
-    call print_string_red
-
-    jmp .step3_end
-
-.step3_end:
-    mov al, [step]
-    inc al
-    mov [step], al
-
-    jmp calc_cycle
-
-print_message:
-    mov bl, 0x1F
-    mov ax, 1301h
-    int 10h
+.exit_pressed:
+    mov byte [exit_flag], 1
+    mov al, 0
+    stosb
+    ret
+    
+.done:
+    mov al, 0
+    stosb
+    mov ah, 0x05
+    int 0x21
     ret
 
-; --DATA--
-wmsg db 'PRos calculator v0.1                                                           ', 13, 10, 0
-inpn1 db "Enter a first num: ", 0
-inpn2 db "Enter a second num: ", 0
-result_prompt db "Result: ", 0
-idk db "==========================", 0
-quit_msg     db "Press: ", 10, 13
-            db "ESC - exit", 10, 13
-            db "Any key - continue", 10, 13
-            db 0
-select_mode db "Select operation:", 10, 13
-            db "1 - add", 10, 13
-            db "2 - sub", 10, 13
-            db "3 - mul", 10, 13
-            db "4 - div", 10, 13
-            db 0
+parse_number:
+    xor eax, eax
+    mov [number], eax
+    mov byte [negative_flag], 0
+    
+    lodsb
+    cmp al, '-'
+    jne .not_negative
+    mov byte [negative_flag], 1
+    lodsb
+    jmp .start_parse
+    
+.not_negative:
+    cmp al, '+'
+    jne .start_parse
+    lodsb
+    
+.start_parse:
+    dec si
+    
+.read_digit:
+    lodsb
+    cmp al, '0'
+    jb .done
+    cmp al, '9'
+    ja .done
+    
+    sub al, '0'
+    movzx ebx, al
+    
+    mov eax, [number]
+    mov edx, 10
+    mul edx
+    jo .overflow
+    add eax, ebx
+    jc .overflow
+    mov [number], eax
+    
+    jmp .read_digit
+    
+.done:
+    dec si
+    
+    cmp byte [negative_flag], 0
+    je .positive
+    neg dword [number]
+.positive:
+    ret
+    
+.overflow:
+    mov dword [error_flag], 1
+    ret
 
-error_mode_msg db "Unknown operation", 10, 13, 0
+parse_input:
+    mov dword [error_flag], 0
+    
+.skip_spaces:
+    lodsb
+    cmp al, ' '
+    je .skip_spaces
+    cmp al, 0
+    je .error
+    dec si
+    
+    call parse_number
+    cmp dword [error_flag], 0
+    jne .error
+    mov eax, [number]
+    mov [operand1], eax
+    
+.skip_spaces2:
+    lodsb
+    cmp al, ' '
+    je .skip_spaces2
+    cmp al, 0
+    je .error
+    
+    mov [operation], al
+    
+.skip_spaces3:
+    lodsb
+    cmp al, ' '
+    je .skip_spaces3
+    cmp al, 0
+    je .error
+    dec si
+    
+    call parse_number
+    cmp dword [error_flag], 0
+    jne .error
+    mov eax, [number]
+    mov [operand2], eax
+    
+.check_extra:
+    lodsb
+    cmp al, 0
+    je .done
+    cmp al, ' '
+    je .check_extra
+    jmp .error
+    
+.done:
+    ret
+    
+.error:
+    mov dword [error_flag], 1
+    ret
 
-mode resw 1
-step resw 1
-input_buffer db 6 dup(0)
-num1 resw 1
-num2 resw 1
-result_str db 7 dup(0)
+perform_operation:
+    mov eax, [operand1]
+    mov ebx, [operand2]
+    
+    mov cl, [operation]
+    
+    cmp cl, '+'
+    je .add
+    cmp cl, '-'
+    je .sub
+    cmp cl, '*'
+    je .mul
+    cmp cl, '/'
+    je .div
+    cmp cl, '^'
+    je .power
+    
+    mov dword [error_flag], 1
+    ret
+    
+.add:
+    add eax, ebx
+    mov [result], eax
+    ret
+    
+.sub:
+    sub eax, ebx
+    mov [result], eax
+    ret
+    
+.mul:
+    imul ebx
+    mov [result], eax
+    ret
+    
+.div:
+    test ebx, ebx
+    jz .div_error
+    
+    xor edx, edx
+    cmp eax, 0x80000000
+    jne .normal_div
+    cmp ebx, -1
+    jne .normal_div
+    mov dword [result], 0x80000000
+    ret
+    
+.normal_div:
+    cdq
+    idiv ebx
+    mov [result], eax
+    ret
+    
+.power:
+    mov ecx, ebx
+    cmp ecx, 0
+    jl .power_error
+    mov eax, 1
+    mov ebx, [operand1]
+    
+    test ebx, ebx
+    jnz .power_loop
+    test ecx, ecx
+    jnz .power_loop
+    mov dword [result], 1
+    ret
+    
+.power_loop:
+    jecxz .power_done
+    imul ebx
+    jo .power_error
+    dec ecx
+    jmp .power_loop
+    
+.power_done:
+    mov [result], eax
+    ret
+    
+.power_error:
+.div_error:
+    mov dword [error_flag], 1
+    ret
+
+print_number:
+    pusha
+    test eax, eax
+    jnz .not_zero
+    
+    mov ah, 0x0E
+    mov al, '0'
+    mov bh, 0
+    mov bl, 0x0F
+    int 0x10
+    jmp .done
+    
+.not_zero:
+    mov edi, number_buffer + 10
+    mov byte [edi], 0
+    dec edi
+    mov ebx, 10
+    
+.convert_loop:
+    xor edx, edx
+    div ebx
+    add dl, '0'
+    mov [edi], dl
+    dec edi
+    test eax, eax
+    jnz .convert_loop
+    
+    inc edi
+    
+    mov si, di
+    mov ah, 0x0E
+    mov bh, 0
+    mov bl, 0x0F
+.print_loop:
+    lodsb
+    cmp al, 0
+    je .done
+    int 0x10
+    jmp .print_loop
+    
+.done:
+    popa
+    ret
+
+welcome_msg db 0xDA, 12 dup(0xC4), ' PRos Calculator (by @litvincode, Saeta and PRoX-dev) ', 12 dup(0xC4), 0xBF
+            db 0xC0, 78 dup(0xC4), 0xD9, 10, 13
+            db 'Supports: + - * / ^', 0x0D, 0x0A
+            db 'Press [ESC] to exit', 0x0D, 0x0A, 0x0D, 0x0A, 0
+prompt      db '> ', 0
+result_msg  db '= ', 0
+error_msg   db 'Error', 0
+exit_msg    db 'Exiting calculator...', 0
+
+error_flag    dd 0
+number        dd 0
+operand1      dd 0
+operand2      dd 0
+operation     db 0
+result        dd 0
+negative_flag db 0
+exit_flag     db 0
+
+number_buffer times 11 db 0
+buffer        times 65 db 0
