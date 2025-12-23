@@ -271,7 +271,7 @@ Hex editor
 <td width="33%" align="center">
 <br>
 <b>And more...</b><br>
-SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN
+SNAKE.BIN, CREDITS.BIN, MANDEL.BIN, AUTOEXEC.BIN
 </td>
 </tr>
 </table>
