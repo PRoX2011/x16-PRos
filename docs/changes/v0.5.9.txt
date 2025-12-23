@@ -1,0 +1,34 @@
+----------------------- Key changes x16-PRos v0.5.9 ----------------------
+
+Release 0.5 had a couple of bugs. The creation of an ISO image has been 
+removed due to the need for its complete reworking. This update fixed them, and also updated some programs.
+                                        -- PRoX
+=======================================================================================
+
+1. Setup & Customization:
+1) Added default theme selection during the first boot process.
+   - Users can now pick their preferred visual style right from the start.
+   - Theme settings are automatically saved to THEME.CFG.
+
+=======================================================================================
+
+2. Kernel & API Fixes:
+1) Major String API (INT 0x23) overhaul:
+   - Fixed a critical bug where AH would overwrite AX, corrupting string pointers.
+
+=======================================================================================
+
+3. New System Applications:
+1) mandel (MANDEL.BIN):
+   - A new mathematical visualization program. Renders the famous Mandelbrot Set in VGA graphics mode.
+2) new calculator (CALC.BIN v0.2)
+   - Added the ability to simply enter an example, and it will be parsed and solved
+   - Added exponentiation
+
+=======================================================================================
+
+4. The creation of an ISO image has been removed due to the need for its complete reworking
+
+=======================================================================================
+
+Copyright (C) 2024-2025 PRoX2011

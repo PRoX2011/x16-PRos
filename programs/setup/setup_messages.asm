@@ -15,6 +15,11 @@ setup_timezone_prompt db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, '    _______________________________    ', 0xBA, 10, 13
                       db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 0
 
+setup_theme_prompt    db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
+                      db 0xBA, '  Select color theme (1-4):            ', 0xBA, 10, 13
+                      db 0xBA, '    _______________________________    ', 0xBA, 10, 13
+                      db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 0
+
 setup_prompt_prompt   db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, '  Select command prompt style (1-3):   ', 0xBA, 10, 13
                       db 0xBA, '    _______________________________    ', 0xBA, 10, 13
@@ -81,6 +86,17 @@ setup_help_msg6       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, '  [2] ', 0xDA, 0xC4, 0xC4, ' user                         ', 0xBA, 10, 13
                       db 0xBA, '      ', 0xC0, 0xC4, ' ', 0xFE, ' ', 0x10,'                           ', 0xBA, 10, 13
                       db 0xBA, '  [3] user@pros:~$                     ', 0xBA, 10, 13
+                      db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 10, 13, 0
+
+setup_help_msg7       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
+                      db 0xBA, ' Setting up color theme                ', 0xBA, 10, 13
+                      db 0xBA, '                                       ', 0xBA, 10, 13
+                      db 0xBA, 39 dup(0xC4), 0xBA, 10, 13
+                      db 0xBA, ' Select your preferred color theme:    ', 0xBA, 10, 13
+                      db 0xBA, '  [1] Standard (default PRos colors)   ', 0xBA, 10, 13
+                      db 0xBA, '  [2] Ubuntu (warm orange/purple)      ', 0xBA, 10, 13
+                      db 0xBA, '  [3] VGA Default (classic 16 colors)  ', 0xBA, 10, 13
+                      db 0xBA, '  [4] Ocean Deep (blue aqua theme)     ', 0xBA, 10, 13
                       db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 10, 13, 0
 
 setup_program_prompt  db 0xC9, 39 dup(0xCD), 0xBB, 10, 13

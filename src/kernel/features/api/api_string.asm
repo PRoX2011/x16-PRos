@@ -4,15 +4,15 @@
 ;
 ; Provides string functions via INT 0x23
 ; Function codes in AH:
-;   0x00: Initialize string API (no-op, reserved)
-;   0x01: Get string length (AX = string, returns AX = length)
-;   0x02: Convert string to uppercase (AX = string)
+;   0x00: Initialize string API
+;   0x01: Get string length (SI = string, returns AX = length)
+;   0x02: Convert string to uppercase (SI = string)
 ;   0x03: Copy string (SI = source, DI = destination)
-;   0x04: Remove leading/trailing spaces (AX = string)
+;   0x04: Remove leading/trailing spaces (SI = string)
 ;   0x05: Compare strings (SI = string1, DI = string2, returns CF set if equal)
 ;   0x06: Compare strings with length limit (SI = string1, DI = string2, CL = length, returns CF set if equal)
 ;   0x07: Tokenize string (SI = string, AL = delimiter, returns DI = next token)
-;   0x08: Input string from keyboard (AX = buffer)
+;   0x08: Input string from keyboard (SI = buffer)
 ;   0x09: Clear screen
 ;   0x0A: Get time string (BX = buffer)
 ;   0x0B: Get date string (BX = buffer)
@@ -21,83 +21,84 @@
 ;   0x0E: Get cursor position (returns DL = column, DH = row)
 ;   0x0F: Move cursor (DL = column, DH = row)
 ;   0x10: Parse string (SI = string, returns AX = token1, BX = token2, CX = token3, DX = token4)
-; Preserves all registers unless specified in function description
-; Sets carry flag (CF) where applicable (e.g., string comparison)
 ; ==================================================================
 
 [BITS 16]
 
-; -----------------------------
-; Initialize the string API (sets up INT 0x23, currently no-op for string-specific init)
-; IN  : None
-; OUT : None
-; Preserves: All registers
 api_string_init:
     pusha
     push es
-    ; Set up INT 0x23 in IVT
     xor ax, ax
     mov es, ax
-    mov word [es:0x23*4], int23_handler ; Offset
-    mov word [es:0x23*4+2], cs          ; Segment
+    cli
+    mov word [es:0x23*4], int23_handler
+    mov word [es:0x23*4+2], cs
+    sti
     pop es
     popa
     ret
 
-; -----------------------------
-; INT 0x23 Handler
-; IN  : AH = Function code, other registers per function (AX, BX, SI, DI, etc.)
-; OUT : Per function (e.g., AX for string_length, DL/DH for get_cursor_pos)
-; Preserves: All registers unless specified in function
 int23_handler:
-    pushf                       ; Save flags (for carry flag)
     pusha
-    cmp ah, 0x00
+    push ds
+    push es
+    
+    mov bp, cs
+    mov ds, bp
+    mov es, bp
+    
+    mov al, ah
+    
+    cmp al, 0x00
     je .init
-    cmp ah, 0x01
+    cmp al, 0x01
     je .string_length
-    cmp ah, 0x02
+    cmp al, 0x02
     je .string_uppercase
-    cmp ah, 0x03
+    cmp al, 0x03
     je .string_copy
-    cmp ah, 0x04
+    cmp al, 0x04
     je .string_chomp
-    cmp ah, 0x05
+    cmp al, 0x05
     je .string_compare
-    cmp ah, 0x06
+    cmp al, 0x06
     je .string_strincmp
-    cmp ah, 0x07
+    cmp al, 0x07
     je .string_tokenize
-    cmp ah, 0x08
+    cmp al, 0x08
     je .string_input
-    cmp ah, 0x09
+    cmp al, 0x09
     je .clear_screen
-    cmp ah, 0x0A
+    cmp al, 0x0A
     je .get_time_string
-    cmp ah, 0x0B
+    cmp al, 0x0B
     je .get_date_string
-    cmp ah, 0x0C
+    cmp al, 0x0C
     je .bcd_to_int
-    cmp ah, 0x0D
+    cmp al, 0x0D
     je .int_to_string
-    cmp ah, 0x0E
+    cmp al, 0x0E
     je .get_cursor_pos
-    cmp ah, 0x0F
+    cmp al, 0x0F
     je .move_cursor
-    cmp ah, 0x10
+    cmp al, 0x10
     je .string_parse
-    stc                         ; Unknown function, set carry
+    
+    stc
     jmp .done
 
 .init:
-    ; No-op (reserved for future initialization)
     jmp .done
 
 .string_length:
+    mov ax, si
     call string_string_length
+    mov bp, sp
+    mov [bp+14], ax
     jmp .done
 
 .string_uppercase:
+    mov ax, si
     call string_string_uppercase
     jmp .done
 
@@ -106,22 +107,27 @@ int23_handler:
     jmp .done
 
 .string_chomp:
+    mov ax, si
     call string_string_chomp
     jmp .done
 
 .string_compare:
     call string_string_compare
-    jmp .done
+    jmp .done_flags
 
 .string_strincmp:
     call string_string_strincmp
-    jmp .done
+    jmp .done_flags
 
 .string_tokenize:
+    mov ax, si
     call string_string_tokenize
+    mov bp, sp
+    mov [bp+4], di
     jmp .done
 
 .string_input:
+    mov ax, si
     call string_input_string
     jmp .done
 
@@ -139,14 +145,20 @@ int23_handler:
 
 .bcd_to_int:
     call string_bcd_to_int
+    mov bp, sp
+    mov [bp+14], al
     jmp .done
 
 .int_to_string:
     call string_int_to_string
+    mov bp, sp
+    mov [bp+14], ax
     jmp .done
 
 .get_cursor_pos:
     call string_get_cursor_pos
+    mov bp, sp
+    mov [bp+10], dx
     jmp .done
 
 .move_cursor:
@@ -155,9 +167,25 @@ int23_handler:
 
 .string_parse:
     call string_string_parse
+    mov bp, sp
+    mov [bp+14], ax
+    mov [bp+12], bx
+    mov [bp+10], cx
+    mov [bp+8], dx
     jmp .done
 
 .done:
+    pop es
+    pop ds
     popa
-    popf                        ; Restore flags (including carry)
+    iret
+
+.done_flags:
+    pushf
+    pop ax
+    pop es
+    pop ds
+    popa
+    push ax
+    popf
     iret

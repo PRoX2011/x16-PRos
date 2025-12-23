@@ -137,6 +137,7 @@ programs=(
     "programs/clock.asm CLOCK.BIN"
     "programs/imfplay.asm IMFPLAY.BIN"
     "programs/fnt_test.asm FNT_TEST.BIN"
+    "programs/mandel.asm MANDEL.BIN"
 )
 
 for prog in "${programs[@]}"; do
@@ -226,11 +227,11 @@ echo -e "$YELLOW Disk contents:$NC"
 mdir -i disk_img/x16pros.img ::/
 
 # Create ISO
-rm -f disk_img/x16pros.iso
-print_info "Creating ISO image (disk_img/x16pros.iso)..."
-mkisofs -quiet -V 'x16-PROS' -input-charset iso8859-1 -o disk_img/x16pros.iso -b x16pros.img disk_img/
-check_error "ISO creation failed"
-print_ok "ISO image created successfully"
+# rm -f disk_img/x16pros.iso
+# print_info "Creating ISO image (disk_img/x16pros.iso)..."
+# mkisofs -quiet -V 'x16-PROS' -input-charset iso8859-1 -o disk_img/x16pros.iso -b x16pros.img disk_img/
+# check_error "ISO creation failed"
+# print_ok "ISO image created successfully"
 
 
 echo -e "$NC"

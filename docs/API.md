@@ -289,10 +289,10 @@ information retrieval (time and date). It uses interrupt `0x23` and is initializ
 - **Description**: Returns the length of a null-terminated string.
 - **Input**:
     - `AH` = 0x01
-    - `AX` = Pointer to null-terminated string
+    - `SI` = Pointer to null-terminated string
 - **Output**:
-    - `AX` = Length of the string (excluding null terminator)
-- **Preserves**: All registers except `AX`
+    - `SI` = Length of the string (excluding null terminator)
+- **Preserves**: All registers except `SI`
 - **Error Handling**: No errors reported
 - **Notes**: Counts characters until a null terminator (`0x00`) is found.
 
@@ -301,7 +301,7 @@ information retrieval (time and date). It uses interrupt `0x23` and is initializ
 - **Description**: Converts all lowercase letters in a string to uppercase.
 - **Input**:
     - `AH` = 0x02
-    - `AX` = Pointer to null-terminated string
+    - `SI` = Pointer to null-terminated string
 - **Output**: Modifies the string in place
 - **Preserves**: All registers
 - **Error Handling**: No errors reported
@@ -324,7 +324,7 @@ information retrieval (time and date). It uses interrupt `0x23` and is initializ
 - **Description**: Removes leading and trailing spaces from a null-terminated string.
 - **Input**:
     - `AH` = 0x04
-    - `AX` = Pointer to null-terminated string
+    - `SI` = Pointer to null-terminated string
 - **Output**: Modifies the string in place
 - **Preserves**: All registers
 - **Error Handling**: No errors reported
@@ -374,7 +374,7 @@ information retrieval (time and date). It uses interrupt `0x23` and is initializ
 - **Description**: Reads a string from the keyboard into a buffer.
 - **Input**:
     - `AH` = 0x08
-    - `AX` = Pointer to destination buffer
+    - `SI` = Pointer to destination buffer
 - **Output**: Stores the input string in the buffer (null-terminated)
 - **Preserves**: All registers
 - **Error Handling**: No errors reported
@@ -388,7 +388,7 @@ information retrieval (time and date). It uses interrupt `0x23` and is initializ
 - **Output**: None
 - **Preserves**: All registers
 - **Error Handling**: No errors reported
-- **Notes**: Calls BIOS interrupt `0x10` with `AX = 0x12`.
+- **Notes**: Calls BIOS interrupt `0x10` with `SI = 0x12`.
 
 ### Function 0x0A: Get Time String
 
@@ -430,10 +430,10 @@ information retrieval (time and date). It uses interrupt `0x23` and is initializ
 - **Description**: Converts an integer to a null-terminated string.
 - **Input**:
     - `AH` = 0x0D
-    - `AX` = Integer value
+    - `SI` = Integer value
 - **Output**:
-    - `AX` = Pointer to the resulting string
-- **Preserves**: All registers except `AX`
+    - `SI` = Pointer to the resulting string
+- **Preserves**: All registers except `SI`
 - **Error Handling**: No errors reported
 - **Notes**: Uses a static buffer to store the string (up to 7 digits).
 
@@ -468,11 +468,11 @@ information retrieval (time and date). It uses interrupt `0x23` and is initializ
     - `AH` = 0x10
     - `SI` = Pointer to string
 - **Output**:
-    - `AX` = Pointer to first token (or 0 if none)
+    - `SI` = Pointer to first token (or 0 if none)
     - `BX` = Pointer to second token (or 0 if none)
     - `CX` = Pointer to third token (or 0 if none)
     - `DX` = Pointer to fourth token (or 0 if none)
-- **Preserves**: All registers except `AX`, `BX`, `CX`, `DX`
+- **Preserves**: All registers except `SI`, `BX`, `CX`, `DX`
 - **Error Handling**: Returns 0 for tokens not found
 - **Notes**: Modifies the original string by inserting null terminators at spaces.
 
@@ -505,4 +505,4 @@ information retrieval (time and date). It uses interrupt `0x23` and is initializ
 The x16-PRos operating system and its API are licensed under the MIT License. See the LICENSE.TXT for details.
 
 **Author**: PRoX (https://github.com/PRoX2011)  
-**Version**: 0.4  
+**Version**: 0.4, 0.5  
