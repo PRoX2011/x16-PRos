@@ -23,3 +23,5 @@ out/
 
 # clang-tidy output
 clang-tidy-fixes.patch
+
+disk_img/
