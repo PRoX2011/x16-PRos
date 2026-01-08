@@ -1,7 +1,7 @@
 from PIL import Image
 import os
 
-def prepare_bmp(input_path, output_path, max_width=220, max_height=170):
+def prepare_bmp(input_path, output_path, max_width=200, max_height=150):
     """
     Convert an image to 8-bit BMP with a 256-color palette.
     

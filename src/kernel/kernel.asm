@@ -20,6 +20,11 @@ start:
     mov ss, ax
     mov sp, 0x0FFFF
 
+    xor ax, ax            
+    mov es, ax
+    mov word [es:0x80], int20_handler 
+    mov word [es:0x82], cs          
+
     sti
 
     cld
@@ -47,7 +52,10 @@ start:
     call api_fs_init        ; File system API (INT 22h)
     call api_string_init    ; String API (INT 23h)
 
-    ; Display PRoX OS logo if available
+    ; Load SYSTEM.CFG (Logo and Sound settings)
+    call load_system_cfg
+
+    ; Display PRoX OS logo if available (using configured filename)
     call load_logo_and_display
 
     call set_video_mode
@@ -221,9 +229,15 @@ start:
     call string_clear_screen
 
     call print_interface    ; Help menu and header
+    
+    ; Check configuration for start sound
+    cmp byte [cfg_sound_enabled], 1
+    jne .skip_melody
+    
     mov si, start_melody
     call play_melody        ; Startup melody
 
+.skip_melody:
     ; Check for AUTOEXEC.BIN
     mov ax, autoexec_file
     call fs_file_exists
@@ -261,19 +275,384 @@ start:
 .password_input     times 32 db 0
 .default_suffix     db '@PRos] > ', 0
 
-; Load and display LOGO.BMP
+; ===================== SYSTEM CONFIGURATION =====================
+
+; Load SYSTEM.CFG
+load_system_cfg:
+    pusha
+    
+    mov byte [cfg_sound_enabled], 1    
+    mov byte [cfg_logo_stretch], 0   
+    
+    mov si, default_logo_file     
+    mov di, current_logo_file
+    call string_string_copy
+    
+    mov ax, system_cfg_file
+    mov cx, 32768                   
+    call fs_load_file
+    jc .done                          
+    
+    mov si, 32768                 
+    mov cx, bx                         
+    call parse_system_cfg_data
+    
+.done:
+    popa
+    ret
+
+parse_system_cfg_data:
+    pusha
+    
+.scan_loop:
+    cmp cx, 0
+    jle .finish_parse
+
+    lodsb
+    dec cx
+    cmp al, ' '
+    je .scan_loop
+    cmp al, 9      
+    je .scan_loop
+    cmp al, 13        
+    je .scan_loop
+    cmp al, 10      
+    je .scan_loop
+
+    cmp al, '#'
+    je .skip_comment_line
+
+    dec si
+    inc cx
+
+    push si
+    mov di, cfg_key_logo
+    call .check_keyword
+    jnc .found_logo
+    pop si
+
+    push si
+    mov di, cfg_key_logo_stretch
+    call .check_keyword
+    jnc .found_logo_stretch
+    pop si
+
+    push si
+    mov di, cfg_key_sound
+    call .check_keyword
+    jnc .found_sound
+    pop si
+
+    inc si
+    dec cx
+    jmp .scan_loop
+
+.skip_comment_line:
+    cmp cx, 0
+    jle .finish_parse
+    lodsb
+    dec cx
+    cmp al, 10     
+    je .scan_loop
+    cmp al, 13     
+    je .scan_loop
+    jmp .skip_comment_line
+
+.found_logo:
+    pop si          
+    add si, 5        
+    sub cx, 5
+    
+.skip_logo_spaces:
+    cmp cx, 0
+    jle .finish_parse
+    lodsb
+    dec cx
+    cmp al, ' '
+    je .skip_logo_spaces
+    cmp al, 9    
+    je .skip_logo_spaces
+    
+    dec si
+    inc cx
+    
+    push si
+    push cx
+    mov di, .false_str
+    call .check_keyword
+    pop cx
+    pop si
+    jnc .set_logo_false
+    
+    mov di, current_logo_file
+.copy_logo_val:
+    cmp cx, 0
+    jle .logo_val_done
+    lodsb
+    dec cx
+    cmp al, 13          ; CR
+    je .logo_val_done
+    cmp al, 10          ; LF
+    je .logo_val_done
+    cmp al, 0
+    je .logo_val_done
+    cmp al, '#'         ; Comment
+    je .logo_val_done
+    cmp al, ' '         ; Space 
+    je .check_logo_end
+    cmp al, 9           ; Tab
+    je .check_logo_end
+    stosb
+    jmp .copy_logo_val
+
+.check_logo_end:
+    cmp cx, 0
+    jle .logo_val_done
+    push si
+    lodsb
+    dec cx
+    cmp al, '#'
+    je .logo_val_done_pop
+    cmp al, 13
+    je .logo_val_done_pop
+    cmp al, 10
+    je .logo_val_done_pop
+    pop si
+    mov al, ' '
+    stosb
+    jmp .copy_logo_val
+
+.logo_val_done_pop:
+    pop si
+.logo_val_done:
+    mov byte [di], 0  
+    mov byte [cfg_logo_enabled], 1
+    jmp .scan_loop    
+
+.set_logo_false:
+    add si, 5       
+    sub cx, 5
+    mov byte [cfg_logo_enabled], 0
+.skip_logo_line:
+    cmp cx, 0
+    jle .finish_parse
+    lodsb
+    dec cx
+    cmp al, 10
+    je .scan_loop
+    cmp al, 13
+    je .scan_loop
+    jmp .skip_logo_line
+
+.found_logo_stretch:
+    pop si  
+    add si, 13        
+    sub cx, 13
+    
+.skip_stretch_spaces:
+    cmp cx, 0
+    jle .finish_parse
+    lodsb
+    dec cx
+    cmp al, ' '
+    je .skip_stretch_spaces
+    cmp al, 9       
+    je .skip_stretch_spaces
+    
+    dec si
+    inc cx
+
+    lodsb
+    dec cx
+    cmp al, 'F'
+    je .set_stretch_false
+    cmp al, 'f'
+    je .set_stretch_false
+    cmp al, 'T'
+    je .set_stretch_true
+    cmp al, 't'
+    je .set_stretch_true
+
+    mov byte [cfg_logo_stretch], 0
+    jmp .skip_stretch_line
+
+.set_stretch_false:
+    mov byte [cfg_logo_stretch], 0
+    jmp .skip_stretch_line
+
+.set_stretch_true:
+    mov byte [cfg_logo_stretch], 1
+    
+.skip_stretch_line:
+    cmp cx, 0
+    jle .finish_parse
+    lodsb
+    dec cx
+    cmp al, 10
+    je .scan_loop
+    cmp al, 13
+    je .scan_loop
+    jmp .skip_stretch_line
+
+.found_sound:
+    pop si      
+    add si, 12        
+    sub cx, 12
+    
+.skip_sound_spaces:
+    cmp cx, 0
+    jle .finish_parse
+    lodsb
+    dec cx
+    cmp al, ' '
+    je .skip_sound_spaces
+    cmp al, 9        
+    je .skip_sound_spaces
+    
+    dec si
+    inc cx
+    lodsb
+    dec cx
+    cmp al, 'F'
+    je .set_sound_false
+    cmp al, 'f'
+    je .set_sound_false
+    cmp al, 'T'
+    je .set_sound_true
+    cmp al, 't'
+    je .set_sound_true
+    
+    mov byte [cfg_sound_enabled], 1
+    jmp .skip_sound_line
+
+.set_sound_false:
+    mov byte [cfg_sound_enabled], 0
+    jmp .skip_sound_line
+
+.set_sound_true:
+    mov byte [cfg_sound_enabled], 1
+    
+.skip_sound_line:
+    cmp cx, 0
+    jle .finish_parse
+    lodsb
+    dec cx
+    cmp al, 10
+    je .scan_loop
+    cmp al, 13
+    je .scan_loop
+    jmp .skip_sound_line
+
+.finish_parse:
+    popa
+    ret
+
+.check_keyword:
+    push si
+    push di
+.kw_loop:
+    mov al, [di]
+    cmp al, 0
+    je .kw_match
+    mov ah, [si]
+    cmp ah, al
+    jne .kw_fail
+    inc si
+    inc di
+    jmp .kw_loop
+.kw_match:
+    pop di
+    pop si
+    clc
+    ret
+.kw_fail:
+    pop di
+    pop si
+    stc
+    ret
+
+.false_str db 'FALSE', 0
+
+; =================================================================
+
+; Load and display Logo
 load_logo_and_display:
     pusha
-    mov ax, pros_logo_file
+
+    cmp byte [cfg_logo_enabled], 0
+    je .done                  
+    
+    mov si, current_logo_file
+    mov di, si
+    xor cx, cx          
+    
+.find_slash:
+    lodsb
+    inc cx
+    cmp al, 0
+    je .no_path           
+    cmp al, '/'
+    je .path_found
+    jmp .find_slash
+
+.path_found:
+    mov si, current_logo_file
+    mov di, .temp_dir_path
+    dec cx   
+    
+.copy_dir_loop:
+    lodsb
+    stosb
+    dec cx
+    jnz .copy_dir_loop
+
+    mov al, '.'
+    stosb
+    mov al, 'D'
+    stosb
+    mov al, 'I'
+    stosb
+    mov al, 'R'
+    stosb
+    mov byte [di], 0
+
+    inc si
+
+    push si
+    mov di, .temp_file_name
+.copy_file_loop:
+    lodsb
+    stosb
+    cmp al, 0
+    jne .copy_file_loop
+
+    mov ax, .temp_dir_path
+    call fs_change_directory
+    jc .error_loading
+
+    pop ax          
+    mov cx, 32768
+    call fs_load_file
+    
+    pushf             
+    call fs_parent_directory  
+    popf
+    
+    jnc .display_logo
+    jmp .error_loading
+
+.no_path:
+    mov ax, current_logo_file   
     mov cx, 32768
     call fs_load_file
     jnc .display_logo
+
+.error_loading:
     mov si, error_message
     call print_string_red
     mov si, logo_missed
     call print_string
     call print_newline
-    ; Wait for key press
     mov ah, 0
     int 16h
     jmp .done
@@ -282,8 +661,16 @@ load_logo_and_display:
     mov ax, 0x13
     int 0x10
     push bx
-    mov si, 32768 
+    mov si, 32768
+    cmp byte [cfg_logo_stretch], 1
+    je .display_stretched
     call display_bmp
+    jmp .wait_key
+
+.display_stretched:
+    call display_bmp_stretched
+
+.wait_key:
     mov ah, 0
     int 16h
     mov byte [_palSet], 0
@@ -293,32 +680,39 @@ load_logo_and_display:
     popa
     ret
 
-; Load FIRST_B.CFG (create if not exists)
+.temp_dir_path  times 20 db 0
+.temp_file_name times 13 db 0
+
+; Load FIRST_B.CFG from CONF.DIR
+; If CONF.DIR or file missing -> Return '1' (First Boot)
 load_first_boot_cfg:
     pusha
+    
+    ; 1. Try Enter CONF.DIR
+    mov ax, conf_dir_name
+    call fs_change_directory
+    jc .fresh_install
+    
+    ; 2. Try Load File
     mov ax, first_boot_file
     mov cx, 32768
     call fs_load_file
-    jnc .done
-    mov si, error_message
-    call print_string_red
-    mov si, boot_cfg_missed
-    call print_string
-    call print_newline
-    ; Wait for key press
-    mov ah, 0
-    int 16h
+    jc .file_missing
+    
+    ; 3. Success: Go back
+    call fs_parent_directory
+    popa
+    ret
 
-    mov si, first_boot_value
-    mov di, 32768
-    mov cx, 2
-    rep movsb
-    mov ax, first_boot_file
-    mov bx, 32768
-    mov cx, 2
-    call fs_write_file
+.file_missing:
+    ; Go back even if file missing
+    call fs_parent_directory
 
-.done:
+.fresh_install:
+    ; If folder or file missing, simulate "First Boot"
+    ; by writing '1' into the buffer
+    mov byte [32768], '1'
+    mov byte [32769], 0
     popa
     ret
 
@@ -347,10 +741,26 @@ load_setup_bin:
 ; Load USER.CFG
 load_user_cfg:
     pusha
+    
+    mov ax, conf_dir_name
+    call fs_change_directory
+    jc .fail_load
+
     mov ax, user_cfg_file
     mov cx, 32768
     call fs_load_file
+    
+    pushf
+    push bx
+    
+    call fs_parent_directory
+    
+    pop bx
+    popf
+    
     jnc .done
+    
+.fail_load:
     mov si, error_message
     call print_string_red
     mov si, user_cfg_missed
@@ -365,46 +775,50 @@ load_user_cfg:
     popa
     ret
 
-; Load PROMPT.CFG
+; Load PROMPT.CFG 
 load_prompt_cfg:
     pusha
+    mov ax, conf_dir_name
+    call fs_change_directory
+    jc .fail
+    
     mov ax, prompt_cfg_file
     mov cx, 32768
     call fs_load_file
-    jnc .done
-    mov si, error_message
-    call print_string_red
-    mov si, prompt_cfg_missed
-    call print_string
-    call print_newline
-    ; Wait for key press
-    mov ah, 0
-    int 16h
-    stc  
-
-.done:
+    
+    pushf
+    call fs_parent_directory
+    popf
+    jc .fail
     popa
+    clc
+    ret
+.fail:
+    popa
+    stc
     ret
 
-; Load PASSWORD.CFG
+; Load PASSWORD.CFG 
 load_password_cfg:
     pusha
+    mov ax, conf_dir_name
+    call fs_change_directory
+    jc .fail
+    
     mov ax, password_cfg_file
     mov cx, 32768
     call fs_load_file
-    jnc .done
-    mov si, error_message
-    call print_string_red
-    mov si, pass_cfg_missed
-    call print_string
-    call print_newline
-    ; Wait for key press
-    mov ah, 0
-    int 16h
-    stc 
-
-.done:
+    
+    pushf
+    call fs_parent_directory
+    popf
+    jc .fail
     popa
+    clc
+    ret
+.fail:
+    popa
+    stc
     ret
 
 set_video_mode:
@@ -601,78 +1015,67 @@ print_interface:
 .tip        db 'Type HELP to get list of the comands', 10, 13, 0
 
 print_help:
-    call string_clear_screen
-    call string_get_cursor_pos
-    mov [.saved_row], dh
-    mov [.saved_col], dl
+    pusha
+
+    call save_current_dir
+    mov di, temp_saved_dir
+    mov si, current_directory
+    call string_string_copy
+    mov byte [current_directory], 0
+
+    mov ax, bin_dir_name
+    call fs_change_directory
+    jc .use_builtin_help
+
+    mov ax, .help_bin_file
+    call fs_file_exists
+    jc .restore_and_builtin
+
+    mov ax, .help_bin_file
+    mov bx, 0
+    mov cx, 32768
+    call fs_load_file
+    jc .restore_and_builtin
+
+    call restore_current_dir
+
+    mov ax, 0
+    mov bx, 0
+    mov cx, 0
+    mov dx, 0
+    mov word si, [param_list]
+    mov di, 0
     
-    mov word [current_category], 0
-    call .show_current_category
-
-.key_loop:
-    mov ah, 0    
-    int 16h    
-    ; Check for navigation keys
-    cmp ah, 0x48    ; Up arrow
-    je .prev_category
-    cmp ah, 0x4B    ; Left arrow
-    je .prev_category
-    cmp ah, 0x50    ; Down arrow
-    je .next_category
-    cmp ah, 0x4D    ; Right arrow
-    je .next_category
-    cmp al, 27      ; ESC key
-    je .exit_help
+    call DisableMouse
+    call 32768
     
-    jmp .key_loop   ; Ignore other keys
-
-.prev_category:
-    ; Can't go before first category
-    cmp word [current_category], 0
-    je .key_loop
-    dec word [current_category]
-    jmp .update_category
-
-.next_category:
-    mov si, help_categories
-    mov bx, [current_category]
-    shl bx, 1      
-    add si, bx
-    add si, 2      
-    cmp word [si], 0
-    je .key_loop  
-    inc word [current_category]
-
-.update_category:
-    call .show_current_category
-    jmp .key_loop
-
-.show_current_category:
-    mov dh, [.saved_row]
-    mov dl, [.saved_col]
-    call string_move_cursor
-
-    mov dh, [.saved_row]
-    mov dl, [.saved_col]
-    call string_move_cursor
+    mov ax, 0x2000
+    mov ds, ax
+    mov es, ax
     
-    mov si, help_categories
-    mov bx, [current_category]
-    shl bx, 1   
-    add si, bx
-    mov si, [si]   
-    call print_string_green
-    ret
+    call EnableMouse
+    call load_and_apply_theme
+    
+    popa
+    jmp get_cmd
 
-.exit_help:
-    mov dh, [.saved_row]
-    add dh, 22     
-    mov dl, 0
-    call string_move_cursor
-    jmp get_cmd  
+.restore_and_builtin:
+    mov di, current_directory
+    mov si, temp_saved_dir
+    call string_string_copy
 
-.saved_row db 0
-.saved_col db 0
+.use_builtin_help:
+    popa
+    call print_newline
+    
+    mov si, kshell_comands
+    call print_string
+    
+    call print_newline
+    
+    jmp get_cmd
+
+.help_bin_file db 'HELP.BIN', 0
 
 print_info:
     mov si, info
@@ -684,21 +1087,21 @@ print_info:
 
 shell:
 get_cmd:
-    mov si, final_prompt 
+    mov si, final_prompt
     call print_string
-    
+
     mov di, input
     mov al, 0
     mov cx, 256
     rep stosb
 
     mov di, command
+    mov al, 0
     mov cx, 32
     rep stosb
 
     mov ax, input
     call string_input_string
-
     call print_newline
 
     mov ax, input
@@ -711,18 +1114,19 @@ get_cmd:
     mov si, input
     mov al, ' '
     call string_string_tokenize
-
     mov word [param_list], di
 
     mov si, input
     mov di, command
     call string_string_copy
 
-    mov ax, input
+    mov ax, command
     call string_string_uppercase
 
-    mov si, input
+    mov si, command
 
+    ; ============ kernel shell comands ============
+    
     mov di, exit_string
     call string_string_compare
     jc near exit
@@ -799,14 +1203,6 @@ get_cmd:
     call string_string_compare
     jc near view_bmp
 
-    mov di, chars_string
-    call string_string_compare
-    jc near print_chars_table
-
-    mov di, grep_string
-    call string_string_compare
-    jc near grep_file
-
     mov di, head_string
     call string_string_compare
     jc near head_file
@@ -814,10 +1210,6 @@ get_cmd:
     mov di, tail_string
     call string_string_compare
     jc near tail_file
-
-    mov di, theme_string
-    call string_string_compare
-    jc near change_theme
 
     mov di, mkdir_string
     call string_string_compare
@@ -830,56 +1222,144 @@ get_cmd:
     mov di, cd_string
     call string_string_compare
     jc near cd_command
-
+    
     mov si, command
     mov di, kernel_file
     call string_string_compare
     jc no_kernel_allowed
 
+    ; ============ Check File Extension ============
+    
+    ; Check if command ends with .COM
     mov ax, command
-    call string_string_uppercase
     call string_string_length
-
+    cmp ax, 4
+    jl .check_bin_extension
+    
     mov si, command
     add si, ax
-
     sub si, 4
+    mov di, com_extension
+    call string_string_compare
+    jc .load_com_program
 
+.check_bin_extension:
+    ; Check if command ends with .BIN
+    mov ax, command
+    call string_string_length
+    mov si, command
+    add si, ax
+    sub si, 4
     mov di, bin_extension
     call string_string_compare
-    jc bin_file
+    jc .load_bin_program
 
+    ; ============ Auto-append Extensions ============
+    
+    ; No extension found, try .COM first
     mov ax, command
     call string_string_length
-
     mov si, command
     add si, ax
+    mov byte [si], '.'
+    mov byte [si+1], 'C'
+    mov byte [si+2], 'O'
+    mov byte [si+3], 'M'
+    mov byte [si+4], 0
 
+    ; Check if .COM file exists
+    mov ax, command
+    call fs_file_exists
+    jnc .load_com_program
+
+    ; .COM not found, try .BIN
+    mov ax, command
+    call string_string_length
+    mov si, command
+    add si, ax
+    sub si, 4
     mov byte [si], '.'
     mov byte [si+1], 'B'
     mov byte [si+2], 'I'
     mov byte [si+3], 'N'
     mov byte [si+4], 0
 
+.load_bin_program:
     mov si, command
     mov di, kernel_file
     call string_string_compare
     jc no_kernel_allowed
 
+    ; Try to load from current directory
     mov ax, command
     mov bx, 0
     mov cx, 32768
     call fs_load_file
-    jc total_fail
+    jnc execute_bin 
 
+    ; If not found, try /BIN directory 
+    call save_current_dir
+
+    mov di, temp_saved_dir
+    mov si, current_directory
+    call string_string_copy
+    mov byte [current_directory], 0
+
+    mov ax, bin_dir_name
+    call fs_change_directory
+    jc .restore_and_fail
+
+    mov ax, command
+    mov bx, 0
+    mov cx, 32768
+    call fs_load_file
+    jc .restore_and_fail
+
+    ; Restore original directory 
+    call restore_current_dir
     jmp execute_bin
 
-bin_file:
+.restore_and_fail:
+    mov di, current_directory
+    mov si, temp_saved_dir
+    call string_string_copy
+    jmp total_fail
+
+.load_com_program:
     mov ax, command
-    mov bx, 0
-    mov cx, 32768
-    call fs_load_file
-    jc total_fail
+    mov dx, program_seg
+    call fs_load_com
+    jc .try_bin_dir_com
+
+    jmp execute_com
+
+.try_bin_dir_com:
+    call save_current_dir
+    
+    mov di, temp_saved_dir
+    mov si, current_directory
+    call string_string_copy
+    mov byte [current_directory], 0
+
+    mov ax, bin_dir_name
+    call fs_change_directory
+    jc .restore_and_fail_com
+
+    mov ax, command
+    mov dx, program_seg
+    call fs_load_com
+    jc .restore_and_fail_com
+
+    call restore_current_dir
+    jmp execute_com
+
+.restore_and_fail_com:
+    mov di, current_directory
+    mov si, temp_saved_dir
+    call string_string_copy
+    jmp total_fail
+
+; ============ Execute BIN Program ============
 
 execute_bin:
     mov ax, 0
@@ -890,7 +1370,6 @@ execute_bin:
     mov di, 0
 
     call DisableMouse
-
     call 32768
 
     mov ax, 0x2000   
@@ -898,11 +1377,45 @@ execute_bin:
     mov es, ax           
 
     call EnableMouse
-
-    ; Load and aply theme from THEME.CFG file
     call load_and_apply_theme
 
     jmp get_cmd
+
+; ============ Execute COM Program ============
+
+execute_com:
+    ; Save current stack
+    mov [com_stack_save], sp
+    mov [com_ss_save], ss
+
+    call api_dos_init
+
+    ; Setup COM program environment
+    mov ax, program_seg     
+    mov ds, ax
+    mov es, ax
+
+    mov byte [ds:0x0000], 0xCD
+    mov byte [ds:0x0001], 0x20
+
+    ; Setup COM program stack
+    cli
+    mov ss, ax           
+    mov sp, 0xFFFE   
+    sti
+
+    call DisableMouse
+
+    push word 0x0000
+
+    ; Jump to COM program entry point (0x0100)
+    push word program_seg    ; CS
+    push word 0x0100         ; IP
+    retf                     ; Jump
+
+.com_return:
+    jmp int20_handler
+
 
 total_fail:
     mov si, invalid_msg
@@ -915,6 +1428,7 @@ no_kernel_allowed:
     call print_string_red
     call print_newline
     jmp get_cmd
+
 
 ; ------------------------------------------------------------------
 
@@ -1685,72 +2199,6 @@ string_string_parse:
     pop si
     ret
 
-; ===================== CUSTOMISATION =====================
-
-change_theme:
-    call string_clear_screen
-
-    mov si, [param_list]           ; Get parameter list
-    cmp byte [si], 0               ; Check if no parameters provided
-    je .show_usage
-
-    ; Check for -h flag
-    mov di, .help_flag_str
-    call string_string_compare
-    jc .show_usage
-
-    ; Check for theme names
-    mov di, .default_str
-    call string_string_compare
-    jc .set_default
-
-    mov di, .groovybox_str
-    call string_string_compare
-    jc .set_groovybox
-
-    mov di, .ubuntu_str
-    call string_string_compare
-    jc .set_ubuntu
-
-    ; Invalid theme
-    mov si, .invalid_theme_msg
-    call print_string_red
-    call print_newline
-    jmp get_cmd
-
-.set_default:
-    call set_default_palette
-    jmp .done
-
-.set_groovybox:
-    call set_groovybox_palette
-    jmp .done
-
-.set_ubuntu:
-    call set_ubuntu_palette
-    jmp .done
-
-.done:
-    call print_interface
-    jmp get_cmd
-
-.show_usage:
-    mov si, .usage_msg
-    call print_string
-    call print_newline
-    jmp get_cmd
-
-.help_flag_str    db '-h', 0
-.default_str      db 'DEFAULT', 0
-.groovybox_str    db 'GROOVYBOX', 0
-.ubuntu_str       db 'UBUNTU', 0
-.usage_msg        db 'Usage: theme [-h] | [thme name]', 10, 13
-                  db 'Themes:', 10, 13
-                  db '  DEFAULT   Set default color palette', 10, 13
-                  db '  GROOVYBOX Set groovybox color palette', 10, 13
-                  db '  UBUNTU    Set ubuntu color palette', 10, 13, 0
-.invalid_theme_msg db 'Invalid theme name', 0
-
 ; -----------------------------
 ; Set VGA background color
 ; IN  : AL = color number (0-15)
@@ -1776,449 +2224,6 @@ wait_for_key:
 
 .tmp_buf    dw 0
 
-
-; -----------------------------
-; Prints ASCII table (0-255)
-; IN  : Nothing
-; OUT : Nothing
-print_chars_table:
-    pusha
-    call print_newline
-    
-    mov cx, 0  
-    
-.print_loop:
-    mov ah, 0x0E
-    mov al, cl                    
-    mov bl, 0x0F           
-    int 0x10
-    
-    mov si, .sep
-    call print_string
-    
-    inc cx
-    cmp cx, 256
-    je .done
-    
-    mov ah, 0x0E
-    mov al, cl                    
-    int 0x10
-
-    mov si, .sep
-    call print_string
-    
-    inc cx
-    cmp cx, 256
-    je .done
-    
-    mov ah, 0x0E
-    mov al, cl                    
-    int 0x10
-
-    mov si, .sep
-    call print_string
-    
-    inc cx
-    cmp cx, 256
-    je .done
-    
-    mov ah, 0x0E
-    mov al, cl                    
-    int 0x10
-
-    mov si, .sep
-    call print_string
-    
-    inc cx
-    cmp cx, 256
-    je .done
-    
-    mov ah, 0x0E
-    mov al, cl                    
-    int 0x10
-
-    mov si, .sep
-    call print_string
-    
-    inc cx
-    cmp cx, 256
-    je .done
-    
-    mov ah, 0x0E
-    mov al, cl                    
-    int 0x10
-
-    mov si, .sep
-    call print_string
-    
-    inc cx
-    cmp cx, 256
-    je .done
-    
-    mov ah, 0x0E
-    mov al, cl                    
-    int 0x10
-
-    mov si, .sep
-    call print_string
-    
-    inc cx
-    cmp cx, 256
-    je .done
-    
-    mov ah, 0x0E
-    mov al, cl                    
-    int 0x10
-
-    mov si, .sep
-    call print_string
-    
-    inc cx
-    cmp cx, 256
-    je .done
-    
-    mov ah, 0x0E
-    mov al, cl                    
-    int 0x10
-
-    mov si, .sep
-    call print_string
-    
-    inc cx
-    cmp cx, 256
-    je .done
-    
-    mov ah, 0x0E
-    mov al, cl                    
-    int 0x10
-
-    mov si, .sep
-    call print_string
-    
-    inc cx
-    cmp cx, 256
-    je .done
-    
-    mov ah, 0x0E
-    mov al, cl                    
-    int 0x10
-    
-    call print_newline
-    inc cx
-    cmp cx, 256
-    jb .print_loop
-    
-.done:
-    call print_newline
-    call print_newline
-    popa
-    jmp get_cmd
-
-.sep db '  ', 0
-
-; ===================== GREP Command =====================
-
-grep_file:
-    call print_newline
-    pusha
-    
-    ; Parse parameters (filename and search string)
-    mov word si, [param_list]
-    call string_string_parse
-    cmp ax, 0
-    je .not_enough_params
-    cmp bx, 0
-    je .not_enough_params
-    
-    ; AX = filename, BX = search string
-    mov [.filename], ax
-    mov [.search_str], bx
-    
-    ; Check if file exists
-    mov ax, [.filename]
-    call fs_file_exists
-    jc .file_not_found
-    
-    ; Load file into memory
-    mov ax, [.filename]
-    mov cx, 32768
-    call fs_load_file
-    jc .load_error
-    
-    ; Check if file is empty
-    cmp bx, 0
-    je .empty_file
-    
-    ; Prepare for search
-    mov word [.file_size], bx
-    mov word [.file_ptr], 32768
-    mov word [.line_num], 1
-    mov word [.col_num], 1
-    mov word [.match_count], 0
-    
-    ; Get search string length
-    mov ax, [.search_str]
-    call string_string_length
-    mov [.search_len], ax
-    cmp ax, 0
-    je .invalid_search
-    
-    ; Convert search string to uppercase for case-insensitive search
-    mov ax, [.search_str]
-    call string_string_uppercase
-    
-.search_loop:
-    ; Check if we have enough bytes left to match
-    mov ax, [.file_size]
-    cmp ax, [.search_len]
-    jb .search_complete
-    
-    ; Compare current position with search string
-    mov si, [.file_ptr]
-    mov di, [.search_str]
-    mov cx, [.search_len]
-    call .compare_chars
-    jc .match_found
-    
-    ; No match, move to next character
-    mov si, [.file_ptr]
-    mov al, [si]
-    call .process_char
-    inc word [.file_ptr]
-    dec word [.file_size]
-    jmp .search_loop
-
-.match_found:
-    ; We found a match
-    inc word [.match_count]
-    
-    ; Find start of line
-    call .find_line_start
-    
-    ; Find end of line
-    call .find_line_end
-    
-    ; Print the line with highlighted match
-    call .print_line_with_match
-    
-    ; Skip past the matched string
-    mov ax, [.search_len]
-    add [.file_ptr], ax
-    sub [.file_size], ax
-    jmp .search_loop
-
-.search_complete:
-    cmp word [.match_count], 0
-    jne .done
-    mov si, .no_matches_msg
-    call print_string
-    call print_newline
-    jmp .done
-
-.not_enough_params:
-    mov si, .usage_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.file_not_found:
-    mov si, notfound_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.load_error:
-    mov si, .load_error_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.empty_file:
-    mov si, .empty_file_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.invalid_search:
-    mov si, .invalid_search_msg
-    call print_string_red
-    call print_newline
-
-.done:
-    popa
-    jmp get_cmd
-
-; Compare characters case-insensitively
-; SI = file pointer, DI = search string, CX = length
-; Returns carry set if match
-.compare_chars:
-    pusha
-.compare_loop:
-    mov al, [si]
-    call .to_upper
-    mov bl, [di]
-    cmp al, bl
-    jne .no_match
-    inc si
-    inc di
-    loop .compare_loop
-    stc
-    jmp .compare_done
-.no_match:
-    clc
-.compare_done:
-    popa
-    ret
-
-; Convert character in AL to uppercase
-.to_upper:
-    cmp al, 'a'
-    jb .not_lower
-    cmp al, 'z'
-    ja .not_lower
-    sub al, 32
-.not_lower:
-    ret
-
-; Process character for line/column counting
-; AL = character
-.process_char:
-    cmp al, 10          ; Newline
-    je .newline
-    cmp al, 13          ; Carriage return
-    je .carriage_return
-    inc word [.col_num]
-    ret
-.newline:
-    inc word [.line_num]
-    mov word [.col_num], 1
-    ret
-.carriage_return:
-    mov word [.col_num], 1
-    ret
-
-; Find start of current line
-.find_line_start:
-    pusha
-    mov si, [.file_ptr]
-    mov cx, [.file_ptr]
-    sub cx, 32768       ; Calculate how far we can go back
-    jbe .find_start_done ; At start of file
-    
-.find_start_loop:
-    dec si
-    mov al, [si]
-    cmp al, 10          ; Found newline
-    je .found_start
-    loop .find_start_loop
-    jmp .find_start_done
-    
-.found_start:
-    inc si              ; Point to first char after newline
-    
-.find_start_done:
-    mov [.line_start], si
-    popa
-    ret
-
-; Find end of current line
-.find_line_end:
-    pusha
-    mov si, [.file_ptr]
-    mov cx, [.file_size]
-    
-.find_end_loop:
-    mov al, [si]
-    cmp al, 10          ; Found newline
-    je .found_end
-    cmp al, 13          ; Found carriage return
-    je .found_end
-    inc si
-    loop .find_end_loop
-    
-.found_end:
-    mov [.line_end], si
-    popa
-    ret
-
-; Print line with highlighted match
-.print_line_with_match:
-    pusha
-    
-    ; Print line number in yellow
-    mov ah, 0x0E
-    mov si, .line
-    call print_string_yellow
-    
-    mov ax, [.line_num]
-    call print_decimal
-    
-    mov al, ' '
-    int 0x10
-    mov si, .column
-    call print_string_yellow
-    
-    mov ax, [.col_num]
-    call print_decimal
-
-    call print_newline
-    
-    ; Print the line with match highlighted
-    mov si, [.line_start]
-    mov di, [.line_end]
-    
-.print_line_loop:
-    cmp si, di
-    jae .print_line_done
-    
-    ; Check if we're at the match position
-    mov ax, [.file_ptr]
-    cmp si, ax
-    jb .normal_char
-    mov ax, [.file_ptr]
-    add ax, [.search_len]
-    cmp si, ax
-    jae .normal_char
-    
-    ; Highlighted character (red)
-    mov bl, 0x0C        ; Red
-    jmp .print_char
-    
-.normal_char:
-    mov bl, 0x07        ; White
-    
-.print_char:
-    mov ah, 0x0E
-    mov al, [si]
-    int 0x10
-    inc si
-    jmp .print_line_loop
-    
-.print_line_done:
-    call print_newline
-    call print_newline
-    popa
-    ret
-
-; Data for grep command
-.filename       dw 0
-.search_str     dw 0
-.search_len     dw 0
-.file_size      dw 0
-.file_ptr       dw 0
-.line_num       dw 0
-.col_num        dw 0
-.match_count    dw 0
-.line_start     dw 0
-.line_end       dw 0
-
-.usage_msg          db 'Usage: grep <filename> <search_string>', 0
-.load_error_msg     db 'Error loading file', 0
-.empty_file_msg     db 'File is empty', 0
-.invalid_search_msg db 'Invalid search string', 0
-.no_matches_msg     db 'No matches found', 0
-.line               db 'Line:', 0
-.column             db 'Column:', 0
 
 ; ===================== HEAD Command =====================
 
@@ -2773,7 +2778,8 @@ cd_command:
 %INCLUDE "src/kernel/features/speaker.asm"          ; PC speaker functions
 %INCLUDE "src/kernel/features/bmp_rendering.asm"    ; BMP rendering functions
 %INCLUDE "src/kernel/features/themes.asm"           ; Themes 
-%INCLUDE "src/kernel/features/encrypt.asm"          ; Encryption
+%INCLUDE "src/kernel/features/encrypt.asm"          ; Encryption     
+%INCLUDE "src/kernel/features/com.asm"              ; COM     
 
 ; ====== DRIVERS ======
 %INCLUDE "src/drivers/ps2_mouse.asm"                ; Mouse driver
@@ -2790,144 +2796,31 @@ cd_command:
 ; ------ Header ------
 header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v0.6', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
 
-; ------ Help menu categories ------
-help_categories:
-    dw  help_menu_1, help_menu_2, help_menu_3, help_menu_4, help_menu_5, help_menu_6                                           
-    dw 0 
-
-current_category dw 0
-
-help_menu_1 db 0xC9, 18 dup(0xCD), ' PRos help ', 18 dup(0xCD), 0xBB, 10, 13
-     db 0xBA, ' Basic Commands                          [1/6] ', 0xBA, 10, 13
-     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
-     db 0xBA, '  help   - get list of the commands            ', 0xBA, 10, 13
-     db 0xBA, '  info   - print system information            ', 0xBA, 10, 13
-     db 0xBA, '  ver    - print PRos terminal version         ', 0xBA, 10, 13
-     db 0xBA, '  cls    - clear terminal                      ', 0xBA, 10, 13
-     db 0xBA, '  shut   - shutdown PC                         ', 0xBA, 10, 13
-     db 0xBA, '  reboot - restart system                      ', 0xBA, 10, 13
-     db 0xBA, '  date   - print current date (DD/MM/YY)       ', 0xBA, 10, 13
-     db 0xBA, '  time   - print current time (HH:MM:SS)       ', 0xBA, 10, 13
-     db 0xBA, '  cpu    - print CPU information               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
-     db 0xBA, ' <-- Back   |  Press ESC to exit   |  Next --> ', 0xBA, 10, 13
-     db 0xC8, 47 dup(0xCD), 0xBC, 0
-
-help_menu_2 db 0xC9, 18 dup(0xCD), ' PRos help ', 18 dup(0xCD), 0xBB, 10, 13
-     db 0xBA, ' File Operations                         [2/6] ', 0xBA, 10, 13
-     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
-     db 0xBA, '  dir               - list files on disk       ', 0xBA, 10, 13
-     db 0xBA, '  size  <filename>  - get file size            ', 0xBA, 10, 13
-     db 0xBA, '  cat   <filename>  - display file contents    ', 0xBA, 10, 13
-     db 0xBA, '  del   <filename>  - delete a file            ', 0xBA, 10, 13
-     db 0xBA, '  copy  <f1> <f2>   - copy a file (only root)  ', 0xBA, 10, 13
-     db 0xBA, '  ren   <f1> <f2>   - rename a file (only root)', 0xBA, 10, 13
-     db 0xBA, '  touch <filename>  - create empty file        ', 0xBA, 10, 13
-     db 0xBA, '  write <f> <text>  - write text to file       ', 0xBA, 10, 13
-     db 0xBA, '  view  <filename>  - view BMP image           ', 0xBA, 10, 13
-     db 0xBA, '  grep  <f1> <txt>  - find text in the file    ', 0xBA, 10, 13
-     db 0xBA, '  head  <filename>  - show first 10 lines      ', 0xBA, 10, 13
-     db 0xBA, '                      of a TXT file            ', 0xBA, 10, 13
-     db 0xBA, '  tail  <filename>  - show last 10 lines       ', 0xBA, 10, 13
-     db 0xBA, '                      of a TXT file            ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
-     db 0xBA, ' <-- Back   |  Press ESC to exit   |  Next --> ', 0xBA, 10, 13
-     db 0xC8, 47 dup(0xCD), 0xBC, 0
-
-help_menu_3 db 0xC9, 18 dup(0xCD), ' PRos help ', 18 dup(0xCD), 0xBB, 10, 13
-     db 0xBA, ' Directories Operations                  [3/6] ', 0xBA, 10, 13
-     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
-     db 0xBA, '  cd     <dirname>  - change directory         ', 0xBA, 10, 13
-     db 0xBA, '  mkdir  <dirname>  - create directory         ', 0xBA, 10, 13
-     db 0xBA, '  deldir <dirname>  - delete directory         ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
-     db 0xBA, ' <-- Back   |  Press ESC to exit   |  Next --> ', 0xBA, 10, 13
-     db 0xC8, 47 dup(0xCD), 0xBC, 0
-
-help_menu_4 db 0xC9, 18 dup(0xCD), ' PRos help ', 18 dup(0xCD), 0xBB, 10, 13
-     db 0xBA, ' Image Operations                        [4/6] ', 0xBA, 10, 13
-     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
-     db 0xBA, '  view  <filename> <flags>  - view image file  ', 0xBA, 10, 13
-     db 0xBA, '                      ---                      ', 0xBA, 10, 13
-     db 0xBA, '  The VIEW command allows you to view BMP      ', 0xBA, 10, 13
-     db 0xBA, '  image files with or without 2x upscaling.    ', 0xBA, 10, 13
-     db 0xBA, '  To enable 2x upscaling when displaying,      ', 0xBA, 10, 13
-     db 0xBA, '  add the -upscale flag                        ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
-     db 0xBA, ' <-- Back   |  Press ESC to exit   |  Next --> ', 0xBA, 10, 13
-     db 0xC8, 47 dup(0xCD), 0xBC, 0
-
-help_menu_5 db 0xC9, 18 dup(0xCD), ' PRos help ', 18 dup(0xCD), 0xBB, 10, 13
-     db 0xBA, ' Other stuff                             [5/6] ', 0xBA, 10, 13
-     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
-     db 0xBA, '  chars           - show characters table      ', 0xBA, 10, 13
-     db 0xBA, '  theme <name>    - change color theme         ', 0xBA, 10, 13
-     db 0xBA, '  exit            - exit to boot loader        ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
-     db 0xBA, ' <-- Back   |  Press ESC to exit   |  Next --> ', 0xBA, 10, 13
-     db 0xC8, 47 dup(0xCD), 0xBC, 0
-
-help_menu_6 db 0xC9, 18 dup(0xCD), ' PRos help ', 18 dup(0xCD), 0xBB, 10, 13
-     db 0xBA, ' Programs                                [6/6] ', 0xBA, 10, 13
-     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
-     db 0xBA, ' In order to execute a program in x16-PRos     ', 0xBA, 10, 13
-     db 0xBA, ' you need to enter the name of the executable  ', 0xBA, 10, 13
-     db 0xBA, ' BIN file with or without extension in the     ', 0xBA, 10, 13
-     db 0xBA, ' terminal. Some programs may reboot your PC    ', 0xBA, 10, 13
-     db 0xBA, ' after finishing their work.                   ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, '                                               ', 0xBA, 10, 13
-     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
-     db 0xBA, ' <-- Back   |  Press ESC to exit   |  Next --> ', 0xBA, 10, 13
-     db 0xC8, 47 dup(0xCD), 0xBC, 0
+; ------ Help ------
+kshell_comands db 'HELP               - get list of commands', 10, 13
+               db 'INFO               - system information', 10, 13
+               db 'VER                - terminal version', 10, 13
+               db 'CLS                - clear screen', 10, 13
+               db 'SHUT               - shutdown', 10, 13
+               db 'REBOOT             - restart', 10, 13
+               db 'DATE               - current date (DD/MM/YY)', 10, 13
+               db 'TIME               - current time (HH:MM:SS)', 10, 13
+               db 'CPU                - CPU info', 10, 13
+               db 'DIR                - list files', 10, 13
+               db 'SIZE   <f>         - file size', 10, 13
+               db 'CAT    <f>         - show file', 10, 13
+               db 'DEL    <f>         - delete file', 10, 13
+               db 'COPY   <f1> <f2>   - copy file (root only)', 10, 13
+               db 'REN    <f1> <f2>   - rename file (root only)', 10, 13
+               db 'TOUCH  <f>         - create empty file', 10, 13
+               db 'WRITE  <f> <text>  - write to file', 10, 13
+               db 'VIEW   <f> <flags> - view BMP image', 10, 13
+               db 'HEAD   <f>         - first 10 lines of TXT', 10, 13
+               db 'TAIL   <f>         - last 10 lines of TXT', 10, 13
+               db 'CD     <dir>       - change directory', 10, 13
+               db 'MKDIR  <dir>       - create directory', 10, 13
+               db 'DELDIR <dir>       - delete directory', 10, 13
+               db 'EXIT               - exit to bootloader', 10, 13, 0
 
 ; ------ About OS ------
 info db 10, 13
@@ -2940,7 +2833,7 @@ info db 10, 13
      db '  Video mode: 0x12 (640x480; 16 colors)', 10, 13
      db '  File system: FAT12', 10, 13
      db '  License: MIT', 10, 13
-     db '  OS version: 0.5.9.1', 10, 13
+     db '  OS version: 0.6', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.2', 10, 13, 0
@@ -2965,11 +2858,8 @@ cpu_string     db 'CPU', 0
 touch_string   db 'TOUCH', 0
 write_string   db 'WRITE', 0
 view_string    db 'VIEW', 0
-chars_string   db 'CHARS', 0 
-grep_string    db 'GREP', 0
 head_string    db 'HEAD', 0
 tail_string    db 'TAIL', 0
-theme_string   db 'THEME', 0
 mkdir_string   db 'MKDIR', 0
 deldir_string  db 'DELDIR', 0
 cd_string      db 'CD', 0
@@ -3054,12 +2944,17 @@ x_offset dw 0
 y_offset dw 0
 
 bin_extension   db '.BIN', 0
+com_extension   db '.COM', 0
 
 total_file_size dd 0
 file_count      dw 0
 
 timezone_offset dw 0
 
+com_stack_save  dw 0
+com_ss_save     dw 0
+
+program_seg    equ 0x3000
 
 first_boot_value         db '1', 0
 
@@ -3072,7 +2967,19 @@ theme_cfg_file       db 'THEME.CFG', 0
 first_boot_file      db 'FIRST_B.CFG', 0
 prompt_cfg_file      db 'PROMPT.CFG', 0
 autoexec_file        db 'AUTOEXEC.BIN', 0
-pros_logo_file       db 'LOGO.BMP', 0
+
+system_cfg_file      db 'SYSTEM.CFG', 0
+cfg_key_logo         db 'LOGO=', 0
+cfg_key_logo_stretch db 'LOGO_STRETCH=', 0
+cfg_key_sound        db 'START_SOUND=', 0
+default_logo_file    db 'LOGO.BMP', 0
+cfg_sound_enabled    db 1  ; 1 = True, 0 = False
+cfg_logo_enabled     db 1  ; 1 = True, 0 = False 
+cfg_logo_stretch     db 0  ; 1 = Stretch, 0 = Centered 
+
+bin_dir_name         db 'BIN.DIR', 0
+conf_dir_name        db 'CONF.DIR', 0
+
 
 login_password_prompt  db 19 dup(' '), 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                        db 19 dup(' '), 0xBA, '        Enter your password:           ', 0xBA, 10, 13
@@ -3086,15 +2993,18 @@ bootdev      db 0
 fmt_date     dw 1
  
 ; ------ Buffers ------
+current_logo_file resb 13 
 tmp_string        resb 15    
 command           resb 32    
 user              resb 32    
 password          resb 32    
 decrypted_pass    resb 32    
-timezone          resb 32    
+timezone          resb 32   
+saved_directory   resb 32  
 final_prompt      resb 64    
 temp_prompt       resb 64      
 input             resb 256   
 current_directory resb 256   
+temp_saved_dir    resb 256
 dirlist           resb 1024  
-file_buffer       resb 32768 
+file_buffer       resb 32768

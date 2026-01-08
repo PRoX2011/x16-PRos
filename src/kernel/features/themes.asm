@@ -1,129 +1,17 @@
-%macro SetPaletteBios 4
-    mov ax, 1010h   
-    mov bx, %1     
-    mov dh, %2   
-    mov ch, %3      
-    mov cl, %4    
-    int 10h        
-%endmacro
-
-set_default_palette:
-    ret
-    
-set_groovybox_palette:
-    pusha       
-
-    ; Color 0
-    SetPaletteBios 0, 8, 9, 11
-
-    ; Color 1
-    SetPaletteBios 1, 0, 0, 32
-
-    ; Color 2
-    SetPaletteBios 2, 0, 32, 0
-
-    ; Color 3
-    SetPaletteBios 3, 0, 32, 32
-
-    ; Color 4
-    SetPaletteBios 4, 32, 0, 0
-
-    ; Color 5
-    SetPaletteBios 5, 20, 13, 18
-
-    ; Color 6
-    SetPaletteBios 6, 42, 17, 6
-
-    ; Color 7
-    SetPaletteBios 7, 24, 22, 22
-
-    ; Color 8
-    SetPaletteBios 8, 14, 14, 14
-
-    ; Color 9
-    SetPaletteBios 9, 31, 37, 46
-
-    ; Color 10
-    SetPaletteBios 10, 35, 50, 15
-
-    ; Color 11
-    SetPaletteBios 11, 20, 51, 50
-
-    ; Color 12
-    SetPaletteBios 12, 55, 13, 13
-
-    ; Color 13
-    SetPaletteBios 13, 43, 31, 38
-
-    ; Color 14
-    SetPaletteBios 14, 58, 51, 21
-
-    ; Color 15
-    SetPaletteBios 15, 56, 53, 52
-
-    popa   
-    ret
-
-set_ubuntu_palette:
-    pusha      
-
-    ; Color 0
-    SetPaletteBios 0, 20, 9, 14
-
-    ; Color 1
-    SetPaletteBios 1, 18, 26, 40
-
-    ; Color 2
-    SetPaletteBios 2, 21, 37, 10
-
-    ; Color 3
-    SetPaletteBios 3, 18, 26, 40
-
-    ; Color 4
-    SetPaletteBios 4, 46, 9, 12
-
-    ; Color 5
-    SetPaletteBios 5, 29, 25, 36
-
-    ; Color 6
-    SetPaletteBios 6, 41, 15, 12
-
-    ; Color 7
-    SetPaletteBios 7, 22, 26, 28
-
-    ; Color 8
-    SetPaletteBios 8, 14, 19, 22
-
-    ; Color 9
-    SetPaletteBios 9, 28, 41, 53
-
-    ; Color 10
-    SetPaletteBios 10, 33, 53, 22
-
-    ; Color 11
-    SetPaletteBios 11, 16, 53, 56
-
-    ; Color 12
-    SetPaletteBios 12, 53, 17, 20
-
-    ; Color 13
-    SetPaletteBios 13, 41, 34, 45
-
-    ; Color 14
-    SetPaletteBios 14, 56, 55, 27
-
-    ; Color 15
-    SetPaletteBios 15, 47, 50, 52
-
-    popa  
-    ret
-
 ; -----------------------------
 ; Load and apply theme from THEME.CFG
 ; IN  : Nothing
 ; OUT : Nothing (carry flag set on error)
 load_and_apply_theme:
     pusha
+
+    call save_current_dir
+
+    call fs_parent_directory
+
+    mov ax, conf_dir_name
+    call fs_change_directory
+    jc .error
     
     ; Load THEME.CFG file
     mov ax, theme_cfg_file
@@ -153,6 +41,9 @@ load_and_apply_theme:
 .done:
     clc
     popa
+
+    call restore_current_dir
+    
     ret
 
 .error:

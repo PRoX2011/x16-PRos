@@ -25,6 +25,13 @@
 
 Designed for simplicity and educational value, x16-PRos provides a platform for low-level programming enthusiasts to explore bare-metal development on x86 systems.
 
+> [!IMPORTANT]  
+> The project needs contributors. Now only I, PRoX2011, is working on the kernel, but I can’t do everything alone. I would like to ask you how to help the project.
+> - Programs
+> - Development of a compatibility layer with MS DOS
+> - Improved documentation and instructions
+>   
+> If you help - thank you so much
 
 <div style="display: flex; flex-direction: row; gap: 20px">
   <img src="docs/screenshots/setup.png" width=45%>
@@ -45,6 +52,7 @@ Designed for simplicity and educational value, x16-PRos provides a platform for 
 
 ## Key Features
 
+- **MS-DOS Compatibility**: Native support for running standard MS-DOS `.COM` executables.
 - **Encrypted Password System**: XOR-based password encryption with custom key
 - **User Authentication**: Login system with configurable user account
 - **Password Protection**: Encrypted PASSWORD.CFG prevents plaintext password storage
@@ -69,6 +77,9 @@ Designed for simplicity and educational value, x16-PRos provides a platform for 
 ## 🖥️ PRos Terminal
 
 The system includes a powerful terminal - **PRos Terminal**. It not only allows you to launch programs but also offers a wide range of built-in commands and utilities.
+
+> [!NOTE]  
+> To run a program, enter the name of the executable file (.BIN or .COM) with or without an extension. Programs will be launched from any directory if its file is placed in the BIN/ directory, and if the program file is not found there, the system will try to find the program in the current, working directory
 
 <div style="display: flex; flex-direction: row; gap: 20px">
   <img src="docs/screenshots/dir.png" width=45%>
@@ -111,7 +122,6 @@ The system includes a powerful terminal - **PRos Terminal**. It not only allows 
 #### Text Processing
 | Command | Syntax | Description |
 |---------|--------|-------------|
-| `grep` | `grep <file> <text>` | Search for text in file with line/column highlighting |
 | `head` | `head <filename>` | Display first 10 lines of file |
 | `tail` | `tail <filename>` | Display last 10 lines of file |
 
@@ -125,9 +135,7 @@ The system includes a powerful terminal - **PRos Terminal**. It not only allows 
 #### Media & Display
 | Command | Syntax | Description |
 |---------|--------|-------------|
-| `view` | `view <file> [-upscale]` | Display BMP image with optional 2x scaling |
-| `chars` | `chars` | Display ASCII character table |
-| `theme` | `theme <name>` | Change color theme (DEFAULT/GROOVYBOX/UBUNTU) |
+| `view` | `view <file> [-upscale] [-stretch]` | Display BMP image with optional 2x scaling |
 
 #### Power Management
 | Command | Description |
@@ -143,6 +151,7 @@ x16-PRos uses several configuration files in the root directory:
 
 | File | Purpose | Format |
 |------|---------|--------|
+| `SYSTEM.CFG` | System boot settings | Key=Value properties |
 | `FIRST_B.CFG` | First boot flag | `0` or `1` (triggers SETUP.BIN on `1`) |
 | `USER.CFG` | Username | Plain text (max 31 chars) |
 | `PASSWORD.CFG` | Encrypted password | XOR-encrypted password |
@@ -151,7 +160,7 @@ x16-PRos uses several configuration files in the root directory:
 | `TIMEZONE.CFG` | Timezone offset | Integer value (hours from UTC) |
 
 ### Prompt Customization
-In the x16-PRos operating system, the command line prompt is configured using the PROMPT.CFG file, which is located in the root directory of the drive.
+In the x16-PRos operating system, the command line prompt is configured using the PROMPT.CFG file, which is located in the CONF directory of the drive.
 
 By default, if the PROMPT.CFG file is missing, a prompt of the following format is used:
 `[$username@PRos] >`
@@ -159,12 +168,16 @@ By default, if the PROMPT.CFG file is missing, a prompt of the following format 
 
 #### How to create or edit a prompt
 
-1. Create (or edit an existing) file `PROMPT.CFG` in the root directory.
+1. Create (or edit an existing) file `PROMPT.CFG` in the CONF directory.
 2. Write a prompt string without the terminating null byte (plain text) into it.
 3. The maximum string length is 63 characters. Anything longer will be truncated.
 4. Reboot the OS.
 
-
+### System Configuration (SYSTEM.CFG)
+This file controls the visual and audio aspects of the boot process.
+- **LOGO**: Path to the BMP file displayed at startup (e.g., `LOGO=BMP/LOGO.BMP`).
+- **LOGO_STRETCH**: Scales the logo to full screen if set to `TRUE`.
+- **START_SOUND**: Enables (`TRUE`) or disables (`FALSE`) the startup melody.
 
 
 ### Password Encryption
@@ -269,12 +282,23 @@ Hex editor
 </td>
 </tr>
 <td width="33%" align="center">
+<img src="docs/screenshots/tetris.png" width="100%"><br>
+<b>TETRIS.BIN</b><br>
+Tetris game 
+</td>
+<td width="33%" align="center">
+<img src="docs/screenshots/mandel.png" width="100%"><br>
+<b>MANDEL.BIN</b><br>
+Mandelbrot-Menge
+</td>
+<td width="33%" align="center">
 <br>
 <b>And more...</b><br>
-SNAKE.BIN, CREDITS.BIN, MANDEL.BIN, AUTOEXEC.BIN
+SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, THEME.BIN, CHARS.BIN, HELLO.COM, FRACTAL.COM
 </td>
 </tr>
 </table>
+
 
 **Developing Your Own Programs**
 
@@ -339,7 +363,6 @@ chmod +x build-linux.sh
 ### Build Output
 
 - `disk_img/x16pros.img` - Bootable floppy disk image (1.44MB)
-- `disk_img/x16pros.iso` - Bootable CD disk image (1.75MB)
 - `build/` - Compiled binaries and intermediate files
 
 ---

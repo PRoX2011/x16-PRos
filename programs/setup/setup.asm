@@ -68,29 +68,39 @@ setup:
     mov ax, di             
     call string_input_string  
     
-    ; Check if input is empty
+    ; Check length
     mov si, 43008
     call string_string_length
     cmp ax, 0
-    jne .copy_username
+    je .skip_copy_user
     
-    ; Use default username if input is empty
-    mov si, default_username
-    jmp .save_username
-    
-.copy_username:
+    ; Copy input to 'user' variable
     mov si, 43008
-    
-.save_username:
     mov di, user 
     mov cx, 31  
     call string_string_copy 
+
+.skip_copy_user:
+    ; --- SAVE USER.CFG in CONF.DIR ---
+    ; 1. Create directory (ignore error if exists)
+    mov ah, 0x0B
+    mov si, conf_dir_name
+    int 0x22
+
+    ; 2. Enter directory
+    mov ah, 0x09
+    mov si, conf_dir_name
+    int 0x22
     
-    ; Save USER.CFG
+    ; 3. Save file
     mov ah, 0x03
     mov si, user_cfg_file
     mov bx, user              
     mov cx, 32
+    int 0x22
+
+    ; 4. Exit directory
+    mov ah, 0x0A
     int 0x22
 
     ; ========== PASSWORD SETUP ==========
@@ -106,7 +116,6 @@ setup:
     mov dl, 0
     call string_move_cursor
     
-    ; Prompt for password
     mov ah, 0x01
     mov si, setup_password_prompt
     int 0x21
@@ -115,41 +124,39 @@ setup:
     mov dl, 5
     call string_move_cursor
     
-    ; Get password input
     mov di, 43008  
     mov byte [di], 0           
     mov ax, di             
     call string_input_string  
     
-    ; Check if input is empty
     mov si, 43008
     call string_string_length
     cmp ax, 0
-    jne .copy_password
+    je .encrypt_pass ; use default empty pass
     
-    ; Use default password if input is empty
-    mov si, default_password
-    jmp .save_password
-    
-.copy_password:
     mov si, 43008
-    
-.save_password:
     mov di, password 
     mov cx, 31  
     call string_string_copy 
-    
-    ; Encrypt the password
+
+.encrypt_pass:
     mov si, password
     mov di, encrypted_pass
     mov cx, 31
     call encrypt_string
     
-    ; Save PASSWORD.CFG with encrypted password
+    ; --- SAVE PASSWORD.CFG in CONF.DIR ---
+    mov ah, 0x09
+    mov si, conf_dir_name
+    int 0x22
+
     mov ah, 0x03
     mov si, password_cfg_file
     mov bx, encrypted_pass              
     mov cx, 32
+    int 0x22
+
+    mov ah, 0x0A
     int 0x22
 
     ; ========== TIMEZONE SETUP ==========
@@ -165,7 +172,6 @@ setup:
     mov dl, 0
     call string_move_cursor
     
-    ; Prompt for timezone
     mov ah, 0x01
     mov si, setup_timezone_prompt
     int 0x21
@@ -174,35 +180,34 @@ setup:
     mov dl, 5
     call string_move_cursor
     
-    ; Get timezone input
     mov di, 43008  
     mov byte [di], 0           
     mov ax, di             
     call string_input_string  
     
-    ; Check if input is empty
     mov si, 43008
     call string_string_length
     cmp ax, 0
-    jne .copy_timezone
+    je .save_timezone
     
-    ; Use default timezone if input is empty
-    mov si, default_timezone
-    jmp .save_timezone
-    
-.copy_timezone:
     mov si, 43008
-    
-.save_timezone:
     mov di, timezone 
     mov cx, 31  
     call string_string_copy 
     
-    ; Save TIMEZONE.CFG
+.save_timezone:
+    ; --- SAVE TIMEZONE.CFG in CONF.DIR ---
+    mov ah, 0x09
+    mov si, conf_dir_name
+    int 0x22
+
     mov ah, 0x03
     mov si, timezone_cfg_file
     mov bx, timezone              
     mov cx, 32
+    int 0x22
+
+    mov ah, 0x0A
     int 0x22
 
     ; ========== THEME SETUP ==========
@@ -218,7 +223,6 @@ setup:
     mov dl, 0
     call string_move_cursor
     
-    ; Show theme selection options
     mov ah, 0x01
     mov si, setup_theme_prompt
     int 0x21
@@ -227,13 +231,11 @@ setup:
     mov dl, 5
     call string_move_cursor
     
-    ; Get theme selection
     mov di, 43008
     mov byte [di], 0
     mov ax, di
     call string_input_string
     
-    ; Convert input to number
     mov si, 43008
     call string_to_int
     cmp ax, 0
@@ -267,16 +269,23 @@ setup:
     jmp .save_theme
 
 .save_theme:
-    ; Copy theme data to buffer
+    ; Copy to buffer
     mov di, 43008
     push cx
     rep movsb
     pop cx
     
-    ; Save THEME.CFG
+    ; --- SAVE THEME.CFG in CONF.DIR ---
+    mov ah, 0x09
+    mov si, conf_dir_name
+    int 0x22
+    
     mov ah, 0x03
     mov si, theme_cfg_file
     mov bx, 43008
+    int 0x22
+    
+    mov ah, 0x0A
     int 0x22
 
     ; ========== PROMPT SETUP ==========
@@ -292,7 +301,6 @@ setup:
     mov dl, 0
     call string_move_cursor
     
-    ; Show prompt selection options
     mov ah, 0x01
     mov si, setup_prompt_prompt
     int 0x21
@@ -301,13 +309,11 @@ setup:
     mov dl, 5
     call string_move_cursor
     
-    ; Get prompt selection
     mov di, 43008
     mov byte [di], 0
     mov ax, di
     call string_input_string
     
-    ; Convert input to number
     mov si, 43008
     call string_to_int
     cmp ax, 0
@@ -334,10 +340,19 @@ setup:
     mov di, 43008
     mov cx, 64
     call string_string_copy
+    
+    ; --- SAVE PROMPT.CFG in CONF.DIR ---
+    mov ah, 0x09
+    mov si, conf_dir_name
+    int 0x22
+
     mov ah, 0x03
     mov si, prompt_cfg_file
     mov bx, 43008
     mov cx, 64
+    int 0x22
+
+    mov ah, 0x0A
     int 0x22
 
     ; ========== PROGRAM SELECTION ==========
@@ -353,7 +368,6 @@ setup:
     mov dl, 0
     call string_move_cursor
     
-    ; Show program options
     mov ah, 0x01
     mov si, setup_program_prompt
     int 0x21
@@ -362,13 +376,11 @@ setup:
     mov dl, 5
     call string_move_cursor
     
-    ; Get program selection
     mov di, 43008
     mov byte [di], 0
     mov ax, di
     call string_input_string
     
-    ; Convert input to number
     mov si, 43008
     call string_to_int
     cmp ax, 0
@@ -377,76 +389,124 @@ setup:
     je .essential_programs
     cmp ax, 3
     je .minimal_programs
+    jmp .default_programs  
 
 .default_programs:
     jmp .save_settings
 
 .essential_programs:
-    ; Remove non-essential programs
+    mov ah, 0x09
+    mov si, bin_dir_name
+    int 0x22
+
     mov ah, 0x06
     mov si, brainf_file
     int 0x22
     mov si, bchart_file
     int 0x22
+    mov si, credits_file
+    int 0x22
     mov si, hello_file
+    int 0x22
+    mov si, imfplay_file
+    int 0x22
+    mov si, mandel_file
     int 0x22
     mov si, mine_file
     int 0x22
-    mov si, piano_file
-    int 0x22
-    mov si, procentc_file
-    int 0x22
-    mov si, space_file
-    int 0x22
-    mov si, hexedit_file
-    int 0x22
     mov si, paint_file
+    int 0x22
+    mov si, piano_file
     int 0x22
     mov si, pong_file
     int 0x22
-    mov si, snake_file
+    mov si, space_file
     int 0x22
+    mov si, tetris_file
+    int 0x22
+    mov si, chars_file
+    int 0x22
+
+    mov ah, 0x0A
+    int 0x22
+
     jmp .save_settings
 
 .minimal_programs:
-    ; Remove all non-core programs
+    mov ah, 0x09
+    mov si, bin_dir_name
+    int 0x22
+
     mov ah, 0x06
     mov si, brainf_file
     int 0x22
     mov si, bchart_file
     int 0x22
+    mov si, credits_file
+    int 0x22
     mov si, hello_file
+    int 0x22
+    mov si, imfplay_file
+    int 0x22
+    mov si, mandel_file
     int 0x22
     mov si, mine_file
     int 0x22
-    mov si, piano_file
-    int 0x22
-    mov si, procentc_file
-    int 0x22
-    mov si, space_file
-    int 0x22
-    mov si, calc_file
-    int 0x22
-    mov si, memory_file
-    int 0x22
-    mov si, writer_file
-    int 0x22
-    mov si, hexedit_file
-    int 0x22
     mov si, paint_file
+    int 0x22
+    mov si, piano_file
     int 0x22
     mov si, pong_file
     int 0x22
+    mov si, space_file
+    int 0x22
+    mov si, tetris_file
+    int 0x22
+    mov si, theme_file
+    int 0x22
+    mov si, calc_file
+    int 0x22
+    mov si, clock_file
+    int 0x22
+    mov si, fetch_file
+    int 0x22
+    mov si, fnt_test_file
+    int 0x22
+    mov si, grep_file
+    int 0x22
+    mov si, hexedit_file
+    int 0x22
+    mov si, memory_file
+    int 0x22
+    mov si, procentc_file
+    int 0x22
     mov si, snake_file
+    int 0x22
+    mov si, writer_file
+    int 0x22
+    mov si, chars_file
+    int 0x22
+    mov si, help_file
+    int 0x22
+
+    mov ah, 0x0A
     int 0x22
 
 .save_settings:
-    ; Update FIRST_B.CFG to '0'
+    ; --- UPDATE FIRST_B.CFG in CONF.DIR ---
+    ; This marks setup as complete ('0')
+    mov ah, 0x09
+    mov si, conf_dir_name
+    int 0x22
+
     mov ah, 0x03
     mov byte [43008], '0'
     mov si, first_boot_file
     mov bx, 43008             
     mov cx, 2  
+    int 0x22
+
+    mov ah, 0x0A
     int 0x22
 
     mov dh, 28
@@ -475,15 +535,21 @@ setup:
 ; ========== DATA SECTION ==========
 
 user_cfg_file        db 'USER.CFG', 0
+conf_dir_name        db 'CONF.DIR', 0
+bin_dir_name         db 'BIN.DIR', 0
 password_cfg_file    db 'PASSWORD.CFG', 0
 timezone_cfg_file    db 'TIMEZONE.CFG', 0
 first_boot_file      db 'FIRST_B.CFG', 0
 prompt_cfg_file      db 'PROMPT.CFG', 0
 theme_cfg_file       db 'THEME.CFG', 0
 
-default_username      db 'user', 0
-default_password      db '', 0
-default_timezone      db '0', 0  
+; Pre-filled defaults
+user                 db 'user', 0
+                     times 27 db 0
+password             times 32 db 0
+timezone             db '0', 0
+                     times 30 db 0
+encrypted_pass       times 32 db 0
 
 ; Prompt options
 prompt_option1       db '[$username@PRos] > ', 0
@@ -570,23 +636,29 @@ theme_ocean_data:
     db '15,58,60,63', 0
 theme_ocean_size equ $ - theme_ocean_data
 
-; Program file names
-brainf_file    db 'BRAINF.BIN', 0
-bchart_file    db 'BCHART.BIN', 0
-hello_file     db 'HELLO.BIN', 0
-mine_file      db 'MINE.BIN', 0
-piano_file     db 'PIANO.BIN', 0
-procentc_file  db 'PROCENTC.BIN', 0
-space_file     db 'SPACE.BIN', 0
-calc_file      db 'CALC.BIN', 0
-memory_file    db 'MEMORY.BIN', 0
-writer_file    db 'WRITER.BIN', 0
-hexedit_file   db 'HEXEDIT.BIN', 0
-paint_file     db 'PAINT.BIN', 0
-pong_file      db 'PONG.BIN', 0
-snake_file     db 'SNAKE.BIN', 0
-
-user           times 32 db 0
-password       times 32 db 0
-timezone       times 32 db 0
-encrypted_pass times 32 db 0
+; Program file names     
+brainf_file        db 'BRAINF.BIN', 0
+bchart_file        db 'BCHART.BIN', 0
+calc_file          db 'CALC.BIN', 0
+chars_file         db 'CHARS.BIN', 0
+clock_file         db 'CLOCK.BIN', 0
+credits_file       db 'CREDITS.BIN', 0
+fetch_file         db 'FETCH.BIN', 0
+fnt_test_file      db 'FNT_TEST.BIN', 0
+grep_file          db 'GREP.BIN', 0
+hello_file         db 'HELLO.BIN', 0
+help_file          db 'HELP.BIN', 0     
+hexedit_file       db 'HEXEDIT.BIN', 0
+imfplay_file       db 'IMFPLAY.BIN', 0
+mandel_file        db 'MANDEL.BIN', 0
+memory_file        db 'MEMORY.BIN', 0
+mine_file          db 'MINE.BIN', 0
+paint_file         db 'PAINT.BIN', 0
+piano_file         db 'PIANO.BIN', 0
+pong_file          db 'PONG.BIN', 0
+procentc_file      db 'PROCENTC.BIN', 0
+snake_file         db 'SNAKE.BIN', 0
+space_file         db 'SPACE.BIN', 0
+tetris_file        db 'TETRIS.BIN', 0
+theme_file         db 'THEME.BIN', 0
+writer_file        db 'WRITER.BIN', 0
