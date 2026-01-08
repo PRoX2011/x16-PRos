@@ -10,7 +10,7 @@
 
 **A minimalistic 16-bit operating system written in NASM for x86 architecture**
 
-[Website](https://x16-pros.netlify.app/) • [Programs Repository](https://github.com/PRoX2011/programs4pros/) • [API Documentation](docs/API.md)
+[Website](https://x16-pros.prosdev.org/) • [Programs Repository](https://github.com/PRoX2011/programs4pros/) • [API Documentation](docs/API.md)
 
 <img src="docs/screenshots/terminal.png" width=75%>
 
