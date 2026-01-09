@@ -78,29 +78,35 @@ mcopy -i disk_img/x16pros.img bin/KERNEL.BIN ::/
 check_error "Kernel copy failed"
 print_ok "Kernel copied successfully"
 
-# Copy config files
-print_info "Copying kernelconfig files..."
-mcopy -i disk_img/x16pros.img src/kernel/configs/USER.CFG ::/
-check_error "USER.CFG copy failed"
-print_ok "USER.CFG copied successfully"
-mcopy -i disk_img/x16pros.img src/kernel/configs/FIRST_B.CFG ::/
-check_error "FIRST_B.CFG copy failed"
-print_ok "FIRST_B.CFG copied successfully"
-mcopy -i disk_img/x16pros.img src/kernel/configs/PASSWORD.CFG ::/
-check_error "PASSWORD.CFG copy failed"
-print_ok "PASSWORD.CFG copied successfully"
-mcopy -i disk_img/x16pros.img src/kernel/configs/TIMEZONE.CFG ::/
-check_error "TIMEZONE.CFG copy failed"
-print_ok "TIMEZONE.CFG copied successfully"
-mcopy -i disk_img/x16pros.img src/kernel/configs/PROMPT.CFG ::/
-check_error "PROMPT.CFG copy failed"
-print_ok "PROMPT.CFG copied successfully"
-mcopy -i disk_img/x16pros.img src/kernel/configs/THEME.CFG ::/
-check_error "THEME.CFG copy failed"
-print_ok "THEME.CFG copied successfully"
-
-
 echo -e "$NC"
+
+# Create BIN directory
+echo -e "$GREEN========== Creating BIN directory... ==========$NC"
+print_info "Creating BIN directory..."
+mmd -i disk_img/x16pros.img ::/BIN.DIR
+check_error "Failed to create BIN directory"
+print_ok "BIN directory created successfully"
+
+# Create COM directory
+echo -e "$GREEN========== Creating COM directory... ==========$NC"
+print_info "Creating COM directory..."
+mmd -i disk_img/x16pros.img ::/COM.DIR
+check_error "Failed to create COM directory"
+print_ok "COM directory created successfully"
+
+# Create BMP directory
+echo -e "$GREEN========== Creating BMP directory... ==========$NC"
+print_info "Creating BMP directory..."
+mmd -i disk_img/x16pros.img ::/BMP.DIR
+check_error "Failed to create BMP directory"
+print_ok "BMP directory created successfully"
+
+# Create CONF directory
+echo -e "$GREEN========== Creating CONF directory... ==========$NC"
+print_info "Creating CONF directory..."
+mmd -i disk_img/x16pros.img ::/CONF.DIR
+check_error "Failed to create CONF directory"
+print_ok "CONF directory created successfully"
 
 # Create DOCS directory
 echo -e "$GREEN========== Creating DOCS directory... ==========$NC"
@@ -109,16 +115,71 @@ mmd -i disk_img/x16pros.img ::/DOCS.DIR
 check_error "Failed to create DOCS directory"
 print_ok "DOCS directory created successfully"
 
+# Create MUSIC directory
+echo -e "$GREEN========== Creating MUSIC directory... ==========$NC"
+print_info "Creating MUSIC directory..."
+mmd -i disk_img/x16pros.img ::/MUSIC.DIR
+check_error "Failed to create MUSIC directory"
+print_ok "MUSIC directory created successfully"
+
+echo -e "$NC"
+
+# Copy config files
+print_info "Copying kernelconfig files..."
+mcopy -i disk_img/x16pros.img src/kernel/configs/USER.CFG ::/CONF.DIR/
+check_error "USER.CFG copy failed"
+print_ok "USER.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/FIRST_B.CFG ::/CONF.DIR/
+check_error "FIRST_B.CFG copy failed"
+print_ok "FIRST_B.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/PASSWORD.CFG ::/CONF.DIR/
+check_error "PASSWORD.CFG copy failed"
+print_ok "PASSWORD.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/TIMEZONE.CFG ::/CONF.DIR/
+check_error "TIMEZONE.CFG copy failed"
+print_ok "TIMEZONE.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/PROMPT.CFG ::/CONF.DIR/
+check_error "PROMPT.CFG copy failed"
+print_ok "PROMPT.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/THEME.CFG ::/CONF.DIR/
+check_error "THEME.CFG copy failed"
+print_ok "THEME.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/SYSTEM.CFG ::/
+check_error "SYSTEM.CFG copy failed"
+print_ok "SYSTEM.CFG copied successfully"
+
 echo -e "$NC"
 
 # Compile and copy programs
 echo -e "$GREEN========== Compiling and copying programs... ==========$NC"
 
 # Define programs as an array of tuples: source, output_name
-programs=(
+programs_root=(
     "programs/autoexec.asm AUTOEXEC.BIN"
     "programs/setup/setup.asm SETUP.BIN"
+)
+
+for prog in "${programs_root[@]}"; do
+    src=$(echo $prog | cut -d' ' -f1)
+    bin_name=$(echo $prog | cut -d' ' -f2)
+    
+    print_info "Compiling $src => bin/$bin_name..."
+    nasm -f bin $src -o bin/$bin_name
+    check_error "Compilation of $src failed"
+    print_ok "$bin_name compiled successfully"
+    
+    print_info "Copying $bin_name to disk..."
+    mcopy -i disk_img/x16pros.img bin/$bin_name ::/
+    check_error "Copy of $bin_name failed"
+    print_ok "$bin_name copied successfully"
+done
+
+programs=(
+    "programs/help.asm HELP.BIN"
+    "programs/grep.asm GREP.BIN"    
+    "programs/theme.asm THEME.BIN"
     "programs/fetch.asm FETCH.BIN"
+    "programs/imfplay.asm IMFPLAY.BIN"
     "programs/credits.asm CREDITS.BIN"
     "programs/hello.asm HELLO.BIN"
     "programs/write.asm WRITER.BIN"
@@ -135,9 +196,9 @@ programs=(
     "programs/pong.asm PONG.BIN"
     "programs/hexedit.asm HEXEDIT.BIN"
     "programs/clock.asm CLOCK.BIN"
-    "programs/imfplay.asm IMFPLAY.BIN"
-    "programs/fnt_test.asm FNT_TEST.BIN"
     "programs/mandel.asm MANDEL.BIN"
+    "programs/tetris.asm TETRIS.BIN"
+    "programs/chars.asm CHARS.BIN"
 )
 
 for prog in "${programs[@]}"; do
@@ -150,10 +211,32 @@ for prog in "${programs[@]}"; do
     print_ok "$bin_name compiled successfully"
     
     print_info "Copying $bin_name to disk..."
-    mcopy -i disk_img/x16pros.img bin/$bin_name ::/
+    mcopy -i disk_img/x16pros.img bin/$bin_name ::/BIN.DIR/
     check_error "Copy of $bin_name failed"
     print_ok "$bin_name copied successfully"
 done
+
+
+programs_com=(
+    "programs/COM/hello.asm HELLO.COM"
+    "programs/COM/fractal.asm FRACTAl.COM"
+)
+
+for prog in "${programs_com[@]}"; do
+    src=$(echo $prog | cut -d' ' -f1)
+    bin_name=$(echo $prog | cut -d' ' -f2)
+    
+    print_info "Compiling $src => bin/$bin_name..."
+    nasm -f bin $src -o bin/$bin_name
+    check_error "Compilation of $src failed"
+    print_ok "$bin_name compiled successfully"
+    
+    print_info "Copying $bin_name to disk..."
+    mcopy -i disk_img/x16pros.img bin/$bin_name ::/COM.DIR/
+    check_error "Copy of $bin_name failed"
+    print_ok "$bin_name copied successfully"
+done
+
 
 echo -e "$NC"
 
@@ -161,7 +244,6 @@ echo -e "$NC"
 echo -e "$GREEN========== Copying text files... ==========$NC"
 text_files=(
     "LICENSE.TXT"
-    "src/txt/ABOUT.TXT"
 )
 
 for file in "${text_files[@]}"; do
@@ -172,9 +254,13 @@ for file in "${text_files[@]}"; do
 done
 
 text_files_doc=(
-    "src/txt/FILESYS.TXT"
-    "src/txt/PROGPACK.TXT"
+    "src/txt/README.TXT"
     "src/txt/CONFIGS.TXT"
+    "src/txt/FILESYS.TXT"
+    "src/txt/LIMITS.TXT"
+    "src/txt/PROGRAMS.TXT"
+    "src/txt/QUICKST.TXT"
+    "src/txt/COMMANDS.TXT"
 )
 
 
@@ -188,15 +274,18 @@ done
 # Copy image files
 echo -e "$GREEN========== Copying image files... ==========$NC"
 image_files=(
-    "src/images/logo/LOGO.BMP"
-    "src/images/PROX.BMP"
-    "src/images/PROS.BMP"
-    "src/images/TRAIN.BMP"
+    "assets/images/logo/LOGO.BMP"
+    "assets/images/PROX.BMP"
+    "assets/images/PROS.BMP"
+    "assets/images/PROS_W.BMP"
+    "assets/images/PROS_A.BMP"
+    "assets/images/TRAIN.BMP"
+    "assets/images/CHILL.BMP"
 )
 
 for file in "${image_files[@]}"; do
     print_info "Copying $file..."
-    mcopy -i disk_img/x16pros.img $file ::/
+    mcopy -i disk_img/x16pros.img $file ::/BMP.DIR/
     check_error "Copy of $file failed"
     print_ok "$file copied successfully"
 done
@@ -204,18 +293,18 @@ done
 # Copy music files
 echo -e "$GREEN========== Copying music files... ==========$NC"
 music_files=(
-    "src/IMF/RICK.IMF"
-    "src/IMF/SONIC.IMF"
-    "src/IMF/HOPES&D.IMF"
-    "src/IMF/RUSSIA.IMF"
-    "src/IMF/METRO_E.IMF"
-    "src/IMF/METRO_E2.IMF"
-    "src/IMF/GTA_VC.IMF"
+    "assets/IMF/RICK.IMF"
+    "assets/IMF/SONIC.IMF"
+    "assets/IMF/HOPES&D.IMF"
+    "assets/IMF/RUSSIA.IMF"
+    "assets/IMF/METRO_E.IMF"
+    "assets/IMF/METRO_E2.IMF"
+    "assets/IMF/GTA_VC.IMF"
 )
 
 for file in "${music_files[@]}"; do
     print_info "Copying $file..."
-    mcopy -i disk_img/x16pros.img $file ::/
+    mcopy -i disk_img/x16pros.img $file ::/MUSIC.DIR/
     check_error "Copy of $file failed"
     print_ok "$file copied successfully"
 done

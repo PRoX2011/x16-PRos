@@ -1,0 +1,149 @@
+===========================================================================
+                       TERMINAL COMMANDS REFERENCE
+===========================================================================
+
+HELP & INFORMATION:
+  help
+    Display categorized command reference
+    Navigate with arrow keys
+    Press ESC to exit
+
+  info
+    Show system information
+    OS version, architecture
+    Memory and hardware details
+
+  ver
+    Display PRos terminal version
+    Quick version check
+
+  cpu
+    Detailed CPU information
+    Family, model, stepping
+    Cache size, core count
+    Feature flags
+
+SCREEN & DISPLAY:
+  cls
+    Clear terminal screen
+    Reset cursor to top
+
+  date
+    Show current date
+    Format: DD/MM/YY
+    Uses RTC (Real-Time Clock)
+
+  time
+    Show current time
+    Format: HH:MM:SS
+    Uses UTC + TIMEZONE.CFG offset
+
+FILE OPERATIONS:
+  dir
+    List files in current directory
+    Shows filenames and sizes
+    Displays file count
+
+  cat <filename>
+    Display text file contents
+    For .TXT files
+    Example: cat README.TXT
+
+  size <filename>
+    Show file size in bytes
+    Example: size KERNEL.BIN
+
+  del <filename>
+    Delete a file
+    KERNEL.BIN is protected
+    Permanent deletion (no recycle bin)
+    Example: del OLDFILE.TXT
+
+  copy <source> <destination>
+    Copy file (root directory only)
+    Example: copy FILE1.TXT FILE2.TXT
+
+  ren <oldname> <newname>
+    Rename file (root directory only)
+    Example: ren OLD.TXT NEW.TXT
+
+  touch <filename>
+    Create empty file
+    Example: touch NEWFILE.TXT
+
+  write <filename> <text>
+    Write text to file
+    Overwrites existing content
+    Example: write TEST.TXT Hello world
+
+TEXT PROCESSING:
+  head <filename>
+    Display first 10 lines of file
+    Example: head LONGFILE.TXT
+
+  tail <filename>
+    Display last 10 lines of file
+    Example: tail LOGFILE.TXT
+
+  grep <pattern> <filename>
+    Search for text pattern in file
+    Case-sensitive search
+    Example: grep error LOGFILE.TXT
+
+DIRECTORY OPERATIONS:
+  cd <directory>
+    Change current directory
+    Example: cd BIN
+
+  cd ..
+    Go to parent directory
+    Move up one level
+
+  cd /
+    Go to root directory
+    Reset to top level
+
+  mkdir <dirname>
+    Create new directory
+    Example: mkdir MYFILES
+
+  deldir <dirname>
+    Delete empty directory only
+    Directory must be empty
+    Example: deldir OLDDIR
+
+MEDIA & VIEWING:
+  view <filename> [options]
+    Display BMP image
+    Maximum resolution: 320x240
+    256 colors
+    
+    Options:
+      -upscale  Scale image 2x
+      -stretch  Stretch to fullscreen
+    
+    Examples:
+      view IMAGE.BMP
+      view LOGO.BMP -upscale
+      view PHOTO.BMP -stretch
+
+SYSTEM CONTROL:
+  reboot
+    Restart computer
+    Immediate restart
+    No confirmation prompt
+
+  shut
+    Shutdown computer via APM
+    Only works on APM-compatible systems
+    May not work in emulators
+
+  exit
+    Exit to bootloader
+    Return to boot menu
+    Allows booting other OS
+
+
+TIP: Type program name to run .BIN or .COM files
+
+===========================================================================

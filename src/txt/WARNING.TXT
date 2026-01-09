@@ -1,5 +1,0 @@
-WARNING! 
-Directory support is under development. Exiting some 
-programs/games with files not located in the ROOT 
-directory may cause unexpected operating system behavior. 
-If you see any kernel errors, simply reboot your PC.

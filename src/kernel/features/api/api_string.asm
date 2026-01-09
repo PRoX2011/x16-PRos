@@ -4,7 +4,7 @@
 ;
 ; Provides string functions via INT 0x23
 ; Function codes in AH:
-;   0x00: Initialize string API
+;   0x00: Re-Initialize string API
 ;   0x01: Get string length (SI = string, returns AX = length)
 ;   0x02: Convert string to uppercase (SI = string)
 ;   0x03: Copy string (SI = source, DI = destination)

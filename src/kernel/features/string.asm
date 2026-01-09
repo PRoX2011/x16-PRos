@@ -3,6 +3,11 @@
 ; Copyright (C) 2025 PRoX2011
 ; ==================================================================
 
+; =======================================================================
+; STRING_STRING_LENGTH - Calculates the length of a null-terminated string
+; IN  : AX = pointer to string
+; OUT : AX = length of string (excluding null terminator)
+; =======================================================================
 string_string_length:
     pusha
     mov bx, ax
@@ -23,6 +28,11 @@ string_string_length:
 
 .tmp_counter dw 0
 
+; =======================================================================
+; STRING_STRING_UPPERCASE - Converts a string to uppercase
+; IN  : AX = pointer to string
+; OUT : String is modified in place
+; =======================================================================
 string_string_uppercase:
     pusha
     mov si, ax
@@ -46,6 +56,12 @@ string_string_uppercase:
     popa
     ret
 
+; =======================================================================
+; STRING_STRING_COPY - Copies a null-terminated string
+; IN  : SI = pointer to source string
+;       DI = pointer to destination buffer
+; OUT : String copied to destination (including null terminator)
+; =======================================================================
 string_string_copy:
     pusha
 
@@ -61,6 +77,11 @@ string_string_copy:
     popa
     ret
 
+; =======================================================================
+; STRING_STRING_CHOMP - Removes leading and trailing spaces from string
+; IN  : AX = pointer to string
+; OUT : String is modified in place, trimmed of whitespace
+; =======================================================================
 string_string_chomp:
     pusha
     mov dx, ax
@@ -108,6 +129,12 @@ string_string_chomp:
     popa
     ret
 
+; =======================================================================
+; STRING_STRING_COMPARE - Compares two null-terminated strings
+; IN  : SI = pointer to first string
+;       DI = pointer to second string
+; OUT : CF = 1 if strings are equal, CF = 0 if different
+; =======================================================================
 string_string_compare:
     pusha
 
@@ -132,6 +159,13 @@ string_string_compare:
     stc
     ret
 
+; =======================================================================
+; STRING_STRING_STRINCMP - Compares first CL characters of two strings
+; IN  : SI = pointer to first string
+;       DI = pointer to second string
+;       CL = number of characters to compare
+; OUT : CF = 1 if strings match for CL characters, CF = 0 if different
+; =======================================================================
 string_string_strincmp:
     pusha
 
@@ -159,6 +193,14 @@ string_string_strincmp:
     stc
     ret
 
+; =======================================================================
+; STRING_STRING_TOKENIZE - Finds and splits string by delimiter
+; IN  : SI = pointer to string
+;       AL = delimiter character
+; OUT : SI = unchanged (original string start)
+;       DI = pointer to next token after delimiter (or 0 if no more)
+;       Delimiter in string is replaced with null terminator
+; =======================================================================
 string_string_tokenize:
     push si
 
@@ -182,6 +224,12 @@ string_string_tokenize:
     pop si
     ret
 
+; =======================================================================
+; STRING_INPUT_STRING - Reads a string from keyboard with backspace support
+; IN  : AX = pointer to buffer for input (256 bytes recommended)
+; OUT : Buffer filled with user input, null-terminated
+;       Maximum length is 255 characters
+; =======================================================================
 string_input_string:
     pusha
     mov di, ax
@@ -230,6 +278,11 @@ string_input_string:
 
 .cursor_col dw 0
 
+; =======================================================================
+; STRING_CLEAR_SCREEN - Clears the screen and applies theme
+; IN  : Nothing
+; OUT : Screen cleared and theme reloaded
+; =======================================================================
 string_clear_screen:
     pusha
     mov ax, 0x12
@@ -239,6 +292,11 @@ string_clear_screen:
     call load_and_apply_theme
     ret
 
+; =======================================================================
+; STRING_GET_TIME_STRING - Gets current time as formatted string (HH:MM:SS)
+; IN  : BX = pointer to buffer for time string (9 bytes minimum)
+; OUT : Buffer filled with time string in format "HH:MM:SS"
+; =======================================================================
 string_get_time_string:
     pusha
     mov di, bx
@@ -285,6 +343,11 @@ string_get_time_string:
     stosb
     ret
 
+; =======================================================================
+; STRING_GET_DATE_STRING - Gets current date as formatted string
+; IN  : BX = pointer to buffer for date string (11 bytes minimum)
+; OUT : Buffer filled with date string 
+; =======================================================================
 string_get_date_string:
     pusha
     mov di, bx
@@ -384,6 +447,11 @@ string_get_date_string:
     stosb
     ret
 
+; =======================================================================
+; STRING_BCD_TO_INT - Converts BCD (Binary Coded Decimal) to integer
+; IN  : AL = BCD value
+; OUT : AL = integer value
+; =======================================================================
 string_bcd_to_int:
     push cx
     mov cl, al
@@ -395,6 +463,11 @@ string_bcd_to_int:
     pop cx
     ret
 
+; =======================================================================
+; STRING_INT_TO_STRING - Converts integer to decimal string
+; IN  : AX = integer value
+; OUT : AX = pointer to converted string (static buffer)
+; =======================================================================
 string_int_to_string:
     pusha
     mov cx, 0
@@ -422,10 +495,11 @@ string_int_to_string:
 
 .t times 7 db 0
 
-; -----------------------------
-; Convert string to integer
-; IN  : SI = string location
-; OUT : AX = number
+; =======================================================================
+; STRING_TO_INT - Converts decimal string to integer
+; IN  : SI = pointer to decimal string
+; OUT : AX = integer value (-1 if invalid)
+; =======================================================================
 string_to_int:
     push bx
     push cx
@@ -465,6 +539,14 @@ string_to_int:
     pop bx
     ret
 
+; =======================================================================
+; PARSE_PROMPT - Parses prompt string with variable substitution
+; IN  : SI = pointer to source prompt string
+;       DI = pointer to destination buffer
+; OUT : Destination buffer filled with parsed prompt
+;       Supports: $username (replaced with user variable)
+;                 %XX (hex escape codes, e.g., %0A for newline)
+; =======================================================================
 parse_prompt:
     push ax
     push bx
@@ -556,6 +638,12 @@ parse_prompt:
     pop ax
     ret
 
+; =======================================================================
+; HEX_CHAR_TO_NIBBLE - Converts hexadecimal character to 4-bit value
+; IN  : AL = hex character ('0'-'9', 'A'-'F', 'a'-'f')
+; OUT : AL = nibble value (0-15)
+;       CF = 0 if valid, CF = 1 if invalid character
+; =======================================================================
 hex_char_to_nibble:
     cmp al, '0'
     jb .invalid

@@ -18,7 +18,7 @@ bmp_width           dw 0
 bmp_height          dw 0
 padding             dw 0
 
-; ===================== BMP Viewing Command with Upscale Option =====================
+; ===================== BMP Viewing Command with Options =====================
 
 view_bmp:
     call DisableMouse
@@ -37,23 +37,72 @@ view_bmp:
     jmp get_cmd
 
 .filename_provided:
-    ; Check if upscale parameter is provided
+    ; Initialize flags
     mov word [.upscale_flag], 0
+    mov word [.stretch_flag], 0
+    
+    ; Check first parameter
     cmp bx, 0
-    je .no_upscale_param
+    je .check_third_param
     
     mov si, bx
     mov di, .upscale_param
     call string_string_compare
-    jc .set_upscale
+    jc .set_upscale_first
+    
+    mov si, bx
+    mov di, .stretch_param
+    call string_string_compare
+    jc .set_stretch_first
+    
+    jmp .check_third_param
 
-.no_upscale_param:
+.set_upscale_first:
+    mov word [.upscale_flag], 1
+    jmp .check_third_param
+    
+.set_stretch_first:
+    mov word [.stretch_flag], 1
+
+.check_third_param:
+    ; Check if there's a third parameter
+    cmp cx, 0
+    je .load_file
+    
+    mov si, cx
+    mov di, .upscale_param
+    call string_string_compare
+    jc .set_upscale_second
+    
+    mov si, cx
+    mov di, .stretch_param
+    call string_string_compare
+    jc .set_stretch_second
+    
     jmp .load_file
 
-.set_upscale:
+.set_upscale_second:
     mov word [.upscale_flag], 1
+    jmp .load_file
+    
+.set_stretch_second:
+    mov word [.stretch_flag], 1
 
 .load_file:
+    ; Check if both upscale and stretch are set (conflict)
+    cmp word [.upscale_flag], 1
+    jne .no_conflict
+    cmp word [.stretch_flag], 1
+    jne .no_conflict
+    
+    ; Show warning about conflicting flags
+    mov si, .conflict_msg
+    call print_string_yellow
+    call print_newline
+    ; Stretch takes priority
+    mov word [.upscale_flag], 0
+
+.no_conflict:
     mov ax, [param_list]
     call fs_file_exists
     jc .not_found
@@ -69,9 +118,12 @@ view_bmp:
     mov ax, 0x13
     int 0x10
 
-    ; Load and display BMP with or without upscaling
+    ; Load and display BMP based on flags
     push bx
     mov si, 32768    ; Point to loaded file data
+    
+    cmp word [.stretch_flag], 1
+    je .display_stretched
     
     cmp word [.upscale_flag], 1
     je .display_upscaled
@@ -81,6 +133,10 @@ view_bmp:
 
 .display_upscaled:
     call display_bmp_upscaled
+    jmp .display_done
+
+.display_stretched:
+    call display_bmp_stretched
 
 .display_done:
     pop bx     
@@ -105,19 +161,30 @@ view_bmp:
     mov ax, [bmp_height]
     call print_decimal
 
-    ; Show upscale status if applicable
-    cmp word [.upscale_flag], 1
-    jne .wait_key
+    ; Show mode status
+    cmp word [.stretch_flag], 1
+    je .show_stretch_status
     
+    cmp word [.upscale_flag], 1
+    je .show_upscale_status
+    
+    jmp .wait_key
+
+.show_upscale_status:
     mov si, .upscale_status
     call print_string_cyan
+    jmp .wait_key
+
+.show_stretch_status:
+    mov si, .stretch_status
+    call print_string_green
 
 .wait_key:
     call wait_for_key
 
     ; Return to original video mode 0x12 (640x480, 16 colors)
-    mov ax, 0x12
-    int 0x10
+    call string_clear_screen
+    
     mov byte [_palSet], 0
 
     popa
@@ -139,8 +206,12 @@ view_bmp:
     jmp get_cmd
 
 .upscale_flag dw 0
+.stretch_flag dw 0
 .upscale_param db '-UPSCALE', 0
+.stretch_param db '-STRETCH', 0
 .upscale_status db ' (2x upscaled)', 0
+.stretch_status db ' (stretched to fit)', 0
+.conflict_msg db 'Warning: Cannot use -upscale and -stretch together. Using -stretch.', 0
 
 ; ===================== BMP Display Function without upscaling =====================
 
@@ -332,6 +403,104 @@ display_bmp_upscaled:
     popa
     ret
 
+; ===================== Stretched BMP Display Function =====================
+
+display_bmp_stretched:
+    pusha
+    mov ax, [si + BMP_HEADER_WIDTH]
+    mov [bmp_width], ax
+    mov ax, [si + BMP_HEADER_HEIGHT]
+    mov [bmp_height], ax
+
+    cmp byte [_palSet], 1
+    je .skip_palette
+    call set_palette
+    mov byte [_palSet], 1
+
+.skip_palette:
+    xor dx, dx
+    mov ax, [bmp_width]
+    mov bx, 4
+    div bx
+    mov [padding], dx
+
+    add si, BMP_HEADER_SIZE + BMP_PALETTE_SIZE
+    
+    mov word [.screen_y], 0
+    mov word [.src_row], 0
+    
+.draw_row:
+    mov ax, [.screen_y]
+    mul word [bmp_height]
+    mov bx, 200
+    div bx
+    
+    mov bx, [bmp_height]
+    dec bx
+    sub bx, ax
+    mov ax, bx
+    
+    cmp ax, [.src_row]
+    je .same_row
+    
+    mov [.src_row], ax
+    
+    mov bx, [bmp_width]
+    add bx, [padding]
+    mul bx
+    mov bx, ax
+    
+    push si
+    add si, bx
+    mov cx, [bmp_width]
+    add cx, [padding]
+    mov di, _bmpSingleLine
+    push ds
+    mov ax, 0x2000
+    mov ds, ax
+    rep movsb
+    pop ds
+    pop si
+
+.same_row:
+    mov word [.screen_x], 0
+    
+.draw_pixel:
+    mov ax, [.screen_x]
+    mul word [bmp_width]
+    mov bx, 320
+    div bx
+    
+    push si
+    mov si, _bmpSingleLine
+    add si, ax
+    lodsb
+    pop si
+    
+    push ax
+    mov ah, 0x0C
+    mov bh, 0
+    mov cx, [.screen_x]
+    mov dx, [.screen_y]
+    int 0x10
+    pop ax
+    
+    inc word [.screen_x]
+    cmp word [.screen_x], 320
+    jl .draw_pixel
+    
+    inc word [.screen_y]
+    cmp word [.screen_y], 200
+    jl .draw_row
+
+    popa
+    ret
+
+.screen_x dw 0
+.screen_y dw 0
+.src_row dw 0
+
+; ===================== Palette Setup =====================
 
 set_palette:
     pusha

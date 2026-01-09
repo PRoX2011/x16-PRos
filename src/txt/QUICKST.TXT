@@ -1,0 +1,38 @@
+===========================================================================
+                            QUICK START GUIDE
+===========================================================================
+
+FIRST BOOT:
+  1. System will run SETUP.BIN automatically
+  2. Enter your username (max 31 characters)
+  3. Create a password (will be encrypted)
+  4. Choose a color theme
+  5. System will reboot
+
+LOGGING IN:
+  - Enter your password when prompted
+  - Password is case-sensitive
+  - Wrong password will restart login process
+
+BASIC COMMANDS:
+  help     - Show all available commands
+  dir      - List files in current directory
+  cd DIR   - Change to directory DIR
+  cat FILE - Display file contents
+  cls      - Clear screen
+  exit     - Exit to bootloader
+
+RUNNING PROGRAMS:
+  - Type program name with or without extension
+  - Example: CALC or CALC.BIN
+  - Programs in BIN/ folder run from any directory
+  - Other programs run from current directory only
+
+GETTING HELP:
+  - Type 'help' for command categories
+  - Use arrow keys to navigate help pages
+  - Press ESC to exit help
+
+See COMMANDS.TXT for complete command reference
+
+===========================================================================

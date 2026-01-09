@@ -267,6 +267,49 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Error Handling**: Sets CF if the file is not found
 - **Notes**: Reads the file size from the directory entry (offset 28).
 
+### Function 0x09: Change Current Directory
+- **Description**: Navigates into the specified directory.
+- **Input**: 
+  - `AH` = 0x09
+  - `SI` = Pointer to directory name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR) 
+- **Output**: CF set on error
+
+### Function 0x0A: Go to Parent Directory
+- **Description**: Moves the current path up one level to the parent directory.
+- **Input**: `AH` = 0x0A
+- **Output**: CF set on error
+
+### Function 0x0B: Create Directory
+- **Description**: Creates a new directory entry on the disk.
+- **Input**: 
+  - `AH` = 0x0B
+  - `SI` = Pointer to directory name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR)
+- **Output**: CF set on error
+
+### Function 0x0C: Remove Directory
+- **Description**: Deletes an empty directory.
+- **Input**: 
+  - `AH` = 0x0C
+  - `SI` = Pointer to directory name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR)
+- **Output**: CF set on error
+
+### Function 0x0D: Check if Directory
+- **Description**: Determines if the specified name is a directory.
+- **Input**: 
+  - `AH` = 0x0D
+  - `SI` = Pointer to name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR)
+- **Output**: CF set if it is a directory
+
+### Function 0x0E: Save Current Directory
+- **Description**: Saves the current directory state to internal kernel storage.
+- **Input**: `AH` = 0x0E
+- **Output**: None
+
+### Function 0x0F: Restore Current Directory
+- **Description**: Restores the directory state previously saved with function 0x0E.
+- **Input**: `AH` = 0x0F
+- **Output**: None
+
 ---
 
 ## INT 0x23 - String Operations API

@@ -36,8 +36,6 @@ main_loop:
     cmp dword [error_flag], 0
     jne .error
     
-    call perform_operation
-    
     mov ah, 0x01
     mov si, result_msg
     int 0x21
@@ -149,6 +147,7 @@ read_string:
     int 0x21
     ret
 
+
 parse_number:
     xor eax, eax
     mov [number], eax
@@ -202,13 +201,33 @@ parse_number:
     mov dword [error_flag], 1
     ret
 
+
+fold_term:
+    mov eax, [result]
+    mov ebx, [operand1]
+    mov cl, [add_op]
+    cmp cl, '+'
+    je .add
+    cmp cl, '-'
+    je .sub
+    ret
+.add:
+    add eax, ebx
+    mov [result], eax
+    ret
+.sub:
+    sub eax, ebx
+    mov [result], eax
+    ret
+
+
 parse_input:
     mov dword [error_flag], 0
     
-.skip_spaces:
+.skip_spaces_start:
     lodsb
     cmp al, ' '
-    je .skip_spaces
+    je .skip_spaces_start
     cmp al, 0
     je .error
     dec si
@@ -218,20 +237,35 @@ parse_input:
     jne .error
     mov eax, [number]
     mov [operand1], eax
-    
-.skip_spaces2:
+    mov dword [result], 0
+    mov byte [add_op], '+'
+
+.expr_loop:
+.skip_spaces_op:
     lodsb
     cmp al, ' '
-    je .skip_spaces2
+    je .skip_spaces_op
     cmp al, 0
-    je .error
-    
+    je .done
+    cmp al, '+'
+    je .store_op
+    cmp al, '-'
+    je .store_op
+    cmp al, '*'
+    je .store_op
+    cmp al, '/'
+    je .store_op
+    cmp al, '^'
+    je .store_op
+    jmp .error
+
+.store_op:
     mov [operation], al
-    
-.skip_spaces3:
+
+.skip_spaces_num:
     lodsb
     cmp al, ' '
-    je .skip_spaces3
+    je .skip_spaces_num
     cmp al, 0
     je .error
     dec si
@@ -241,26 +275,42 @@ parse_input:
     jne .error
     mov eax, [number]
     mov [operand2], eax
-    
-.check_extra:
-    lodsb
-    cmp al, 0
-    je .done
-    cmp al, ' '
-    je .check_extra
-    jmp .error
-    
+
+    mov al, [operation]
+    cmp al, '*'
+    je .mul_div_pow
+    cmp al, '/'
+    je .mul_div_pow
+    cmp al, '^'
+    je .mul_div_pow
+
+    call fold_term
+    mov al, [operation]
+    mov [add_op], al
+    mov eax, [operand2]
+    mov [operand1], eax
+    jmp .expr_loop
+
+.mul_div_pow:
+    call perform_operation
+    cmp dword [error_flag], 0
+    jne .error
+    mov eax, [operand1]
+    mov [operand1], eax
+    jmp .expr_loop
+
 .done:
+    call fold_term
     ret
     
 .error:
     mov dword [error_flag], 1
     ret
 
+
 perform_operation:
     mov eax, [operand1]
     mov ebx, [operand2]
-    
     mov cl, [operation]
     
     cmp cl, '+'
@@ -279,17 +329,17 @@ perform_operation:
     
 .add:
     add eax, ebx
-    mov [result], eax
+    mov [operand1], eax
     ret
     
 .sub:
     sub eax, ebx
-    mov [result], eax
+    mov [operand1], eax
     ret
     
 .mul:
     imul ebx
-    mov [result], eax
+    mov [operand1], eax
     ret
     
 .div:
@@ -301,13 +351,13 @@ perform_operation:
     jne .normal_div
     cmp ebx, -1
     jne .normal_div
-    mov dword [result], 0x80000000
+    mov dword [operand1], 0x80000000
     ret
     
 .normal_div:
     cdq
     idiv ebx
-    mov [result], eax
+    mov [operand1], eax
     ret
     
 .power:
@@ -321,7 +371,7 @@ perform_operation:
     jnz .power_loop
     test ecx, ecx
     jnz .power_loop
-    mov dword [result], 1
+    mov dword [operand1], 1
     ret
     
 .power_loop:
@@ -332,13 +382,14 @@ perform_operation:
     jmp .power_loop
     
 .power_done:
-    mov [result], eax
+    mov [operand1], eax
     ret
     
 .power_error:
 .div_error:
     mov dword [error_flag], 1
     ret
+
 
 print_number:
     pusha
@@ -384,6 +435,7 @@ print_number:
     popa
     ret
 
+
 welcome_msg db 0xDA, 12 dup(0xC4), ' PRos Calculator (by @litvincode, Saeta and PRoX-dev) ', 12 dup(0xC4), 0xBF
             db 0xC0, 78 dup(0xC4), 0xD9, 10, 13
             db 'Supports: + - * / ^', 0x0D, 0x0A
@@ -401,6 +453,7 @@ operation     db 0
 result        dd 0
 negative_flag db 0
 exit_flag     db 0
+add_op        db 0
 
 number_buffer times 11 db 0
 buffer        times 65 db 0

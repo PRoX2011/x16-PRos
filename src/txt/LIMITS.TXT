@@ -1,0 +1,25 @@
+===========================================================================
+                          SYSTEM LIMITATIONS
+===========================================================================
+
+FILE SYSTEM LIMITATIONS:
+  Maximum file size:         32768 bytes (32 KB)
+  Filename length:           8 characters
+  File extension length:     3 characters
+  Total path length:         Limited by FAT12
+  Files per directory:       224 (root), varies (subdirs)
+  Maximum disk size:         1.44 MB (floppy)
+
+FILENAME RESTRICTIONS:
+  Format: 8.3 (name.ext)
+  Forbidden characters: \ / : * ? " < > | (space)
+  Case insensitive (stored as uppercase)
+  No Unicode support (ASCII only)
+
+STRING LIMITATIONS:
+  Username (USER.CFG):       31 characters
+  Password:                  63 characters (encrypted)
+  Command prompt:            63 characters
+  Command line input:        127 characters
+
+===========================================================================

@@ -1,0 +1,74 @@
+----------------------- Key changes x16-PRos v0.6 ----------------------
+
+Now it should be completely obvious who is cooler here - PRos or GovnOS.
+And... HAPPY NEW YEAR!!!
+                                        -- PRoX
+
+=======================================================================================
+
+1. Added support for .COM programs
+1) Now you can run the COM program from PRos Terminal
+2) Some MS DOS system calls are emulated by the x16-PRos kernel, but this feature is under development
+
+=======================================================================================
+
+2. Improved file organization on disk
+1) Programs are stored and launched from the BIN/ directory
+2) configuration files are located in the CONF/ directory
+3) The remaining files were also scattered across directories (BMP; COM; MUSIC; DOCS)
+
+=======================================================================================
+
+3, Fixed file system bugs
+1) Directory folders can now store more than 20 files
+2) Operations with files in the directory now work correctly
+
+=======================================================================================
+
+4. Some parts of the kernel have been optimized, which has reduced its weight by 5kib
+
+=======================================================================================
+
+5. Some commands have been moved from kshell to separate programs
+1) grep
+2) chars
+3) theme
+4) help
+
+=======================================================================================
+
+6. New programs
+1) MANDEL.BIN
+   - A program that draws the Mandelbrot set 
+2) TETRIS.BIN
+   - Tetris game
+3) THEME.BIN
+   - The THEME command has not only been moved out of kshell, but has also been improved
+4) FRACTAL.COM
+   - The program draws a fractal (Sierpinski triangle)
+
+=======================================================================================
+
+7. Fixed string api bugs
+
+=======================================================================================
+
+8. Added a system call to force exit the program
+1) Restores a kernel segment
+2) Restores registers
+3) Can be applied everywhere by calling INT 0x20
+
+=======================================================================================
+
+9. Added system calls for working with directories
+1) INT 0x22; AH = 0x09: Change current directory (SI = dirname, returns CF flag)
+2) INT 0x22; AH = 0x0A: Go to parent directory (returns CF flag)
+3) INT 0x22; AH = 0x0B: Create directory (SI = dirname, returns CF flag) 
+4) INT 0x22; AH = 0x0C: Remove directory (SI = dirname, returns CF flag) 
+5) INT 0x22; AH = 0x0D: Check if directory (SI = name, returns CF flag)  
+6) INT 0x22; AH = 0x0E: Save current directory 
+7) INT 0x22; AH = 0x0F: Restore current directory
+
+=======================================================================================
+
+Copyright (C) 2024-2026 PRoX2011
