@@ -1,0 +1,164 @@
+===========================================================================
+                        BUILT-IN PROGRAMS REFERENCE
+===========================================================================
+
+All programs are located in BIN/ directory.
+Programs can be executed from any directory by typing their name.
+
+SYSTEM PROGRAMS:
+  SETUP.BIN
+    First-boot setup wizard
+    Configure username, password, theme
+    Run manually to reconfigure system
+
+  AUTOEXEC.BIN
+    Auto-execution script
+    Runs automatically at startup (after login)
+    Edit to customize startup behavior
+
+  THEME.BIN
+    Color theme configurator
+    Switch between DEFAULT, GROOVYBOX, UBUNTU
+    Create custom themes
+
+PRODUCTIVITY:
+  WRITER.BIN
+    Text file editor
+    Create and edit .TXT files
+    Keyboard controls displayed in program
+
+  CALC.BIN
+    Basic calculator
+    Supports +, -, *, / operations
+    Decimal and integer arithmetic
+
+  PROCENTC.BIN
+    Percentage calculator
+    Calculate percentages quickly
+    Useful for discounts and ratios
+
+UTILITIES:
+  FETCH.BIN
+    System information display
+    Shows CPU, memory, OS version
+    "I use PRos btw" style output
+
+  MEMORY.BIN
+    Memory viewer
+    Inspect RAM contents
+    Hexadecimal display
+    Navigate with arrow keys
+
+  HEXEDIT.BIN
+    Hexadecimal file editor
+    Edit binary files byte-by-byte
+    Advanced users only
+
+  CHARS.BIN
+    ASCII character table
+    Shows all printable characters
+    Useful for finding special symbols
+
+  CLOCK.BIN
+    Real-time clock display
+    Shows current time and date
+    Uses TIMEZONE.CFG setting
+
+MEDIA:
+  IMFPLAY.BIN
+    IMF music player
+    Play .IMF music files
+    Requires AdLib sound card
+    Usage: IMFPLAY <filename>
+
+  PAINT.BIN
+    Basic drawing program
+    Create simple BMP images
+    Save and load artwork
+    Mouse required
+
+GAMES:
+  MINE.BIN
+    Minesweeper game
+    Classic puzzle game
+    Mouse or keyboard controls
+    Multiple difficulty levels
+
+  SPACE.BIN
+    Space shooter arcade game
+    Keyboard controls
+    Shoot enemies, avoid obstacles
+    Score tracking
+
+  PONG.BIN
+    Classic Pong game
+    Two-player or vs CPU
+    Keyboard controls (W/S and arrows)
+
+  SNAKE.BIN
+    Snake game
+    Arrow keys to move
+    Eat food, grow longer
+    Don't hit walls or yourself
+
+  TETRIS.BIN
+    Tetris game
+    Arrow keys to move/rotate
+    Clear lines for points
+    Speed increases over time
+
+DEVELOPMENT:
+  BRAINF.BIN
+    Brainfuck interpreter
+    Execute .BF programs
+    Educational tool for esoteric programming
+
+  BCHART.BIN
+    Bar chart creator
+    Create simple data visualizations
+    Text-based output
+
+  GREP.BIN
+    Text search utility
+    Find patterns in files
+    Usage: GREP <pattern> <file>
+
+SPECIAL:
+  CREDITS.BIN
+    Contributors and special thanks
+    Shows project contributors
+    Acknowledgments
+
+  MANDEL.BIN
+    Mandelbrot set generator
+    Mathematical visualization
+    Navigate with arrow keys
+
+  FRACTAL.COM
+    Fractal pattern generator
+    MS-DOS .COM program example
+    Demonstrates DOS compatibility
+
+  HELLO.COM
+    "Hello, world" demonstration
+    MS-DOS .COM program example
+    Source code available for learning
+
+RUNNING PROGRAMS:
+  Method 1: Type name without extension
+    Example: CALC
+
+  Method 2: Type full filename
+    Example: CALC.BIN
+
+  With parameters:
+    Example: IMFPLAY MUSIC/SONG.IMF
+
+PROGRAM LOCATIONS:
+  - BIN/ directory: Run from anywhere
+  - Current directory: Run only when in that directory
+  - Use full path for files in other directories
+
+See COMMANDS.TXT for built-in terminal commands.
+
+===========================================================================

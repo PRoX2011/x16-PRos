@@ -1,28 +1,53 @@
-============================================================================
+===========================================================================
+                          FILE SYSTEM INFORMATION
+===========================================================================
 
-PRos uses the FAT12 file system. You can name your files in the 8.3 format:
-  [8] - file name
-  [3] - file extension
-The following characters cannot be used in file names: \ / : * ? " < > |
-The maximum file size for reading in PRos is 32768 bytes (32 KB)
+FILE SYSTEM: FAT12
 
-Supported file types:
+FILE NAMING FORMAT: 8.3
+  - Up to 8 characters for name
+  - Up to 3 characters for extension
+  - Example: FILENAME.TXT
 
-  [.BIN] - Executable files (programs). They are started by entering the 
-           name of the executable file with or without an extension into
-           the terminal.
+FORBIDDEN CHARACTERS:
+  \ / : * ? " < > | (space)
 
-  [.TXT] - Text files. Contain plain text. Can be displayed using the 
-           CAT command.
+MAXIMUM FILE SIZE: 32768 bytes (32 KB)
 
-  [.BMP] - Raster image. Can be displayed using the VIEW command. 
-           Maximum resolution - [320x240]. 
-           Number of supported colors - [256]
+SUPPORTED FILE TYPES:
 
-  [.IMF] - Music files. Can be played using the PLAY command. 
-           You need ADlib sound card to listen IMF files.
+  .BIN - Executable programs
+         Run by typing filename in terminal
+         Must be in BIN/ folder or current directory
 
+  .COM - MS-DOS executable programs
+         Native MS-DOS compatibility
+         Run same way as .BIN files
 
+  .TXT - Plain text files
+         Display with CAT command
+         Edit with WRITER.BIN
 
+  .BMP - Bitmap images
+         Maximum resolution: 320x240
+         256 colors supported
+         Display with VIEW command
+         Flags: -upscale (2x zoom), -stretch (fullscreen)
 
-============================================================================
+  .IMF - Music files for AdLib sound card
+         Play with IMFPLAY.BIN
+         Requires AdLib/OPL2 compatible hardware
+
+  .CFG - System configuration files
+         Located in CONF/ directory
+         See CONFIGS.TXT for details
+
+DIRECTORY STRUCTURE:
+  /           - Root directory
+  BIN/        - System programs and applications
+  CONF/       - Configuration files
+  DOCS/       - Documentation files
+  BMP/        - Image files
+  MUSIC/      - IMF music files
+
+===========================================================================

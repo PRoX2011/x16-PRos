@@ -1858,16 +1858,59 @@ cat_file:
     jc .not_found
     mov cx, 32768
     call fs_load_file
+    jc .not_found
+    
     mov word [file_size], bx
     cmp bx, 0
     je .empty_file
+
     mov si, 32768
     mov di, file_buffer
     mov cx, bx
     rep movsb
     mov byte [di], 0
+    
     mov si, file_buffer
+    mov word [.line_count], 0
+
+.print_loop:
+    lodsb
+    cmp al, 0
+    je .end_cat
+    
+    cmp al, 0x0A
+    je .handle_newline
+    
+    mov ah, 0x0E
+    mov bl, 0x0F
+    int 0x10
+    jmp .print_loop
+
+.handle_newline:
+    mov al, 0x0D
+    int 0x10
+    mov al, 0x0A
+    int 0x10
+    
+    inc word [.line_count]
+    cmp word [.line_count], 28
+    jne .print_loop
+    
+    push si
+    mov si, .continue_msg
+    call print_string_cyan
+    
+    mov ah, 0
+    int 16h
+    
+    mov si, .clear_msg
     call print_string
+    
+    mov word [.line_count], 0
+    pop si
+    jmp .print_loop
+
+.end_cat:
     call print_newline
     call print_newline
     popa
@@ -1883,6 +1926,10 @@ cat_file:
     call print_newline
     popa
     jmp get_cmd
+
+.line_count   dw 0
+.continue_msg db 13, ' --- Press any key to continue --- ', 0
+.clear_msg    db 13, '                                    ', 13, 0
 
 del_file:
     mov word si, [param_list]
@@ -2833,7 +2880,7 @@ info db 10, 13
      db '  Video mode: 0x12 (640x480; 16 colors)', 10, 13
      db '  File system: FAT12', 10, 13
      db '  License: MIT', 10, 13
-     db '  OS version: 0.6', 10, 13
+     db '  OS version: 0.6.1', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.2', 10, 13, 0

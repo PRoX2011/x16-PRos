@@ -244,7 +244,6 @@ echo -e "$NC"
 echo -e "$GREEN========== Copying text files... ==========$NC"
 text_files=(
     "LICENSE.TXT"
-    "src/txt/ABOUT.TXT"
 )
 
 for file in "${text_files[@]}"; do
@@ -255,9 +254,13 @@ for file in "${text_files[@]}"; do
 done
 
 text_files_doc=(
-    "src/txt/FILESYS.TXT"
-    "src/txt/PROGPACK.TXT"
+    "src/txt/README.TXT"
     "src/txt/CONFIGS.TXT"
+    "src/txt/FILESYS.TXT"
+    "src/txt/LIMITS.TXT"
+    "src/txt/PROGRAMS.TXT"
+    "src/txt/QUICKST.TXT"
+    "src/txt/COMMANDS.TXT"
 )
 
 
