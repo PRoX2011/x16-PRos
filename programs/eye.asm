@@ -35,7 +35,7 @@ start:
     call sleep_ms_esc
     jc exit_program
     
-    ; 1) LIcensed
+    ; 1) Licensed
     call clear_inside 
     mov si, msg_license
     mov dh, TEXT_ROW_MAIN
@@ -167,7 +167,7 @@ ui_enter:
     ret
 
 ui_exit:
-    ; return to VGA mode 0x12 (как в WRITER)
+    ; return to VGA mode 0x12
     mov ax, 0x0012
     int 10h
     ret
@@ -291,7 +291,16 @@ draw_centered_text_row:
     push dx
     push si
 
+    cmp si, 0
+    je .done
+
+    cmp si, 0x8000
+    jb .done
+
     call strlen_preserve     ; CX=len
+
+    cmp cx, 0
+    je .done
     cmp cx, 78
     jbe .len_ok
     mov cx, 78
@@ -311,7 +320,14 @@ draw_centered_text_row:
     lodsb
     test al, al
     jz .done
+
+    cmp al, 32
+    jb .skip_char
+    cmp al, 126
+    ja .skip_char
+    
     call put_char_attr
+.skip_char:
     inc dl
     dec cx
     jmp .print_loop
@@ -328,10 +344,23 @@ strlen_preserve:
     push ax
     push si
     xor cx, cx
+    
+    cmp si, 0
+    je .out
+    cmp si, 0x8000
+    jb .out
+    
 .len:
+    cmp cx, 200
+    jge .out
+    
     mov al, [si]
     test al, al
     jz .out
+
+    cmp al, 32
+    jb .out
+    
     inc si
     inc cx
     jmp .len
@@ -474,8 +503,8 @@ check_esc:
     ret
 
 ; sleep_ms_esc:
-;   AX = milliseconds (0..65535)  -> max ~65 сек
-;   CF=1 если ESC
+;   AX = milliseconds (0..65535)
+;   CF=1 if ESC
 sleep_ms_esc:
     push ax
     push bx
@@ -513,7 +542,7 @@ sleep_ms_esc:
 
 ; sleep_ticks_esc:
 ;   SI = ticks to wait
-;   CF=1 если ESC
+;   CF=1 if ESC
 sleep_ticks_esc:
     push ax
     push bx
@@ -540,7 +569,6 @@ sleep_ticks_esc:
     mov dx, cx
     sbb dx, bp          ; delta_high in DX
 
-    ; если delta_high != 0, значит delta >= 65536 тиков -> точно больше SI
     cmp dx, 0
     jne .ok
 
@@ -587,22 +615,39 @@ play_beep:
 
 pick_phrase:
     push ax
+    push cx
     push dx
     push di
+    push bp
+
+    mov bp, bx     
+    mov di, cx     
 
     mov ah, 00h
-    int 1Ah          ; CX:DX = ticks
+    int 1Ah         
+    
     mov ax, dx
+    xor dx, dx      
 
-    xor dx, dx
-    div cx           ; DX = rem (0..CX-1)
+    cmp di, 0
+    je .use_first
+    
+    div di          
+                   
+    mov si, dx
+    shl si, 1     
+    add si, bp      
+    mov si, [si]    
+    jmp .done
 
-    mov di, dx
-    shl di, 1        ; rem * 2 (word table)
-    mov si, [bx + di]
+.use_first:
+    mov si, [bp] 
 
+.done:
+    pop bp
     pop di
     pop dx
+    pop cx
     pop ax
     ret
 
@@ -617,19 +662,19 @@ dot_col db CENTER_COL
 ; ---- Center phrases ----
 center_tbl:
     dw msg_center_1
-    dw msg_center_1
-    dw msg_center_1
     dw msg_center_2
     dw msg_center_3
     dw msg_center_4
+    dw msg_center_5
+    dw msg_center_6
 center_tbl_count equ ($ - center_tbl) / 2
 
 ; ---- Relax phrases ----
 relax_tbl:
     dw msg_relax_1
-    dw msg_relax_1
     dw msg_relax_2
     dw msg_relax_3
+    dw msg_relax_4
 relax_tbl_count equ ($ - relax_tbl) / 2
 
 ; ---- Strings ----
@@ -637,12 +682,14 @@ msg_center_1 db "LOOK AT THE CENTER", 0
 msg_center_2 db "CENTER. STILL.", 0
 msg_center_3 db "EYES TO THE CENTER.", 0
 msg_center_4 db "HOLD THE CENTER POINT.", 0
+msg_center_5 db "FOCUS ON THE CENTER.", 0
+msg_center_6 db "KEEP YOUR EYES CENTERED.", 0
 
 msg_relax_1  db "RELAX...", 0
 msg_relax_2  db "BLINK SOFTLY.", 0
 msg_relax_3  db "BREATH IN... OUT...", 0
+msg_relax_4  db "REST YOUR EYES.", 0
 
 msg_license  db "Tayo Micro Software. Eyes Trainer 2026", 0
 
 msg_hint     db "ESC - EXIT | TAYO since 2006", 0
-
