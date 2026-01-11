@@ -13,7 +13,7 @@ int20_handler:
     mov ss, [com_ss_save]
     mov sp, [com_stack_save]
     
-    sti              
+    sti    
 
     mov dx, .finished_msg
     mov ah, 0x09
@@ -52,6 +52,8 @@ int21_dos_handler:
     je .input_char_echo
     cmp ah, 0x02
     je .output_char
+    cmp ah, 0x06
+    je .direct_console_io
     cmp ah, 0x07
     je .input_char_no_echo
     cmp ah, 0x08
@@ -60,6 +62,8 @@ int21_dos_handler:
     je .output_string_dollar
     cmp ah, 0x0A
     je .buffered_input
+    cmp ah, 0x0B
+    je .check_input_status
     cmp ah, 0x4C
     je .terminate
     
@@ -89,6 +93,45 @@ int21_dos_handler:
 .input_char_no_echo:
     mov ah, 0x00
     int 0x16
+    iret
+
+.check_input_status:
+    mov ah, 0x01
+    int 0x16
+    jz .no_key_available
+    mov al, 0xFF        
+    iret
+.no_key_available:
+    mov al, 0x00        
+    iret
+
+.direct_console_io:
+    cmp dl, 0xFF
+    je .direct_input
+
+    push ax
+    push bx
+    mov ah, 0x0E
+    mov al, dl
+    mov bl, 0x0F
+    int 0x10
+    pop bx
+    pop ax
+    iret
+
+.direct_input:
+    mov ah, 0x01
+    int 0x16
+    jz .no_char_ready
+
+    mov ah, 0x00
+    int 0x16
+    clc                
+    iret
+
+.no_char_ready:
+    xor al, al        
+    or al, al        
     iret
 
 .output_string_dollar:
@@ -180,4 +223,4 @@ int21_dos_handler:
 
 .terminate:
     int 0x20
-    iret 
+    iret
