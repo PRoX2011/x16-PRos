@@ -552,6 +552,214 @@ fs_load_file:
 .current_cluster dw 0
 
 ; ========================================================================
+; FS_LOAD_HUGE_FILE - Loads a large file across segment boundaries
+; IN : AX = file name, CX = load offset address, DX = load segment address 
+; OUT : EBX = file size, CF = error flag
+; ========================================================================
+fs_load_huge_file:
+    pusha
+
+    mov [.huge_offset], cx
+    mov [.huge_segment], dx
+    
+    call string_string_uppercase
+    call int_filename_convert
+    mov [.huge_filename], ax
+
+    call fs_reset_floppy
+    jnc .floppy_ok
+    jmp .error_exit
+
+.floppy_ok:
+    cmp byte [current_directory], 0
+    je .search_root
+    jmp .search_subdir
+
+.search_root:
+    mov ax, 19
+    call fs_convert_l2hts
+    mov si, disk_buffer
+    mov bx, si
+    mov ah, 2
+    mov al, 14
+    stc
+    int 13h
+    jc .error_exit
+    mov cx, 224
+    mov bx, -32
+    jmp .scan_root_loop
+
+.scan_root_loop:
+    add bx, 32
+    mov di, disk_buffer
+    add di, bx
+    mov al, [di]
+    cmp al, 0
+    je .error_exit
+    cmp al, 0E5h
+    je .next_root
+    mov al, [di+11]
+    cmp al, 0Fh
+    je .next_root
+    test al, 18h
+    jnz .next_root
+    
+    push di
+    mov byte [di+11], 0
+    mov ax, di
+    call string_string_uppercase
+    mov si, [.huge_filename]
+    call string_string_compare
+    pop di
+    jc .found_file
+
+.next_root:
+    loop .scan_root_loop
+    jmp .error_exit
+
+.search_subdir:
+    mov ax, current_directory
+    call string_string_uppercase
+    call int_dirname_convert
+    jc .error_exit
+    
+    push ax
+    call fs_read_root_dir
+    pop ax
+    
+    mov di, disk_buffer
+    call fs_get_root_entry
+    jc .error_exit
+    
+    mov ax, [di+26]
+    mov [.huge_curr_cluster], ax
+    cmp ax, 0
+    je .error_exit
+
+.load_subdir_sector:
+    mov ax, [.huge_curr_cluster]
+    add ax, 31
+    call fs_convert_l2hts
+    mov bx, disk_buffer
+    mov ah, 2
+    mov al, 1
+    stc
+    int 13h
+    jc .error_exit
+    
+    mov bx, 0
+    mov cx, 16
+
+.scan_subdir_loop:
+    mov di, disk_buffer
+    add di, bx
+    mov al, [di]
+    cmp al, 0
+    je .error_exit
+    cmp al, 0E5h
+    je .next_sub
+    mov al, [di+11]
+    test al, 0x18
+    jnz .next_sub
+
+    push di
+    push bx
+    mov byte [di+11], 0
+    mov ax, di
+    call string_string_uppercase
+    mov si, [.huge_filename]
+    call string_string_compare
+    pop bx
+    pop di
+    jc .found_file
+
+.next_sub:
+    add bx, 32
+    dec cx
+    jnz .scan_subdir_loop
+    
+    mov ax, [.huge_curr_cluster]
+    call fs_get_next_directory_cluster
+    jc .error_exit
+    mov [.huge_curr_cluster], ax
+    jmp .load_subdir_sector
+
+.found_file:
+    mov ax, [di+28]
+    mov word [.huge_filesize], ax
+    mov ax, [di+30]
+    mov word [.huge_filesize+2], ax
+    
+    mov ax, [di+26]
+    mov word [.huge_cluster], ax
+    
+    call fs_read_fat 
+
+.load_loop:
+    mov ax, word [.huge_cluster]
+    add ax, 31
+    call fs_convert_l2hts
+    
+    mov es, [.huge_segment] 
+    mov bx, [.huge_offset]  
+    
+    mov ah, 02
+    mov al, 01
+    stc
+    int 13h
+    
+    push ds
+    pop es
+    
+    jc .error_exit
+
+    add word [.huge_offset], 512
+    jnc .check_next_cluster
+    
+    add word [.huge_segment], 0x1000 
+
+.check_next_cluster:
+    mov ax, [.huge_cluster]
+    mov bx, 3
+    mul bx
+    mov bx, 2
+    div bx
+    mov si, disk_buffer
+    add si, ax
+    mov ax, word [ds:si]
+    or dx, dx
+    jz .even_cluster
+.odd_cluster:
+    shr ax, 4
+    jmp .got_next_cluster
+.even_cluster:
+    and ax, 0FFFh
+.got_next_cluster:
+    mov word [.huge_cluster], ax
+    cmp ax, 0FF8h
+    jae .success_exit
+    
+    jmp .load_loop
+
+.success_exit:
+    mov ebx, [.huge_filesize]
+    popa
+    clc
+    ret
+
+.error_exit:
+    popa
+    stc
+    ret
+
+.huge_filename     dw 0
+.huge_segment      dw 0
+.huge_offset       dw 0
+.huge_filesize     dd 0
+.huge_cluster      dw 0
+.huge_curr_cluster dw 0
+
+; ========================================================================
 ; FS_WRITE_FILE - Writes a file to the current directory
 ; IN : AX = file name, BX = data address, CX = size
 ; OUT : CF = error flag

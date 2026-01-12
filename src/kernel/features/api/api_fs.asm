@@ -19,6 +19,7 @@
 ;   0x0D: Check if directory (SI = name, returns CF flag)  
 ;   0x0E: Save current directory 
 ;   0x0F: Restore current directory
+;   0x10: Load huge file (SI = filename, CX = load offset (position), DX = load segment address)
 ; ==================================================================
 
 [BITS 16]
@@ -81,6 +82,8 @@ int22_handler:
     je .save_directory
     cmp al, 0x0F
     je .restore_directory
+    cmp al, 0x10
+    je .load_huge_file
     stc
     jmp .done
 
@@ -178,6 +181,11 @@ int22_handler:
 
 .restore_directory:
     call restore_current_dir
+    jmp .done
+    
+.load_huge_file:
+    mov ax, si
+    call fs_load_huge_file
     jmp .done
     
 .done:

@@ -3,7 +3,6 @@
 ===========================================================================
 
 FILE SYSTEM LIMITATIONS:
-  Maximum file size:         32768 bytes (32 KB)
   Filename length:           8 characters
   File extension length:     3 characters
   Total path length:         Limited by FAT12

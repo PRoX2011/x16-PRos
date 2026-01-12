@@ -20,9 +20,10 @@ start:
 		mov si, loading_msg
 		int 0x21
 
-		mov ah, 0x02
+		mov ah, 0x10
         mov si, [filename_ptr]
-        mov cx, 43008
+        mov cx, 43008    
+        mov dx, 0x2000    
         int 22h
 
 		mov ah, 0x01

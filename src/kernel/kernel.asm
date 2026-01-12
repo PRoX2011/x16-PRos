@@ -1010,7 +1010,7 @@ print_interface:
             db ' |  ___/|  _  /| |  | |\___ \ ', 10, 13
             db ' | |    | | \ \| |__| |____) |', 10, 13
             db ' |_|    |_|  \_\\____/|_____/ ', 10, 13, 0
-.copyright  db '* Copyright (C) 2025 PRoX2011', 10, 13, 0
+.copyright  db '* Copyright (C) 2024-2026 PRoX2011', 10, 13, 0
 .shell      db '* Shell: ', 0
 .tip        db 'Type HELP to get list of the comands', 10, 13, 0
 
@@ -1291,10 +1291,10 @@ get_cmd:
     jc no_kernel_allowed
 
     ; Try to load from current directory
-    mov ax, command
-    mov bx, 0
-    mov cx, 32768
-    call fs_load_file
+    mov ax, command  
+    mov cx, 32768     
+    mov dx, 0x2000    
+    call fs_load_huge_file
     jnc execute_bin 
 
     ; If not found, try /BIN directory 
@@ -1842,43 +1842,56 @@ list_directory:
 cat_file:
     call print_newline
     pusha
+
     mov word si, [param_list]
     call string_string_parse
     cmp ax, 0
     jne .filename_provided
+    
     mov si, nofilename_msg
     call print_string
     call print_newline
-    popa
-    call print_newline
-    jmp get_cmd
+    jmp .exit_cat
 
 .filename_provided:
+    push ax          
     call fs_file_exists
+    pop ax               
     jc .not_found
-    mov cx, 32768
-    call fs_load_file
-    jc .not_found
+
+    mov cx, 32768     
+    mov dx, ds           
     
-    mov word [file_size], bx
-    cmp bx, 0
+    call fs_load_huge_file  
+    jc .load_fail
+
+    cmp ebx, 0
     je .empty_file
 
-    mov si, 32768
-    mov di, file_buffer
-    mov cx, bx
-    rep movsb
-    mov byte [di], 0
-    
-    mov si, file_buffer
+    mov dword [.rem_size], ebx 
+    mov word [.curr_seg], ds 
+    mov word [.curr_off], 32768 
     mov word [.line_count], 0
 
 .print_loop:
-    lodsb
-    cmp al, 0
+    cmp dword [.rem_size], 0
     je .end_cat
+
+    mov es, [.curr_seg]   
+    mov si, [.curr_off] 
+    mov al, [es:si]      
+
+    inc word [.curr_off]   
+    jnz .no_wrap        
     
-    cmp al, 0x0A
+    add word [.curr_seg], 0x1000 
+.no_wrap:
+    sub dword [.rem_size], 1
+
+    cmp al, 0
+    je .end_cat       
+    
+    cmp al, 0x0A       
     je .handle_newline
     
     mov ah, 0x0E
@@ -1893,43 +1906,61 @@ cat_file:
     int 0x10
     
     inc word [.line_count]
-    cmp word [.line_count], 28
+    cmp word [.line_count], 23 
     jne .print_loop
     
     push si
+    push es            
     mov si, .continue_msg
     call print_string_cyan
     
     mov ah, 0
-    int 16h
+    int 16h       
     
     mov si, .clear_msg
     call print_string
     
     mov word [.line_count], 0
+    pop es              
     pop si
     jmp .print_loop
 
 .end_cat:
     call print_newline
     call print_newline
-    popa
-    jmp get_cmd
+    jmp .exit_cat
 
 .empty_file:
-    popa
-    jmp get_cmd
+    mov si, .empty_msg
+    call print_string_red
+    call print_newline
+    jmp .exit_cat
 
 .not_found:
     mov si, notfound_msg
     call print_string_red
     call print_newline
+    jmp .exit_cat
+
+.load_fail:
+    mov si, .load_err_msg
+    call print_string_red
+    call print_newline
+
+.exit_cat:
     popa
+    call print_newline
     jmp get_cmd
 
 .line_count   dw 0
-.continue_msg db 13, ' --- Press any key to continue --- ', 0
-.clear_msg    db 13, '                                    ', 13, 0
+.curr_seg     dw 0       
+.curr_off     dw 0         
+.rem_size     dd 0      
+
+.continue_msg db 13, ' -- Press key -- ', 0
+.clear_msg    db 13, '                 ', 13, 0
+.empty_msg    db 'File is empty', 0
+.load_err_msg db 'Error loading file', 0
 
 del_file:
     mov word si, [param_list]
@@ -2023,8 +2054,9 @@ copy_file:
     call fs_file_exists
     jnc .already_exists
     mov ax, dx
-    mov cx, 32768
-    call fs_load_file
+    mov cx, 32768     
+    mov dx, 0x2000    
+    call fs_load_huge_file
     jc .load_fail
     mov cx, bx
     mov bx, 32768
@@ -2880,7 +2912,7 @@ info db 10, 13
      db '  Video mode: 0x12 (640x480; 16 colors)', 10, 13
      db '  File system: FAT12', 10, 13
      db '  License: MIT', 10, 13
-     db '  OS version: 0.6.2', 10, 13
+     db '  OS version: 0.6.3', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.2', 10, 13, 0

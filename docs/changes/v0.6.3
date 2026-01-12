@@ -1,0 +1,14 @@
+---------------------- Key changes x16-PRos v0.6.3 ---------------------
+
+=======================================================================================
+
+1. Added system call for loading big files.
+1) INT 0x22; AH = 0x10 (SI = filename, CX = load offset (position), DX = load segment address)
+
+=======================================================================================
+
+2. The maximum size of executable BIN files has been increased. A 1048576 bytes file can now be executed
+
+=======================================================================================
+
+Copyright (C) 2024-2026 PRoX2011
