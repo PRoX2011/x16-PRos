@@ -554,10 +554,15 @@ fs_load_file:
 ; ========================================================================
 ; FS_LOAD_HUGE_FILE - Loads a large file across segment boundaries
 ; IN : AX = file name, CX = load offset address, DX = load segment address 
-; OUT : EBX = file size, CF = error flag
+; OUT : DX:AX = file size (DX=High, AX=Low), CF = error flag
 ; ========================================================================
 fs_load_huge_file:
-    pusha
+    push bx
+    push cx
+    push si
+    push di
+    push es
+    push ds
 
     mov [.huge_offset], cx
     mov [.huge_segment], dx
@@ -585,35 +590,39 @@ fs_load_huge_file:
     stc
     int 13h
     jc .error_exit
-    mov cx, 224
-    mov bx, -32
-    jmp .scan_root_loop
+    
+    mov cx, 224       
+    mov bx, 0        
 
 .scan_root_loop:
-    add bx, 32
     mov di, disk_buffer
     add di, bx
+    
     mov al, [di]
-    cmp al, 0
+    cmp al, 0         
     je .error_exit
-    cmp al, 0E5h
+    cmp al, 0E5h       
     je .next_root
-    mov al, [di+11]
-    cmp al, 0Fh
+    
+    mov al, [di+11]   
+    cmp al, 0Fh        
     je .next_root
-    test al, 18h
+    test al, 18h      
     jnz .next_root
     
     push di
+    push bx       
     mov byte [di+11], 0
     mov ax, di
     call string_string_uppercase
     mov si, [.huge_filename]
     call string_string_compare
+    pop bx             
     pop di
     jc .found_file
 
 .next_root:
+    add bx, 32
     loop .scan_root_loop
     jmp .error_exit
 
@@ -647,8 +656,8 @@ fs_load_huge_file:
     int 13h
     jc .error_exit
     
-    mov bx, 0
-    mov cx, 16
+    mov bx, 64           
+    mov cx, 14
 
 .scan_subdir_loop:
     mov di, disk_buffer
@@ -685,14 +694,21 @@ fs_load_huge_file:
     jmp .load_subdir_sector
 
 .found_file:
-    mov ax, [di+28]
-    mov word [.huge_filesize], ax
-    mov ax, [di+30]
-    mov word [.huge_filesize+2], ax
+    mov ax, [di+28]        
+    mov word [.huge_filesize_low], ax
+    mov ax, [di+30]       
+    mov word [.huge_filesize_high], ax
     
     mov ax, [di+26]
     mov word [.huge_cluster], ax
     
+    cmp word [.huge_filesize_low], 0
+    jne .start_load
+    cmp word [.huge_filesize_high], 0
+    jne .start_load
+    jmp .success_exit_empty  
+    
+.start_load:
     call fs_read_fat 
 
 .load_loop:
@@ -742,22 +758,47 @@ fs_load_huge_file:
     jmp .load_loop
 
 .success_exit:
-    mov ebx, [.huge_filesize]
-    popa
+    mov ax, [.huge_filesize_low]
+    mov dx, [.huge_filesize_high]
+    
+    pop ds
+    pop es
+    pop di
+    pop si
+    pop cx
+    pop bx
+    clc
+    ret
+
+.success_exit_empty:
+    xor ax, ax
+    xor dx, dx
+    pop ds
+    pop es
+    pop di
+    pop si
+    pop cx
+    pop bx
     clc
     ret
 
 .error_exit:
-    popa
+    pop ds
+    pop es
+    pop di
+    pop si
+    pop cx
+    pop bx
     stc
     ret
 
-.huge_filename     dw 0
-.huge_segment      dw 0
-.huge_offset       dw 0
-.huge_filesize     dd 0
-.huge_cluster      dw 0
-.huge_curr_cluster dw 0
+.huge_filename       dw 0
+.huge_segment        dw 0
+.huge_offset         dw 0
+.huge_filesize_low   dw 0 
+.huge_filesize_high  dw 0
+.huge_cluster        dw 0
+.huge_curr_cluster   dw 0
 
 ; ========================================================================
 ; FS_WRITE_FILE - Writes a file to the current directory

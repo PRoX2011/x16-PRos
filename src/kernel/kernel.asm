@@ -1864,11 +1864,14 @@ cat_file:
     
     call fs_load_huge_file  
     jc .load_fail
+    
+    mov word [.rem_size], ax   
+    mov word [.rem_size+2], dx  
+    
+    mov cx, ax
+    or cx, dx          
+    jz .empty_file
 
-    cmp ebx, 0
-    je .empty_file
-
-    mov dword [.rem_size], ebx 
     mov word [.curr_seg], ds 
     mov word [.curr_off], 32768 
     mov word [.line_count], 0
