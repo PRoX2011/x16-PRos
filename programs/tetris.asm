@@ -521,8 +521,9 @@ check_game_over:
     ret
 
 set_cursor:
-    mov ah, 0x0F
-    int 0x23
+    mov ah, 0x02
+    mov bh, 0
+    int 0x10
     ret
 
 print_string:

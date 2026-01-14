@@ -221,6 +221,7 @@ done
 programs_com=(
     "programs/COM/hello.asm HELLO.COM"
     "programs/COM/fractal.asm FRACTAl.COM"
+    "programs/COM/clock.asm CLOCK.COM"
 )
 
 for prog in "${programs_com[@]}"; do

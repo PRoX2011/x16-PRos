@@ -50,7 +50,6 @@ start:
     ; PRoX kernel API initialization
     call api_output_init    ; Output API (INT 21H)
     call api_fs_init        ; File system API (INT 22h)
-    call api_string_init    ; String API (INT 23h)
 
     ; Load SYSTEM.CFG (Logo and Sound settings)
     call load_system_cfg
@@ -2870,7 +2869,6 @@ cd_command:
 ; ====== API ======
 %INCLUDE "src/kernel/features/api/api_output.asm"
 %INCLUDE "src/kernel/features/api/api_fs.asm"
-%INCLUDE "src/kernel/features/api/api_string.asm"
 ; =================
 
 ; ===================== Data Section =====================
@@ -2915,7 +2913,7 @@ info db 10, 13
      db '  Video mode: 0x12 (640x480; 16 colors)', 10, 13
      db '  File system: FAT12', 10, 13
      db '  License: MIT', 10, 13
-     db '  OS version: 0.6.3', 10, 13
+     db '  OS version: 0.6.4', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.2', 10, 13, 0
