@@ -264,6 +264,7 @@ text_files_doc=(
     "src/txt/PROGRAMS.TXT"
     "src/txt/QUICKST.TXT"
     "src/txt/COMMANDS.TXT"
+    "src/txt/EDMAN.TXT"
 )
 
 
