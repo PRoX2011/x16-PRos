@@ -1,0 +1,32 @@
+ED
+Dev: Desvor
+Ver: 0.0.1
+
+SHELL SINTAX:
+    ed <file>
+        for editing file
+    ed ?
+        for getting little text info about ed
+
+LINES_OPERANDS:
+    marked as **LN, for example "StLN" or "usage_lineLN"
+
+    takes numbers start at 1 and ending at last line number of file
+
+    Special symbols:
+        symbol '.' is a current line number
+            the number before the symbol will be added to the final value
+        symbol '$' is a last line number
+            the number before the symbol will be subtracted from the final value
+
+COMANDS:
+    Q                   - quit ed without auto saving buffer
+    q                   - quit if buffer will be saved
+  p P [<StLN>] [<EdLN>] - puts lines start with <StLN> and endig at <EdLN>
+                          if specified only <StLN>, puts only <StLN> line
+                          if operands not specified, puts current line
+                          current line number will be set to <StLN>
+  w W <StLN> <EdLN>     - write to current file lines start with <StLN>
+                          and endig at <EdLN>
+  d D <StLN> <EdLN>     - deleting lines start of <StLN> and eding <EdLN>
+                          including <EdLN>
