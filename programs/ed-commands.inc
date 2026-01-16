@@ -4,6 +4,7 @@
 ; in:          si - ptr to start of operand
 ; out:         cx - line_num
 ; side effect: ax
+;              si point to 0 or ' '
 command_parse_line_operand:
     xor cx, cx
     
@@ -51,6 +52,38 @@ command_parse_line_invalid_operand:
     ret
 
 
+; in:          si - ptr to start of operands (or spaces after operands)
+;              di - buffer to write operands (word)
+;              cx - num of operands to get
+; out:         save to buffer LN operands
+;              bx - num of finded operands
+; side effect: ax, dx
+command_get_line_operands:
+    xor bx, bx
+command_get_line_operands_skip_spaces:
+    mov ax, [si]
+    cmp al, 0
+    je command_get_line_operands_end
+    cmp al, ' '
+    jne command_get_line_operands_skip_spaces_end
+    inc si
+    jmp command_get_line_operands_skip_spaces
+
+command_get_line_operands_skip_spaces_end:
+    push cx  ; saving num of operands to get
+    call command_parse_line_operand
+    pop dx  ; get saved num of oprands to dx
+    mov [di], cx  ; save operand value to buffer
+    mov cx, dx  ; moving saved num of operands back to cx
+    add di, 2
+    inc bx
+    cmp bx, cx
+    je command_get_line_operands_end
+    jmp command_get_line_operands_skip_spaces
+
+command_get_line_operands_end:
+    ret
+
 command_W:
     mov si, file_text_buffer
     call strlen
@@ -73,34 +106,21 @@ command_q:
 
 
 command_P:
-    mov ax, [si]
-    cmp al, 0
-    je .command_P_non_operands
-    cmp al, ' '
-    jne .command_P_skip_spaces_end
-    inc si
-    jmp command_P
-
-.command_P_skip_spaces_end:
-    call command_parse_line_operand
-    mov dx, cx
-    
-.command_P_skip_spases2:
-    mov ax, [si]
-    cmp al, 0
-    je .command_P_non_operands2
-    cmp al, ' '
-    jne .command_P_skip_spases2_end
-    inc si
-    jmp .command_P_skip_spases2
-
-.command_P_skip_spases2_end:
-    call command_parse_line_operand
-    xchg dx, cx
-    jmp .command_P_operans_valid_chack
-
     ; cx - StLN
     ; dx - EdLN
+
+    mov di, command_operand_buffer
+    mov cx, 2
+    call command_get_line_operands
+
+    cmp bx, 1
+    jb .command_P_non_operands
+    je .command_P_non_operands2
+
+    mov cx, [command_operand_buffer]
+    mov dx, [command_operand_buffer + 2]
+
+    jmp .command_P_operans_valid_chack
 
 .command_P_non_operands:
     mov cx, [cur_line]
@@ -190,7 +210,6 @@ command_P:
     jmp command_loop
 
 .command_P_err_invalid_operand:
-    pop cx
     mov si, err_text_invalid_operand
     mov ah, 0x01
     int 0x21
@@ -198,6 +217,8 @@ command_P:
 
 
 command_D:
+
+
     jmp command_loop
 
 %include "programs/ed-common.inc"
