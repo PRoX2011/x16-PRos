@@ -387,7 +387,9 @@ sudo pacman -S qemu-system-x86
 sudo dnf install qemu-system-x86
 ```
 
-Run with audio support:
+#### Run with QEMU
+
+##### Run using a command:
 ```bash
 qemu-system-x86_64 \
     -display gtk \
@@ -397,7 +399,7 @@ qemu-system-x86_64 \
     -audiodev pa,id=snd0
 ```
 
-Or use the provided script (recommended):
+##### Run using a script (recommended):
 ```bash
 chmod +x run-linux.sh
 ./run-linux.sh
