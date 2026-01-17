@@ -129,17 +129,17 @@ command_P:
 
 .command_P_operans_valid_chack:
     cmp cx, 1
-    jb .command_P_err_invalid_operand
+    jb command_err_invalid_operand
     cmp cx, [lines_num]
-    jae .command_P_err_invalid_operand
+    jae command_err_invalid_operand
     
     cmp dx, 1
-    jb .command_P_err_invalid_operand
+    jb command_err_invalid_operand
     cmp dx, [lines_num]
-    jae .command_P_err_invalid_operand
+    jae command_err_invalid_operand
 
     cmp dx, cx
-    jb .command_P_err_invalid_operand
+    jb command_err_invalid_operand
 
 .command_P_ptr_con:
     push cx
@@ -209,16 +209,78 @@ command_P:
     mov [cur_line], cx
     jmp command_loop
 
-.command_P_err_invalid_operand:
-    mov si, err_text_invalid_operand
-    mov ah, 0x01
-    int 0x21
+command_D:
+    ; cx - StLN
+    ; dx - EdLN
+
+    mov di, command_operand_buffer
+    mov cx, 2
+    call command_get_line_operands
+
+    cmp bx, 1
+    jb .command_P_non_operands
+    je .command_P_non_operands2
+
+    mov cx, [command_operand_buffer]
+    mov dx, [command_operand_buffer + 2]
+
+    jmp .command_P_operands_valid_chack
+
+.command_P_non_operands:
+    mov cx, [cur_line]
+.command_P_non_operands2:
+    mov dx, cx
+
+.command_P_operands_valid_chack:
+    cmp cx, 1
+    jb command_err_invalid_operand
+    cmp cx, [lines_num]
+    jae command_err_invalid_operand
+    
+    cmp dx, 1
+    jb command_err_invalid_operand
+    cmp dx, [lines_num]
+    jae command_err_invalid_operand
+
+    cmp dx, cx
+    jb command_err_invalid_operand
+
+.command_D_delete_line:
+    mov bx, dx
+    ; ; TODO: deliting last line
+    ; cmp bx, [lines_num]
+    ; ja .command_D_get_line_ptr
+    shl bx, 1
+    mov di, [text_lines_buffer + bx]  ; di - point to start of next line after EdLN
+
+    mov bx, cx
+    dec bx
+    cmp bx, 0
+    je .command_D_get_start_line_ptr
+    shl bx, 1
+.command_D_get_start_line_ptr:
+    mov si, [text_lines_buffer + bx]  ; si - point to start of StLN
+
+.command_D_move_char:
+    mov al, [di]
+    mov [si], al
+
+    cmp al, 0
+    je .command_D_move_end
+
+    inc si
+    inc di
+    jmp .command_D_move_char
+.command_D_move_end:
+    call split_text_by_lines
+    and byte [flags], 0b11111110  ; disable bit of file saved
     jmp command_loop
 
 
-command_D:
-
-
+command_err_invalid_operand:
+    mov si, err_text_invalid_operand
+    mov ah, 0x01
+    int 0x21
     jmp command_loop
 
 %include "programs/ed-common.inc"

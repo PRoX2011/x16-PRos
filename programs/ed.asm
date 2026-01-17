@@ -67,33 +67,7 @@ open_file:
         int 0x21
     ; ================================
 
-    ; === splitting text on strings ===
-        mov si, file_text_buffer
-        mov di, text_lines_buffer
-
-        mov [di], si
-        add di, 2
-
-line_splitting_loop:
-        mov ax, [si]
-        cmp al, 0x0A
-        je line_splitting_NL
-        cmp al, 0
-        je line_splitting_end
-        inc si
-        jmp line_splitting_loop
-    
-line_splitting_NL:
-        inc si
-        mov [di], si
-        add di, 2
-        inc cx
-        jmp line_splitting_loop
-
-line_splitting_end:
-        inc cx
-        mov [lines_num], cx
-    ; =================================
+    call split_text_by_lines
 
 command_loop:
     mov cx, 0
@@ -161,8 +135,13 @@ parse_command:
     je command_W
     cmp al, 'w'
     je command_W
+    cmp al, 'D'
+    je command_D
+    cmp al, 'd'
+    je command_D
 
     jmp err_unknown_command
+
 exit_prog:
     ret
 
@@ -170,7 +149,7 @@ err_unknown_command:
     mov si, err_text_unknown_command
     mov ah, 0x01
     int 0x21
-    ret
+    jmp command_loop
 
 err_file_name_lenght:
     mov si, err_text_file_name_lenght

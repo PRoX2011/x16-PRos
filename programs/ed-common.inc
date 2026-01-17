@@ -24,9 +24,9 @@
 ; === sub info ===
     ; control flags
     ; 0 - file_text_buffer is saved
-    flags db 0
+    flags db 0b00000001
     ; num of buffer lines
-    lines_num dw 0
+    lines_num dw 1
     ; number of current line
     cur_line dw 1
 ; ================
@@ -87,5 +87,37 @@ strcmp:
 .strcmp_eq:
     mov ax, 0
     ret
+
+
+; in:          no
+; out:         file_text_lines and lines_num updating
+; side effect: si, di, ax
+split_text_by_lines:
+    mov word [lines_num], 1
+    mov si, file_text_buffer
+    mov di, text_lines_buffer
+
+    mov [di], si
+    add di, 2
+
+.splitting_loop:
+    mov ax, [si]
+    cmp al, 0x0A  ; if al = '\r'
+    je .next_line
+    cmp al, 0
+    je .end
+    inc si
+    jmp .splitting_loop
+
+.next_line:
+    inc si
+    mov [di], si
+    add di, 2
+    inc word [lines_num]
+    jmp .splitting_loop
+
+.end:
+    inc word [lines_num]
+    mov word [di + 2], 0
 
 %endif
