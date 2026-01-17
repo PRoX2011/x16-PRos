@@ -55,13 +55,13 @@ COMMAND_BUF_SIZE     equ 24  ; calced for 'A L01 L02 filename.ext \0'
 ; side effect: no
 strlen:
     xor cx, cx
-.strlen_count_loop:
+.count_loop:
     cmp byte [si], 0
-    je .strlen_end
+    je .end
     inc cx
     inc si
-    jmp .strlen_count_loop
-.strlen_end:
+    jmp .count_loop
+.end:
     ret
 
 ; in:          si - str1
@@ -69,22 +69,22 @@ strlen:
 ; out:         ax = 0 - eq, ax = 1 - not eq
 ; side effect: no
 strcmp:
-.strcmp_count_loop:
+.count_loop:
     cmp byte [si], 0
-    je .strcmp_end
+    je .loop_end
     mov al, [si]
     cmp [di], al
-    jne .strcmp_neq
+    jne .neq
     inc si
     inc di
-    jmp .strcmp_count_loop
-.strcmp_end:
+    jmp .count_loop
+.loop_end:
     cmp byte [di], 0
-    je .strcmp_eq
-.strcmp_neq:
+    je .eq
+.neq:
     mov ax, 0xFFFF
     ret
-.strcmp_eq:
+.eq:
     mov ax, 0
     ret
 
@@ -117,7 +117,6 @@ split_text_by_lines:
     jmp .splitting_loop
 
 .end:
-    inc word [lines_num]
     mov word [di + 2], 0
 
 %endif

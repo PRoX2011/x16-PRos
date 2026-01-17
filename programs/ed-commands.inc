@@ -8,44 +8,43 @@
 command_parse_line_operand:
     xor cx, cx
     
-command_parse_line_operand_get_char:
+.get_char:
     mov ax, [si]
     cmp al, ' '
-    je command_parse_line_operand_end
+    je .end
     cmp al, 0
-    je command_parse_line_operand_end
+    je .end
     cmp al, '.'
-    je command_parse_line_operand_cur_line
+    je .handle_cur_line
     cmp al, '$'
-    je command_parse_line_operand_last_line
+    je .handle_last_line
 
     cmp al, '0'
-    jb command_parse_line_invalid_operand
+    jb .invalid_operand
     cmp al, '9'
-    ja command_parse_line_invalid_operand
+    ja .invalid_operand
     sub al, '0'
     imul cx, 10
     xor ah, ah
     add cx, ax
 
-command_parse_line_operand_next_char:
+.next_char:
     inc si
-    jmp command_parse_line_operand_get_char
+    jmp .get_char
 
-command_parse_line_operand_cur_line:
+.handle_cur_line:
     add cx, [cur_line]
-    jmp command_parse_line_operand_next_char
+    jmp .next_char
 
-command_parse_line_operand_last_line:
+.handle_last_line:
     neg cx
     add cx, [lines_num]
-    sub cx, 1
-    jmp command_parse_line_operand_next_char
+    jmp .next_char
 
-command_parse_line_operand_end:
+.end:
     ret
 
-command_parse_line_invalid_operand:
+.invalid_operand:
     mov si, err_text_invalid_operand
     mov ah, 0x01
     int 0x21
@@ -60,16 +59,16 @@ command_parse_line_invalid_operand:
 ; side effect: ax, dx
 command_get_line_operands:
     xor bx, bx
-command_get_line_operands_skip_spaces:
+.skip_spaces:
     mov ax, [si]
     cmp al, 0
-    je command_get_line_operands_end
+    je .end
     cmp al, ' '
-    jne command_get_line_operands_skip_spaces_end
+    jne .skip_spaces_end
     inc si
-    jmp command_get_line_operands_skip_spaces
+    jmp .skip_spaces
 
-command_get_line_operands_skip_spaces_end:
+.skip_spaces_end:
     push cx  ; saving num of operands to get
     call command_parse_line_operand
     pop dx  ; get saved num of oprands to dx
@@ -78,10 +77,10 @@ command_get_line_operands_skip_spaces_end:
     add di, 2
     inc bx
     cmp bx, cx
-    je command_get_line_operands_end
-    jmp command_get_line_operands_skip_spaces
+    je .end
+    jmp .skip_spaces
 
-command_get_line_operands_end:
+.end:
     ret
 
 command_W:
@@ -113,45 +112,45 @@ command_P:
     mov cx, 2
     call command_get_line_operands
 
-    cmp bx, 1
-    jb .command_P_non_operands
-    je .command_P_non_operands2
-
     mov cx, [command_operand_buffer]
     mov dx, [command_operand_buffer + 2]
 
-    jmp .command_P_operans_valid_chack
+    cmp bx, 1
+    jb .non_operands
+    je .non_operands2
 
-.command_P_non_operands:
+    jmp .operands_valid_chack
+
+.non_operands:
     mov cx, [cur_line]
-.command_P_non_operands2:
+.non_operands2:
     mov dx, cx
 
-.command_P_operans_valid_chack:
+.operands_valid_chack:
+    mov [cur_line], cx
+
     cmp cx, 1
     jb command_err_invalid_operand
     cmp cx, [lines_num]
-    jae command_err_invalid_operand
+    ja command_err_invalid_operand
     
     cmp dx, 1
     jb command_err_invalid_operand
     cmp dx, [lines_num]
-    jae command_err_invalid_operand
+    ja command_err_invalid_operand
 
     cmp dx, cx
     jb command_err_invalid_operand
-
-.command_P_ptr_con:
     push cx
 
     mov bx, cx
     sub bx, 1
-    jz .command_P_ptr_set
+    jz .ptr_set
     shl bx, 1
-.command_P_ptr_set:
+.ptr_set:
     lea di, [text_lines_buffer + bx]
 
-.command_P_print_line:
+.print_line:
     pusha
         mov ax, cx
         mov di, number_convert_buffer
@@ -170,22 +169,22 @@ command_P:
 
     mov si, [di]
     mov bx, 0x0F
-.command_P_print_char:
+.print_char:
     mov ax, [si]
     mov ah, 0x0E
     int 0x10
     
     cmp al, 0x0A  ; al == '\n'
-    je .command_P_to_next_line
+    je .to_next_line
     cmp al, 0x0D  ; al == '\r'
-    je .command_P_to_next_line
+    je .to_next_line
     cmp al, 0
-    je .command_P_end
+    je .end
 
     inc si
-    jmp .command_P_print_char
+    jmp .print_char
 
-.command_P_to_next_line:
+.to_next_line:
     mov ax, [si + 1]
     mov ah, 0x0E
     int 0x10
@@ -194,11 +193,11 @@ command_P:
     inc cx
 
     cmp cx, dx
-    ja .command_P_end
+    ja .end
 
-    jmp .command_P_print_line
+    jmp .print_line
 
-.command_P_end:
+.end:
     mov ah, 0x0E
     mov al, 10
     int 0x10
@@ -206,7 +205,6 @@ command_P:
     int 0x10
 
     pop cx
-    mov [cur_line], cx
     jmp command_loop
 
 command_D:
@@ -217,63 +215,90 @@ command_D:
     mov cx, 2
     call command_get_line_operands
 
-    cmp bx, 1
-    jb .command_P_non_operands
-    je .command_P_non_operands2
-
     mov cx, [command_operand_buffer]
     mov dx, [command_operand_buffer + 2]
 
-    jmp .command_P_operands_valid_chack
+    cmp bx, 1
+    jb .non_operands
+    je .non_operands2
 
-.command_P_non_operands:
+    jmp .operands_valid_chack
+
+.non_operands:
     mov cx, [cur_line]
-.command_P_non_operands2:
+.non_operands2:
     mov dx, cx
 
-.command_P_operands_valid_chack:
+.operands_valid_chack:
+    mov [cur_line], cx
+
     cmp cx, 1
     jb command_err_invalid_operand
     cmp cx, [lines_num]
-    jae command_err_invalid_operand
+    ja command_err_invalid_operand
     
     cmp dx, 1
     jb command_err_invalid_operand
     cmp dx, [lines_num]
-    jae command_err_invalid_operand
+    ja command_err_invalid_operand
 
     cmp dx, cx
     jb command_err_invalid_operand
 
-.command_D_delete_line:
+.delete_line:
     mov bx, dx
-    ; ; TODO: deliting last line
-    ; cmp bx, [lines_num]
-    ; ja .command_D_get_line_ptr
+    cmp dx, [lines_num]
+    je .last_line_get_ptr
     shl bx, 1
     mov di, [text_lines_buffer + bx]  ; di - point to start of next line after EdLN
+    jmp .get_start_line_ptr_prelude
 
+.last_line_get_ptr:
+    mov bx, [lines_num]
+    dec bx
+    shl bx, 1
+    mov di, [text_lines_buffer + bx]
+.last_line_get_ptr_shift_char:
+    cmp byte [di], 0
+    je .get_start_line_ptr_prelude
+    inc di
+    jmp .last_line_get_ptr_shift_char
+
+.get_start_line_ptr_prelude:
+    push word 0  ; flag of deletting first line
     mov bx, cx
     dec bx
     cmp bx, 0
-    je .command_D_get_start_line_ptr
+    je .get_start_line_ptr
     shl bx, 1
-.command_D_get_start_line_ptr:
-    mov si, [text_lines_buffer + bx]  ; si - point to start of StLN
 
-.command_D_move_char:
+.get_start_line_ptr:
+    mov si, [text_lines_buffer + bx]  ; si - point to start of StLN
+    jmp .move_char
+
+.set_firt_line_flag:
+    mov bp, sp
+    mov word [bp], 1  ; set flag of delleting last line
+    jmp .get_start_line_ptr
+
+.move_char:
     mov al, [di]
     mov [si], al
 
     cmp al, 0
-    je .command_D_move_end
+    je .move_end
 
     inc si
     inc di
-    jmp .command_D_move_char
-.command_D_move_end:
+    jmp .move_char
+.move_end:
     call split_text_by_lines
     and byte [flags], 0b11111110  ; disable bit of file saved
+    pop bx
+    cmp bx, 0
+    jnz .end
+    dec word [lines_num]
+.end:
     jmp command_loop
 
 
