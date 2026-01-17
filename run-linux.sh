@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # ==================================================================
 # x16-PRos -- The x16-PRos run script for Linux
 # Copyright (C) 2025 PRoX2011
