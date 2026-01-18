@@ -164,8 +164,8 @@ x16-PRos uses several configuration files in the CONF directory:
 In the x16-PRos operating system, the command line prompt is configured using the PROMPT.CFG file, which is located in the CONF directory of the drive.
 
 By default, if the PROMPT.CFG file is missing, a prompt of the following format is used:
-`[$user@PRos] >`
-(where the `$user` is taken from the `USER.CFG` file created during the first boot via SETUP).
+`[$username@PRos] >`
+(where the `$username` is taken from the `USER.CFG` file created during the first boot via SETUP).
 
 #### How to create or edit a prompt
 
