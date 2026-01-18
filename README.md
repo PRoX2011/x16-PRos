@@ -71,8 +71,8 @@ Designed for simplicity and educational value, x16-PRos provides a platform for 
 - **API Access**: Comprehensive kernel API for file, string, and output operations
 - **Debugging Tools**: CPU info display, memory viewer, register inspection
 
-
 ---
+
 
 ## 🖥️ PRos Terminal
 
@@ -145,9 +145,10 @@ The system includes a powerful terminal - **PRos Terminal**. It not only allows 
 
 ---
 
+
 ## ⚙️ Configuration Files
 
-x16-PRos uses several configuration files in the root directory:
+x16-PRos uses several configuration files in the CONF directory:
 
 | File | Purpose | Format |
 |------|---------|--------|
@@ -163,8 +164,8 @@ x16-PRos uses several configuration files in the root directory:
 In the x16-PRos operating system, the command line prompt is configured using the PROMPT.CFG file, which is located in the CONF directory of the drive.
 
 By default, if the PROMPT.CFG file is missing, a prompt of the following format is used:
-`[$username@PRos] >`
-(where the `$username` is taken from the `USER.CFG` file created during the first boot via SETUP).
+`[$user@PRos] >`
+(where the `$user` is taken from the `USER.CFG` file created during the first boot via SETUP).
 
 #### How to create or edit a prompt
 
@@ -179,7 +180,6 @@ This file controls the visual and audio aspects of the boot process.
 - **LOGO_STRETCH**: Scales the logo to full screen if set to `TRUE`.
 - **START_SOUND**: Enables (`TRUE`) or disables (`FALSE`) the startup melody.
 
-
 ### Password Encryption
 Passwords are encrypted using XOR cipher with a custom key defined in `src/kernel/features/encrypt.asm`. To set a password:
 1. Use SETUP.BIN on first boot, or
@@ -187,125 +187,122 @@ Passwords are encrypted using XOR cipher with a custom key defined in `src/kerne
 
 ---
 
+
 ## 📦 Standard Software Package
 
 x16-PRos includes a comprehensive collection of built-in applications:
 
 <table>
 <tr>
-<td width="33%" align="center">
-<img src="docs/screenshots/writer.png" width="100%"><br>
-<b>WRITER.BIN</b><br>
-Simple editor for text files
-</td>
-<td width="33%" align="center">
-<img src="docs/screenshots/bchart.png" width="100%"><br>
-<b>BCHART.BIN</b><br>
-Barchart software for creating simple diagrams
-</td>
-<td width="33%" align="center">
-<img src="docs/screenshots/brainf.png" width="100%"><br>
-<b>BRAINF.BIN</b><br>
-Brainfuck interpreter
-</td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/writer.png" width="100%"><br>
+    <b>WRITER.BIN</b><br>
+    Simple editor for text files
+  </td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/bchart.png" width="100%"><br>
+    <b>BCHART.BIN</b><br>
+    Barchart software for creating simple diagrams
+  </td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/brainf.png" width="100%"><br>
+    <b>BRAINF.BIN</b><br>
+    Brainfuck interpreter
+  </td>
 </tr>
-
 <tr>
-<td width="33%" align="center">
-<img src="docs/screenshots/mine.png" width="100%"><br>
-<b>MINE.BIN</b><br>
-Minesweeper game
-</td>
-<td width="33%" align="center">
-<img src="docs/screenshots/piano.png" width="100%"><br>
-<b>PIANO.BIN</b><br>
-Simple piano to play melodies using PC Speaker
-</td>
-<td width="33%" align="center">
-<img src="docs/screenshots/procentc.png" width="100%"><br>
-<b>PROCENTC.BIN</b><br>
-Percentages calculator
-</td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/mine.png" width="100%"><br>
+    <b>MINE.BIN</b><br>
+    Minesweeper game
+  </td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/piano.png" width="100%"><br>
+    <b>PIANO.BIN</b><br>
+    Simple piano to play melodies using PC Speaker
+  </td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/procentc.png" width="100%"><br>
+    <b>PROCENTC.BIN</b><br>
+    Percentages calculator
+  </td>
 </tr>
-
 <tr>
-<td width="33%" align="center">
-<img src="docs/screenshots/space.png" width="100%"><br>
-<b>SPACE.BIN</b><br>
-Space arcade game
-</td>
-<td width="33%" align="center">
-<img src="docs/screenshots/calc.png" width="100%"><br>
-<b>CALC.BIN</b><br>
-Simple calculator
-</td>
-<td width="33%" align="center">
-<img src="docs/screenshots/memory.png" width="100%"><br>
-<b>MEMORY.BIN</b><br>
-Memory viewer
-</td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/space.png" width="100%"><br>
+    <b>SPACE.BIN</b><br>
+    Space arcade game
+  </td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/calc.png" width="100%"><br>
+    <b>CALC.BIN</b><br>
+    Simple calculator
+  </td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/memory.png" width="100%"><br>
+    <b>MEMORY.BIN</b><br>
+    Memory viewer
+  </td>
 </tr>
-
 <tr>
-<td width="33%" align="center">
-<img src="docs/screenshots/paint.png" width="100%"><br>
-<b>PAINT.BIN</b><br>
-Paint program
-</td>
-<td width="33%" align="center">
-<img src="docs/screenshots/pong.png" width="100%"><br>
-<b>PONG.BIN</b><br>
-Pong game
-</td>
-<td width="33%" align="center">
-<img src="docs/screenshots/fetch.png" width="100%"><br>
-<b>FETCH.BIN</b><br>
-Print system fetch (I use PRos btw)
-</td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/paint.png" width="100%"><br>
+    <b>PAINT.BIN</b><br>
+    Paint program
+  </td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/pong.png" width="100%"><br>
+    <b>PONG.BIN</b><br>
+    Pong game
+  </td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/fetch.png" width="100%"><br>
+    <b>FETCH.BIN</b><br>
+    Print system fetch (I use PRos btw)
+  </td>
 </tr>
-
 <tr>
-<td width="33%" align="center">
-<img src="docs/screenshots/imfplay.png" width="100%"><br>
-<b>IMFPLAY.BIN</b><br>
-IMF music player
-</td>
-<td width="33%" align="center">
-<img src="docs/screenshots/clock.png" width="100%"><br>
-<b>CLOCK.BIN</b><br>
-Clock application
-</td>
-<td width="33%" align="center">
-<img src="docs/screenshots/hexedit.png" width="100%"><br>
-<b>HEXEDIT.BIN</b><br>
-Hex editor
-</td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/imfplay.png" width="100%"><br>
+    <b>IMFPLAY.BIN</b><br>
+    IMF music player
+  </td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/clock.png" width="100%"><br>
+    <b>CLOCK.BIN</b><br>
+    Clock application
+  </td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/hexedit.png" width="100%"><br>
+    <b>HEXEDIT.BIN</b><br>
+    Hex editor
+  </td>
 </tr>
-<td width="33%" align="center">
-<img src="docs/screenshots/tetris.png" width="100%"><br>
-<b>TETRIS.BIN</b><br>
-Tetris game 
-</td>
-<td width="33%" align="center">
-<img src="docs/screenshots/mandel.png" width="100%"><br>
-<b>MANDEL.BIN</b><br>
-Mandelbrot-Menge
-</td>
-<td width="33%" align="center">
-<br>
-<b>And more...</b><br>
-SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, THEME.BIN, CHARS.BIN, HELLO.COM, FRACTAL.COM
-</td>
+<tr>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/tetris.png" width="100%"><br>
+    <b>TETRIS.BIN</b><br>
+    Tetris game 
+  </td>
+  <td width="33%" align="center">
+    <img src="docs/screenshots/mandel.png" width="100%"><br>
+    <b>MANDEL.BIN</b><br>
+    Mandelbrot-Menge
+  </td>
+  <td width="33%" align="center">
+    <br>
+    <b>And more...</b><br>
+    SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, THEME.BIN, CHARS.BIN, HELLO.COM, FRACTAL.COM
+  </td>
 </tr>
 </table>
-
 
 **Developing Your Own Programs**
 
 You can create custom programs using NASM and the PRos API.
 
-
 ---
+
 
 ## 🛠️ Building from Source
 
@@ -317,6 +314,7 @@ You can create custom programs using NASM and the PRos API.
 - cdrtools (optional for OS ISO image)
 
 ---
+
 #### Installing packages:
 
 ##### Ubuntu/Debian
@@ -367,16 +365,31 @@ chmod +x build-linux.sh
 
 ---
 
+
 ## 🚀 Running x16-PRos
 
 ### QEMU (Recommended)
 
-Install QEMU:
+#### Install QEMU:
+
+##### Debian/Ubuntu
 ```bash
 sudo apt install qemu-system-x86
 ```
 
-Run with audio support:
+##### ArchLinux/Manjaro
+```bash
+sudo pacman -S qemu-system-x86
+```
+
+##### Fedora
+```bash
+sudo dnf install qemu-system-x86
+```
+
+#### Run with QEMU
+
+##### Run using a command:
 ```bash
 qemu-system-x86_64 \
     -display gtk \
@@ -386,12 +399,11 @@ qemu-system-x86_64 \
     -audiodev pa,id=snd0
 ```
 
-Or use the provided script (recommended):
+##### Run using a script (recommended):
 ```bash
-chmod +x run.sh
+chmod +x run-linux.sh
 ./run-linux.sh
 ```
-
 
 ### Online Emulation
 
@@ -400,7 +412,6 @@ Try x16-PRos in your browser using [v86 emulator](https://copy.sh/v86/):
 2. Boot the system
 
 ### Real Hardware
-
 
 1. Write image to USB drive:
 ```bash
@@ -412,13 +423,16 @@ sudo dd if=disk_img/x16pros.img of=/dev/sdX bs=512
 **UEFI Systems**: Enable "CSM Support" or "Legacy Boot" in BIOS settings
 
 > [!NOTE]  
-> More detailed launch instructions are available on the project website: <https://x16-pros.netlify.app/>
+> More detailed launch instructions are available on the project website: <https://x16-pros.prosdev.org/>
+
 ---
 
-### Contributors
+
+## Contributors
 
 [<img src="https://wsrv.nl/?url=github.com/akbe2020.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="akbe2020" />](https://github.com/akbe2020)
 [<img src="https://wsrv.nl/?url=github.com/ilnarildarovuch2.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="ilnarildarovuch2" />](https://github.com/ilnarildarovuch2)
+[<img src="https://wsrv.nl/?url=github.com/dexoron.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="dexoron" />](https://github.com/dexoron)
 [<img src="https://wsrv.nl/?url=github.com/realtomokokuroki.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="realtomokokuroki" />](https://github.com/realtomokokuroki)
 [<img src="https://wsrv.nl/?url=https://github.com/leonardo-ono.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="leo-ono" />](https://github.com/leonardo-ono)
 
@@ -430,6 +444,7 @@ We welcome contributions! Special thanks to all who have submitted:
 - Program development
 
 ---
+
 
 ## 🤝 Contributing
 
@@ -459,6 +474,7 @@ We welcome contributions! Special thanks to all who have submitted:
 </a>
 
 ---
+
 
 ## 📄 License
 
@@ -490,6 +506,5 @@ SOFTWARE.
 <div align="center">
 
 **Made with ❤️ by PRoX**
-
 
 </div>
