@@ -1290,10 +1290,10 @@ get_cmd:
     jc no_kernel_allowed
 
     ; Try to load from current directory
-    mov ax, command  
-    mov cx, 32768     
-    mov dx, 0x2000    
-    call fs_load_huge_file
+    mov ax, command
+    mov bx, 0
+    mov cx, 32768
+    call fs_load_file
     jnc execute_bin 
 
     ; If not found, try /BIN directory 

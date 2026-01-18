@@ -304,6 +304,9 @@ music_files=(
     "assets/IMF/METRO_E.IMF"
     "assets/IMF/METRO_E2.IMF"
     "assets/IMF/GTA_VC.IMF"
+    "assets/IMF/CYBWRLD.IMF"
+    "assets/IMF/BIGSHOT.IMF"
+    "assets/IMF/DF.IMF"
 )
 
 for file in "${music_files[@]}"; do
