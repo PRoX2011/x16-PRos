@@ -15,7 +15,7 @@
     text_help_command       db "?", 0
     text_help_message       db "ED", 10, 13
                             db "Dev: Desvor", 10, 13
-                            db "Ver: 0.0.2", 10, 13
+                            db "Ver: 0.0.4", 10, 13
                             db "See manual A:/docs/edman.txt", 10, 13, 0
     comm_text_buf_not_saved db "Text buffer not saved. save file with `w` command "
                             db "or use `Q` command for exiting witout chacking", 10, 13, 0
@@ -32,12 +32,12 @@
 ; ================
 
 ; === buffers ===
-    ; buf resb TEXT_BUF_SIZE  ; buffer for some calculations
-    command_buffer        resb COMMAND_BUF_SIZE  ; buffer for command
-    cur_file_name         resb FILE_NAME_MAX_LENGTH + 1  ; name of current file
-    file_text_buffer      resb FILE_TEXT_BUF_SIZE  ; redacted buffer
-    text_lines_buffer     resb FILE_LINES_BUF_SIZE * 2  ; array of pointer to lines at file_text_buffer
-    number_convert_buffer resb 6
+    undo_buffer            resb TEXT_BUF_SIZE  ; buffer for saving buffer before edits command
+    command_buffer         resb COMMAND_BUF_SIZE  ; buffer for command
+    cur_file_name          resb FILE_NAME_MAX_LENGTH + 1  ; name of current file
+    file_text_buffer       resb FILE_TEXT_BUF_SIZE  ; redacted buffer
+    text_lines_buffer      resb FILE_LINES_BUF_SIZE * 2  ; array of pointer to lines at file_text_buffer
+    number_convert_buffer  resb 6
     command_operand_buffer resb 8
 ; ===============
 
@@ -118,5 +118,26 @@ split_text_by_lines:
 
 .end:
     mov word [di + 2], 0
+    ret
+
+
+; in:          no
+; out:         save file_text_buffer to undo_buffer
+; side effect: si, di, al
+save_buffer_for_undo:
+    mov si, undo_buffer
+    mov di, file_text_buffer
+
+.save_char:
+    mov al, [di]
+    mov [si], al
+    cmp al, 0
+    je .end
+    inc si
+    inc di
+    jmp .save_char
+
+.end:
+    ret
 
 %endif

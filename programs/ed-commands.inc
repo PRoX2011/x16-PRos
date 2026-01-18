@@ -83,7 +83,7 @@ command_get_line_operands:
 .end:
     ret
 
-command_W:
+command_w:
     mov si, file_text_buffer
     call strlen
     mov bx, file_text_buffer
@@ -104,7 +104,7 @@ command_q:
     jmp command_loop
 
 
-command_P:
+command_p:
     ; cx - StLN
     ; dx - EdLN
 
@@ -207,9 +207,13 @@ command_P:
     pop cx
     jmp command_loop
 
-command_D:
+command_d:
     ; cx - StLN
     ; dx - EdLN
+
+    push si
+    call save_buffer_for_undo
+    pop si
 
     mov di, command_operand_buffer
     mov cx, 2
@@ -300,6 +304,30 @@ command_D:
     dec word [lines_num]
 .end:
     jmp command_loop
+
+
+command_u:
+    mov si, file_text_buffer
+    mov di, undo_buffer
+
+.restore_char:
+    mov al, [di]
+    mov [si], al
+    cmp al, 0
+    je .end
+    inc si
+    inc di
+    jmp .restore_char
+
+.end:
+    call split_text_by_lines
+    jmp command_loop
+
+
+command_a:
+    push si
+    call save_buffer_for_undo
+    pop si
 
 
 command_err_invalid_operand:

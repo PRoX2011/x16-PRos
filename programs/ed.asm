@@ -67,12 +67,13 @@ open_file:
         int 0x21
     ; ================================
 
+    call save_buffer_for_undo
     call split_text_by_lines
 
 command_loop:
     mov cx, 0
     mov di, command_buffer
-    mov dh, 0x0E  ; номер функции для вывода текста
+    mov dh, 0x0E
 get_command_char:
     mov ah, 0
     int 0x16
@@ -127,18 +128,14 @@ parse_command:
     je command_q
     cmp al, 'Q'
     je exit_prog
-    cmp al, 'P'
-    je command_P
     cmp al, 'p'
-    je command_P
-    cmp al, 'W'
-    je command_W
+    je command_p
     cmp al, 'w'
-    je command_W
-    cmp al, 'D'
-    je command_D
+    je command_w
     cmp al, 'd'
-    je command_D
+    je command_d
+    cmp al, 'u'
+    je command_u
 
     jmp err_unknown_command
 
