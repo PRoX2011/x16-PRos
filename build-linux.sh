@@ -200,6 +200,7 @@ programs=(
     "programs/tetris.asm TETRIS.BIN"
     "programs/chars.asm CHARS.BIN"
     "programs/eye.asm EYE.BIN"
+    "programs/ed.asm ED.BIN"
 )
 
 for prog in "${programs[@]}"; do
@@ -263,6 +264,7 @@ text_files_doc=(
     "src/txt/PROGRAMS.TXT"
     "src/txt/QUICKST.TXT"
     "src/txt/COMMANDS.TXT"
+    "src/txt/EDMAN.TXT"
 )
 
 
