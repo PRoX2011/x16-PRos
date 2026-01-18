@@ -3,19 +3,18 @@
 
 ; === error messages ===
     err_text_file_name_lenght   db "ERROR: to large file name", 10, 13, 0
-    err_text_file_not_be_opened db "ERROR: input file_not be opened (file not exist or disk error)", 10, 13, 0
+    err_text_file_not_be_opened db "ERROR: input file not be opened (file not exist or disk error)", 10, 13, 0
     err_text_unknown_command    db "ERROR: Unknown command", 10, 13, 0
     err_text_invalid_operand    db "ERROR: Invalid operand", 10, 13, 0
 ; ======================
 
 ; === info messages ===
-    
     text_file_readed1       db "readed ", 0
     text_file_readed2       db " bytes", 10, 13, 0
     text_help_command       db "?", 0
     text_help_message       db "ED", 10, 13
                             db "Dev: Desvor", 10, 13
-                            db "Ver: 0.0.4", 10, 13
+                            db "Ver: 0.0.5", 10, 13
                             db "See manual A:/docs/edman.txt", 10, 13, 0
     comm_text_buf_not_saved db "Text buffer not saved. save file with `w` command "
                             db "or use `Q` command for exiting witout chacking", 10, 13, 0
@@ -42,11 +41,11 @@
 ; ===============
 
 ; === constants ===
-FILE_NAME_MAX_LENGTH equ 12
-TEXT_BUF_SIZE        equ 4096
-FILE_TEXT_BUF_SIZE   equ TEXT_BUF_SIZE
-FILE_LINES_BUF_SIZE  equ TEXT_BUF_SIZE / 4
-COMMAND_BUF_SIZE     equ 24  ; calced for 'A L01 L02 filename.ext \0'
+    FILE_NAME_MAX_LENGTH equ 12
+    TEXT_BUF_SIZE        equ 4096
+    FILE_TEXT_BUF_SIZE   equ TEXT_BUF_SIZE
+    FILE_LINES_BUF_SIZE  equ TEXT_BUF_SIZE / 4
+    COMMAND_BUF_SIZE     equ 24  ; calced for 'A L01 L02 filename.ext \0'
 ; =================
 
 
