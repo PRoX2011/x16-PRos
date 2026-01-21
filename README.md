@@ -5,7 +5,7 @@
 <h1>x16-PRos Operating System</h1>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
-[![Version](https://img.shields.io/badge/version-0.6.3-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.6.5-blue.svg)](#)
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](#contributing)
 
 **A minimalistic 16-bit operating system written in NASM for x86 architecture**
@@ -292,7 +292,7 @@ x16-PRos includes a comprehensive collection of built-in applications:
   <td width="33%" align="center">
     <br>
     <b>And more...</b><br>
-    SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, THEME.BIN, CHARS.BIN, HELLO.COM, FRACTAL.COM
+    SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, THEME.BIN, CHARS.BIN, WAVPLAY.BIN, ED.BIN, HELLO.COM, FRACTAL.COM
   </td>
 </tr>
 </table>
