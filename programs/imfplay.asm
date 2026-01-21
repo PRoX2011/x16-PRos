@@ -5,6 +5,8 @@
 ; http://www.vgmpf.com/Wiki/index.php?title=IMF
 ; MID2IMF2 - http://k1n9duk3.shikadi.net/imftools.html
 ; Made by Leo-ono and PRoX-dev
+;
+; Usage: imfplay <filename.imf>
 ; ==================================================================
 
 		cpu 8086
@@ -38,20 +40,38 @@ start:
 		call start_fast_clock
 		
 		; imf type-1: first word is the data length
-		mov dx, [43008]
+		mov ax, 0x2000
+		mov es, ax
+		mov si, 43008
+		mov dx, [es:si]
 		mov [music_length], dx
 
 		; if imf is type-1 then index starts at 2
-		mov si, 2 ; current index for music_data
+		mov ax, 43008
+		add ax, 2
+		mov [curr_off], ax
+		mov ax, 0x2000
+		mov [curr_seg], ax
 		
+		mov word [bytes_read], 0
+
 	.next_note:
 		; select opl2 register through port 388h
-		mov bl, [si + 43008 + 0] ; opl2 register
-		mov bh, [si + 43008 + 1] ; data
+		call get_byte
+		mov bl, al ; opl2 register
+		
+		call get_byte
+		mov bh, al ; data
+		
 		call write_adlib
 
-		mov bx, [si + 43008 + 2]
-		add si, 4
+		call get_byte
+		mov cl, al
+		call get_byte
+		mov ch, al
+		mov bx, cx
+
+		add word [bytes_read], 4
 		
 	.repeat_delay:
 		call delay
@@ -63,7 +83,8 @@ start:
 		dec bx
 		jg .repeat_delay
 		
-		cmp si, [music_length]
+		mov ax, [bytes_read]
+		cmp ax, [music_length]
 		jb .next_note
 		
 	.exit:
@@ -72,6 +93,20 @@ start:
 		
 		mov ax, 4c00h
 		int 21h
+
+get_byte:
+		push ds
+		push si
+		mov ds, [cs:curr_seg]
+		mov si, [cs:curr_off]
+		mov al, [si]
+		inc word [cs:curr_off]
+		jnz .ok
+		add word [cs:curr_seg], 0x1000
+	.ok:
+		pop si
+		pop ds
+		ret
 
 reset_all_registers:
 		mov bl, 0h
@@ -164,6 +199,9 @@ delay:
 last_time    dw 0	
 music_length dw 0	
 filename_ptr dw 0
+curr_seg     dw 0
+curr_off     dw 0
+bytes_read   dw 0
 
 loading_msg  db '  Loading IMF file...', 10, 13, 0
 playing_msg  db '  Playing IMF file. ', 0

@@ -180,6 +180,7 @@ programs=(
     "programs/theme.asm THEME.BIN"
     "programs/fetch.asm FETCH.BIN"
     "programs/imfplay.asm IMFPLAY.BIN"
+    "programs/wavplay.asm WAVPLAY.BIN"
     "programs/credits.asm CREDITS.BIN"
     "programs/hello.asm HELLO.BIN"
     "programs/write.asm WRITER.BIN"
@@ -307,6 +308,9 @@ music_files=(
     "assets/IMF/CYBWRLD.IMF"
     "assets/IMF/BIGSHOT.IMF"
     "assets/IMF/DF.IMF"
+    "assets/IMF/TRUEHERO.IMF"
+    "assets/IMF/CORE.IMF"
+    "assets/WAV/1985.WAV"
 )
 
 for file in "${music_files[@]}"; do
