@@ -34,7 +34,8 @@
     undo_buffer            resb TEXT_BUF_SIZE  ; buffer for saving buffer before edits command
     command_buffer         resb COMMAND_BUF_SIZE  ; buffer for command
     cur_file_name          resb FILE_NAME_MAX_LENGTH + 1  ; name of current file
-    file_text_buffer       resb FILE_TEXT_BUF_SIZE  ; redacted buffer
+    file_text_buffer       resb FILE_TEXT_BUF_SIZE  ; redacting buffer
+    slice_file_text_buffer resb FILE_TEXT_BUF_SIZE  ; buffer for 2nd part of file_text_buffer where it be sliced
     text_lines_buffer      resb FILE_LINES_BUF_SIZE * 2  ; array of pointer to lines at file_text_buffer
     number_convert_buffer  resb 6
     command_operand_buffer resb 8
@@ -51,7 +52,7 @@
 
 ; in:          si - string
 ; out:         cx - size
-; side effect: no
+; side effect: none
 strlen:
     xor cx, cx
 .count_loop:
@@ -88,7 +89,7 @@ strcmp:
     ret
 
 
-; in:          no
+; in:          none
 ; out:         file_text_lines and lines_num updating
 ; side effect: si, di, ax
 split_text_by_lines:
@@ -103,13 +104,15 @@ split_text_by_lines:
     mov ax, [si]
     cmp al, 0x0A  ; if al = '\r'
     je .next_line
+    cmp al, 0x0D  ; if al = '\n'
+    je .next_line
     cmp al, 0
     je .end
     inc si
     jmp .splitting_loop
 
 .next_line:
-    inc si
+    add si, 2
     mov [di], si
     add di, 2
     inc word [lines_num]
@@ -120,7 +123,7 @@ split_text_by_lines:
     ret
 
 
-; in:          no
+; in:          none
 ; out:         save file_text_buffer to undo_buffer
 ; side effect: si, di, al
 save_buffer_for_undo:

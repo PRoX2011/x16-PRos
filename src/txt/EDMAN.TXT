@@ -40,3 +40,6 @@ COMANDS:
 /e      a <AtLN>
         <text>
         .                   - append text after <AtLN> line
+/e      A <BrLN>
+        <text>
+        .                   - append text before <BrLN> line
