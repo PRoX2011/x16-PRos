@@ -14,7 +14,7 @@
     text_help_command       db "?", 0
     text_help_message       db "ED", 10, 13
                             db "Dev: Desvor", 10, 13
-                            db "Ver: 0.0.5", 10, 13
+                            db "Ver: 1.0.0", 10, 13
                             db "See manual A:/docs/edman.txt", 10, 13, 0
     comm_text_buf_not_saved db "Text buffer not saved. save file with `w` command "
                             db "or use `Q` command for exiting witout chacking", 10, 13, 0

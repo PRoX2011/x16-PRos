@@ -1,6 +1,6 @@
 ED
 Dev: Desvor
-Ver: 0.0.5
+Ver: 1.0.0
 
 SHELL SINTAX:
     ed <file>

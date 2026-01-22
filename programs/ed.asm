@@ -138,6 +138,8 @@ parse_command:
     je command_u
     cmp al, 'a'
     je command_a
+    cmp al, 'A'
+    je command_A
 
     jmp err_unknown_command
 
