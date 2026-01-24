@@ -1,6 +1,6 @@
 ED
 Dev: Desvor
-Ver: 0.0.5
+Ver: 1.0.0
 
 SHELL SINTAX:
     ed <file>
@@ -40,3 +40,6 @@ COMANDS:
 /e      a <AtLN>
         <text>
         .                   - append text after <AtLN> line
+/e      A <BrLN>
+        <text>
+        .                   - append text before <BrLN> line

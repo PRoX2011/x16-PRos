@@ -325,9 +325,288 @@ command_u:
 
 
 command_a:
+    ; cx - AtLN
+
     push si
     call save_buffer_for_undo
     pop si
+
+    mov di, command_operand_buffer
+    mov cx, 1
+    call command_get_line_operands
+
+    mov cx, [command_operand_buffer]
+
+    cmp bx, 0
+    je .non_operands
+
+    jmp .operands_valid_chack
+
+.non_operands:
+    mov cx, [cur_line]
+
+.operands_valid_chack:
+    mov [cur_line], cx
+
+    cmp cx, 1
+    jb command_err_invalid_operand
+    cmp cx, [lines_num]
+    ja command_err_invalid_operand
+
+.slice_text_buffer:
+    mov bx, cx
+    shl bx, 1
+    mov di, [text_lines_buffer + bx]
+    mov si, slice_file_text_buffer
+
+.slice_char:
+    mov al, [di]
+    mov [si], al
+    cmp al, 0
+    je .slicing_end
+    inc si
+    inc di
+    jmp .slice_char
+
+.slicing_end:
+    cmp cx, [lines_num]
+    je .AtNL_is_last_line
+    mov bx, cx
+    shl bx, 1
+.get_AtLN_ptr:
+    mov di, [text_lines_buffer + bx]
+.get_text_prelude
+    push cx
+    mov cx, 0
+    mov dh, 0x0E
+    jmp .get_text_char
+
+.AtNL_is_last_line:
+    mov bx, cx
+    dec bx
+    shl bx, 1
+    mov di, [text_lines_buffer + bx]
+
+.shift_char:
+    cmp byte [di], 0
+    je .shift_end
+    inc di
+    jmp .shift_char
+.shift_end:
+    mov byte [di], 0x0A
+    mov byte [di + 1], 0x0D
+    mov byte [di + 2], 0
+    add di, 2
+    jmp .get_text_prelude
+
+.get_text_char:
+    mov ah, 0
+    int 0x16
+    xchg ah, dh
+    mov bx, 0x0F
+    int 0x10
+    xchg ah, dh
+
+    cmp ah, 0x0E  ; if ah = Backspace
+    je .bs_handle
+    cmp ah, 0x1C  ; if ah = Enter
+    je .enter_handle
+
+    mov [di], al
+    inc di
+    inc cx
+    jmp .get_text_char
+
+.push_enter:
+    mov byte [di], 0x0A
+    mov byte [di + 1], 0x0D
+    xchg ah, dh
+    mov bx, 0x0F
+    mov al, 0x0A
+    int 0x10
+    mov al, 0x0D
+    int 0x10
+    xchg ah, dh
+    add di, 2
+    add cx, 2
+    jmp .get_text_char
+
+.enter_handle:
+    cmp cx, 2
+    jb .push_enter
+    cmp byte [di - 1], 0x2E  ; .
+    jne .push_enter
+    cmp byte [di - 2], 0x0D  ; \n
+    jne .push_enter
+    jmp .restore_text
+
+.bs_handle:
+    mov ah, 0x0E
+    mov al, 0x20
+    int 0x10
+    mov al, 0x08
+    int 0x10
+
+    cmp cx, 0
+    jne .bs_handle_del_from_buf
+    jmp .get_text_char
+.bs_handle_del_from_buf:
+    dec di
+    dec cx
+    jmp .get_text_char
+
+.restore_text:
+    dec di
+    pop cx
+    cmp cx, [lines_num]
+    je .end
+
+    mov si, slice_file_text_buffer
+.restore_char:
+    mov al, [si]
+    mov [di], al
+    inc di
+    inc si
+    cmp al, 0
+    je .end
+    jmp .restore_char
+
+.end:
+    mov byte [di], 0
+    call split_text_by_lines
+    jmp command_loop
+
+
+
+command_A:
+    ; cx - BfLN
+
+    push si
+    call save_buffer_for_undo
+    pop si
+
+    mov di, command_operand_buffer
+    mov cx, 1
+    call command_get_line_operands
+
+    mov cx, [command_operand_buffer]
+
+    cmp bx, 0
+    je .non_operands
+
+    jmp .operands_valid_chack
+
+.non_operands:
+    mov cx, [cur_line]
+
+.operands_valid_chack:
+    mov [cur_line], cx
+
+    cmp cx, 1
+    jb command_err_invalid_operand
+    cmp cx, [lines_num]
+    ja command_err_invalid_operand
+
+.slice_text_buffer:
+    mov bx, cx
+    dec bx
+    shl bx, 1
+    mov di, [text_lines_buffer + bx]
+    mov si, slice_file_text_buffer
+
+.slice_char:
+    mov al, [di]
+    mov [si], al
+    cmp al, 0
+    je .slicing_end
+    inc si
+    inc di
+    jmp .slice_char
+
+.slicing_end:
+    mov bx, cx
+    dec bx
+    shl bx, 1
+    mov di, [text_lines_buffer + bx]
+.get_text_prelude
+    push cx
+    mov cx, 0
+    mov dh, 0x0E
+
+.get_text_char:
+    mov ah, 0
+    int 0x16
+    xchg ah, dh
+    mov bx, 0x0F
+    int 0x10
+    xchg ah, dh
+
+    cmp ah, 0x0E  ; if ah = Backspace
+    je .bs_handle
+    cmp ah, 0x1C  ; if ah = Enter
+    je .enter_handle
+
+    mov [di], al
+    inc di
+    inc cx
+    jmp .get_text_char
+
+.push_enter:
+    mov byte [di], 0x0A
+    mov byte [di + 1], 0x0D
+    xchg ah, dh
+    mov bx, 0x0F
+    mov al, 0x0A
+    int 0x10
+    mov al, 0x0D
+    int 0x10
+    xchg ah, dh
+    add di, 2
+    add cx, 2
+    jmp .get_text_char
+
+.enter_handle:
+    cmp cx, 2
+    jb .push_enter
+    cmp byte [di - 1], 0x2E  ; .
+    jne .push_enter
+    cmp byte [di - 2], 0x0D  ; \n
+    jne .push_enter
+    jmp .restore_text
+
+.bs_handle:
+    mov ah, 0x0E
+    mov al, 0x20
+    int 0x10
+    mov al, 0x08
+    int 0x10
+
+    cmp cx, 0
+    jne .bs_handle_del_from_buf
+    jmp .get_text_char
+.bs_handle_del_from_buf:
+    dec di
+    dec cx
+    jmp .get_text_char
+
+.restore_text:
+    dec di
+    pop cx
+
+    mov si, slice_file_text_buffer
+.restore_char:
+    mov al, [si]
+    mov [di], al
+    inc di
+    inc si
+    cmp al, 0
+    je .end
+    jmp .restore_char
+
+.end:
+    mov byte [di], 0
+    call split_text_by_lines
+    jmp command_loop
 
 
 command_err_invalid_operand:
