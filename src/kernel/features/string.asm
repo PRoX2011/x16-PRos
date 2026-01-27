@@ -245,6 +245,8 @@ string_input_string:
     je .done_read
     cmp al, 0x08
     je .handle_backspace
+    cmp al, 0x7F
+    je .handle_ctrl_backspace
     cmp cx, 255
     jge .read_loop
     stosb
@@ -257,6 +259,7 @@ string_input_string:
 .handle_backspace:
     cmp cx, 0
     je .read_loop
+
     dec di
     dec cx
     call string_get_cursor_pos
@@ -269,6 +272,67 @@ string_input_string:
     int 0x10
     mov al, 0x08
     int 0x10
+    jmp .read_loop
+
+.handle_ctrl_backspace:
+    cmp cx, 0
+    je .read_loop
+
+.handle_ctrl_backspace_loop:
+    mov al, [di]
+    push ax
+
+    dec di
+    dec cx
+    call string_get_cursor_pos
+    cmp dl, [.cursor_col]
+    jbe .read_loop
+    mov ah, 0x0E
+    mov al, 0x08
+    int 0x10
+    mov al, ' '
+    int 0x10
+    mov al, 0x08
+    int 0x10
+
+    cmp cx, 0
+    je .read_loop
+
+    pop ax
+
+    cmp al, 'A'
+    jb .handle_ctrl_backspace_not_L
+    cmp al, 'Z'
+    ja .handle_ctrl_backspace_not_L
+    cmp byte [di], 'A'
+    jb .handle_ctrl_backspace_end
+    cmp byte [di], 'Z'
+    ja .handle_ctrl_backspace_end
+    jmp .handle_ctrl_backspace_loop
+
+.handle_ctrl_backspace_not_L:  ; saved leter not at upper case
+    cmp al, 'a'
+    jb .handle_ctrl_backspace_not_l
+    cmp al, 'z'
+    ja .handle_ctrl_backspace_not_l
+    cmp byte [di], 'a'
+    jb .handle_ctrl_backspace_end
+    cmp byte [di], 'z'
+    ja .handle_ctrl_backspace_end
+    jmp .handle_ctrl_backspace_loop
+
+.handle_ctrl_backspace_not_l:  ; saved leter not at lower case
+    cmp al, '0'
+    jb .handle_ctrl_backspace_end
+    cmp al, '9'
+    ja .handle_ctrl_backspace_end
+    cmp byte [di], '0'
+    jb .handle_ctrl_backspace_end
+    cmp byte [di], '9'
+    ja .handle_ctrl_backspace_end
+    jmp .handle_ctrl_backspace_loop
+
+.handle_ctrl_backspace_end
     jmp .read_loop
 
 .done_read:
