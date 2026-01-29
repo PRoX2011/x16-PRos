@@ -8,11 +8,15 @@
 FLAG_QUIET_MODE=0
 FLAG_NO_MUSIC=0
 FLAG_NO_TXT=0
+FLAG_NO_BOOT_RECOMP=0
+FLAG_NO_KERNEL_RECOMP=0
 
 for arg in $@; do
-    if [ $arg == "-quiet" ]; then FLAG_QUIET_MODE=1; fi
-    if [ $arg == "-no-music" ]; then FLAG_NO_MUSIC=1; fi
-    if [ $arg == "-no-txt" ]; then FLAG_NO_TXT=1; fi
+    if [ $arg == "-quiet" ]; then FLAG_QUIET_MODE=1; continue; fi
+    if [ $arg == "-no-music" ]; then FLAG_NO_MUSIC=1; continue; fi
+    if [ $arg == "-no-txt" ]; then FLAG_NO_TXT=1; continue; fi
+    if [ $arg == "-no-boot-recomp" ]; then FLAG_NO_BOOT_RECOMP=1; continue; fi
+    if [ $arg == "-no-kernel-recomp" ]; then FLAG_NO_KERNEL_RECOMP=1; continue; fi
 done
 
 RED='\033[31m'
@@ -40,8 +44,8 @@ print_failed() {
     local message="$1"
     if [ $FLAG_QUIET_MODE == 0 ]; then
         echo -e "${RED}[ FAILED ]${NC} ${message}"
-        exit 1
     fi
+    exit 1
 }
 
 print_splitline() {
@@ -69,16 +73,20 @@ print_splitline "Starting x16-PRos build..."
 echo -e "$NC"
 
 # Compile bootloader
-print_info "Compiling bootloader (boot.asm => bin/BOOT.BIN)..."
-nasm -f bin src/bootloader/boot.asm -o bin/BOOT.BIN
-check_error "Bootloader compilation failed"
-print_ok "Bootloader compiled successfully"
+if [ $FLAG_NO_BOOT_RECOMP == 0 ]; then
+    print_info "Compiling bootloader (boot.asm => bin/BOOT.BIN)..."
+    nasm -f bin src/bootloader/boot.asm -o bin/BOOT.BIN
+    check_error "Bootloader compilation failed"
+    print_ok "Bootloader compiled successfully"
+fi
 
 # Compile kernel
-print_info "Compiling kernel (kernel.asm => bin/KERNEL.BIN)..."
-nasm -f bin src/kernel/kernel.asm -o bin/KERNEL.BIN
-check_error "Kernel compilation failed"
-print_ok "Kernel compiled successfully"
+if [ $FLAG_NO_KERNEL_RECOMP == 0 ]; then
+    print_info "Compiling kernel (kernel.asm => bin/KERNEL.BIN)..."
+    nasm -f bin src/kernel/kernel.asm -o bin/KERNEL.BIN
+    check_error "Kernel compilation failed"
+    print_ok "Kernel compiled successfully"
+fi
 
 # Create and format disk image
 print_info "Creating disk image (disk_img/x16pros.img)..."
