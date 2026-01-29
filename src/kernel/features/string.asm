@@ -274,12 +274,14 @@ string_input_string:
     int 0x10
     jmp .read_loop
 
+
 .handle_ctrl_backspace:
+    mov byte [.handle_ctrl_backspace_deleting_counter], 0
     cmp cx, 0
     je .read_loop
 
 .handle_ctrl_backspace_loop:
-    mov al, [di]
+    mov al, [di - 1]
     push ax
 
     dec di
@@ -294,6 +296,8 @@ string_input_string:
     int 0x10
     mov al, 0x08
     int 0x10
+
+    inc byte [.handle_ctrl_backspace_deleting_counter]
 
     cmp cx, 0
     je .read_loop
@@ -333,7 +337,17 @@ string_input_string:
     jmp .handle_ctrl_backspace_loop
 
 .handle_ctrl_backspace_end
+
+    cmp byte [.handle_ctrl_backspace_deleting_counter], 1
+    jbe .read_loop
+    mov byte [di], al
+    inc di
+    inc cx
+    mov ah, 0x0E
+    int 0x10
     jmp .read_loop
+
+.handle_ctrl_backspace_deleting_counter db 0
 
 .done_read:
     mov byte [di], 0
