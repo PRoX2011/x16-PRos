@@ -358,6 +358,16 @@ chmod +x build-linux.sh
 ./build-linux.sh
 ```
 
+> [!FOR ADVANSED USERS]\
+> build-linux have special flags:
+> ```
+> -quiet            - disable all script messages, but not disable nasm's warnings and errors
+> -no-music         - do not add music files in system build
+> -no-txt           - do not add text files in system build
+> -no-boot-recomp   - do not compiling bootloader, in system build using old compiled bootloader from bin/ directory
+> -no-kernel-recomp - do not compiling kernel, in system build using old compiled kernel from bin/ directory
+> ```
+
 ### Build Output
 
 - `disk_img/x16pros.img` - Bootable floppy disk image (1.44MB)
