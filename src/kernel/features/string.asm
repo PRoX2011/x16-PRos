@@ -281,6 +281,9 @@ string_input_string:
     je .read_loop
 
 .handle_ctrl_backspace_loop:
+    cmp cx, 0
+    je .read_loop
+    
     mov al, [di - 1]
     push ax
 
@@ -298,9 +301,6 @@ string_input_string:
     int 0x10
 
     inc byte [.handle_ctrl_backspace_deleting_counter]
-
-    cmp cx, 0
-    je .read_loop
 
     pop ax
 

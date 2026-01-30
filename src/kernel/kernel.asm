@@ -3071,7 +3071,7 @@ Sides        dw 2
 SecsPerTrack dw 18
 bootdev      db 0
 fmt_date     dw 1
- 
+
 ; ------ Buffers ------
 current_logo_file resb 13 
 tmp_string        resb 15    
