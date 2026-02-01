@@ -43,7 +43,7 @@ print_string_green:
     jmp .print_char
 .done:
     ret
-    
+
 ; Cyan text
 ; si - string
 print_string_cyan:
@@ -58,7 +58,7 @@ print_string_cyan:
     jmp .print_char
 .done:
     ret
-    
+
 ; Red text
 ; si - string
 print_string_red:

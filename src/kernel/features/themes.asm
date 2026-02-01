@@ -12,29 +12,29 @@ load_and_apply_theme:
     mov ax, conf_dir_name
     call fs_change_directory
     jc .error
-    
+
     ; Load THEME.CFG file
     mov ax, theme_cfg_file
     mov cx, 32768
     call fs_load_file
     jc .error
-    
+
     ; Check if file is empty
     cmp bx, 0
     je .error
-    
+
     ; Parse and apply theme
-    mov si, 32768 
+    mov si, 32768
     mov word [.line_count], 0
-    
+
 .parse_loop:
     cmp word [.line_count], 16
     jge .done
-    
+
     ; Parse line: "index, r, g, b"
     call .parse_color_line
     jc .error
-    
+
     inc word [.line_count]
     jmp .parse_loop
 
@@ -43,7 +43,7 @@ load_and_apply_theme:
     popa
 
     call restore_current_dir
-    
+
     ret
 
 .error:
@@ -53,36 +53,36 @@ load_and_apply_theme:
 
 .parse_color_line:
     pusha
-    
+
     call .skip_whitespace
-    
+
     call .parse_number
     jc .parse_error
     mov [.color_index], al
-    
+
     call .skip_comma_and_space
     jc .parse_error
-    
+
     call .parse_number
     jc .parse_error
     mov [.red], al
-    
+
     call .skip_comma_and_space
     jc .parse_error
-    
+
     call .parse_number
     jc .parse_error
     mov [.green], al
-    
+
     call .skip_comma_and_space
     jc .parse_error
-    
+
     call .parse_number
     jc .parse_error
     mov [.blue], al
-    
+
     call .skip_to_newline
-    
+
     mov ax, 1010h
     mov bl, [.color_index]
     mov bh, 0
@@ -90,7 +90,7 @@ load_and_apply_theme:
     mov ch, [.green]
     mov cl, [.blue]
     int 10h
-    
+
     popa
     clc
     ret
@@ -106,9 +106,9 @@ load_and_apply_theme:
     lodsb
     cmp al, ' '
     je .skip_ws_loop
-    cmp al, 9           
+    cmp al, 9
     je .skip_ws_loop
-    dec si            
+    dec si
     pop ax
     ret
 
@@ -131,18 +131,18 @@ load_and_apply_theme:
     push ax
 .skip_nl_loop:
     lodsb
-    cmp al, 0         
+    cmp al, 0
     je .skip_nl_done
-    cmp al, 10        
+    cmp al, 10
     je .skip_nl_done
-    cmp al, 13         
+    cmp al, 13
     je .skip_nl_check_lf
     jmp .skip_nl_loop
 .skip_nl_check_lf:
     lodsb
     cmp al, 10
     je .skip_nl_done
-    dec si        
+    dec si
 .skip_nl_done:
     pop ax
     ret
@@ -150,38 +150,38 @@ load_and_apply_theme:
 .parse_number:
     push bx
     push cx
-    
+
     xor ax, ax
-    xor cx, cx 
-    
+    xor cx, cx
+
 .parse_num_loop:
     push ax
     lodsb
-    
+
     cmp al, '0'
     jb .parse_num_done_char
     cmp al, '9'
     ja .parse_num_done_char
-    
+
     sub al, '0'
     mov bl, al
     pop ax
-    
+
     mov bh, 10
     mul bh
-    
+
     add al, bl
     inc cx
     jmp .parse_num_loop
-    
+
 .parse_num_done_char:
-    pop bx            
-    dec si            
-    mov al, bl         
-    
+    pop bx
+    dec si
+    mov al, bl
+
     cmp cx, 0
     je .parse_num_error
-    
+
     pop cx
     pop bx
     clc

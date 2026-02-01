@@ -162,12 +162,12 @@ programs_root=(
 for prog in "${programs_root[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
-    
+
     print_info "Compiling $src => bin/$bin_name..."
     nasm -f bin $src -o bin/$bin_name
     check_error "Compilation of $src failed"
     print_ok "$bin_name compiled successfully"
-    
+
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/
     check_error "Copy of $bin_name failed"
@@ -176,7 +176,7 @@ done
 
 programs=(
     "programs/help.asm HELP.BIN"
-    "programs/grep.asm GREP.BIN"    
+    "programs/grep.asm GREP.BIN"
     "programs/theme.asm THEME.BIN"
     "programs/fetch.asm FETCH.BIN"
     "programs/imfplay.asm IMFPLAY.BIN"
@@ -207,12 +207,12 @@ programs=(
 for prog in "${programs[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
-    
+
     print_info "Compiling $src => bin/$bin_name..."
     nasm -f bin $src -o bin/$bin_name
     check_error "Compilation of $src failed"
     print_ok "$bin_name compiled successfully"
-    
+
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/BIN.DIR/
     check_error "Copy of $bin_name failed"
@@ -229,12 +229,12 @@ programs_com=(
 for prog in "${programs_com[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
-    
+
     print_info "Compiling $src => bin/$bin_name..."
     nasm -f bin $src -o bin/$bin_name
     check_error "Compilation of $src failed"
     print_ok "$bin_name compiled successfully"
-    
+
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/COM.DIR/
     check_error "Copy of $bin_name failed"

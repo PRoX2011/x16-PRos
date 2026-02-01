@@ -7,7 +7,7 @@
 ;              si point to 0 or ' '
 command_parse_line_operand:
     xor cx, cx
-    
+
 .get_char:
     mov ax, [si]
     cmp al, ' '
@@ -133,7 +133,7 @@ command_p:
     jb command_err_invalid_operand
     cmp cx, [lines_num]
     ja command_err_invalid_operand
-    
+
     cmp dx, 1
     jb command_err_invalid_operand
     cmp dx, [lines_num]
@@ -158,7 +158,7 @@ command_p:
         mov si, number_convert_buffer
         mov ah, 0x01
         int 0x21
-        
+
         mov ah, 0x0E
         mov bx, 0x0F
         mov al, '.'
@@ -173,7 +173,7 @@ command_p:
     mov ax, [si]
     mov ah, 0x0E
     int 0x10
-    
+
     cmp al, 0x0A  ; al == '\n'
     je .to_next_line
     cmp al, 0x0D  ; al == '\r'
@@ -188,7 +188,7 @@ command_p:
     mov ax, [si + 1]
     mov ah, 0x0E
     int 0x10
-    
+
     add di, 2
     inc cx
 
@@ -240,7 +240,7 @@ command_d:
     jb command_err_invalid_operand
     cmp cx, [lines_num]
     ja command_err_invalid_operand
-    
+
     cmp dx, 1
     jb command_err_invalid_operand
     cmp dx, [lines_num]

@@ -1,7 +1,7 @@
 ; ==================================================================
 ; x16-PRos -- FETCH. Neofetch-like fetch tool for x16-PRos
 ; Copyright (C) 2025 PRoX2011
-; 
+;
 ; Made by PRoX-dev
 ; ==================================================================
 
@@ -16,8 +16,8 @@ start:
     mov ah, 0x0E
     int 0x22
 
-    ; Go to root 
-    mov ah, 0x0A    
+    ; Go to root
+    mov ah, 0x0A
     int 0x22
 
     ; Switch to /CONF directory
@@ -42,16 +42,16 @@ start:
     int 0x21
 
     mov ah, 0x03
-    xor bh, bh 
-    int 0x10      
+    xor bh, bh
+    int 0x10
 
     mov [cursor_y], dh
     mov [cursor_x], dl
 
-    sub dh, 25  
-    mov dl, 40    
+    sub dh, 25
+    mov dl, 40
     mov ah, 0x02
-    xor bh, bh    
+    xor bh, bh
     int 0x10
 
     ; ------ The top of the fetch output ------
@@ -489,26 +489,26 @@ start:
     mov si, resolution_msg
     int 0x21
 
-    mov ax, 0x4F03   
+    mov ax, 0x4F03
     int 0x10
-    cmp ax, 0x004F    
+    cmp ax, 0x004F
     jne .resolution_unknown
-    
+
     push es
     mov ax, ds
     mov es, ax
     mov di, vesa_buffer
-    mov cx, bx         
-    mov ax, 0x4F01  
+    mov cx, bx
+    mov ax, 0x4F01
     int 0x10
     pop es
-    
-    cmp ax, 0x004F   
+
+    cmp ax, 0x004F
     jne .resolution_unknown
-    
-    mov ax, [vesa_buffer + 12h]  
-    mov bx, [vesa_buffer + 14h]  
-    
+
+    mov ax, [vesa_buffer + 12h]
+    mov bx, [vesa_buffer + 14h]
+
     call print_resolution
     jmp .after_resolution
 
@@ -533,17 +533,17 @@ start:
     int 0x10
 
     ; ---------------- Color blocks -----------
-    mov cx, 16    
-    mov bl, 0          
+    mov cx, 16
+    mov bl, 0
 .color_blocks:
-    push cx             
-    mov ah, 0x07        
+    push cx
+    mov ah, 0x07
     int 0x21
-    mov ah, 0x08        
+    mov ah, 0x08
     mov si, block_char
     int 0x21
-    inc bl             
-    pop cx           
+    inc bl
+    pop cx
     loop .color_blocks
     ; -----------------------------------------
 
@@ -553,9 +553,9 @@ start:
     int 0x21
 
     mov ah, 0x02
-    xor bh, bh      
-    mov dh, [cursor_y]  
-    mov dl, [cursor_x]  
+    xor bh, bh
+    mov dh, [cursor_y]
+    mov dl, [cursor_x]
     int 0x10
 
     ret
@@ -563,7 +563,7 @@ start:
 .copy_user:
     rep movsb
     mov byte [di], 0
-    
+
     ret
 
 print_full_name_part:
@@ -596,17 +596,17 @@ print_resolution:
     push bx
     push cx
     push dx
-    
+
     mov cx, ax
     call print_number
-    
+
     mov ah, 0x01
     mov si, x_char
     int 0x21
-     
+
     mov cx, bx
     call print_number
-    
+
     pop dx
     pop cx
     pop bx
@@ -618,11 +618,11 @@ print_number:
     push bx
     push cx
     push dx
-    
+
     mov ax, cx
     mov bx, 10
     mov cx, 0
-    
+
 .digit_loop:
     xor dx, dx
     div bx
@@ -630,7 +630,7 @@ print_number:
     inc cx
     test ax, ax
     jnz .digit_loop
-    
+
 .output_loop:
     pop ax
     add al, '0'
@@ -638,7 +638,7 @@ print_number:
     mov bl, 0x0F
     int 0x10
     loop .output_loop
-    
+
     pop dx
     pop cx
     pop bx
@@ -672,7 +672,7 @@ cursor_y       db 0
 
 conf_dir       db 'CONF.DIR', 0
 
-block_char     db 0xDB, 0 
+block_char     db 0xDB, 0
 x_char         db 'x', 0
 
 ascii_art      db '                   .l.    lo,                 ', 13, 10
@@ -736,5 +736,5 @@ ps2_p75_str    db 'IBM PS/2 Model P75', 0
 ps2_90_xp      db 'IBM PS/2 Model 90 XP 486', 0
 ps2_95_xp      db 'IBM PS/2 Model 95 XP 486', 0
 
-buffer resb 32 
+buffer resb 32
 vesa_buffer resb 512

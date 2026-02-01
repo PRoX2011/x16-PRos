@@ -25,12 +25,12 @@
 
 Designed for simplicity and educational value, x16-PRos provides a platform for low-level programming enthusiasts to explore bare-metal development on x86 systems.
 
-> [!IMPORTANT]  
+> [!IMPORTANT]
 > The project needs contributors. Now only I, PRoX2011, is working on the kernel, but I can’t do everything alone. I would like to ask you how to help the project.
 > - Programs
 > - Development of a compatibility layer with MS DOS
 > - Improved documentation and instructions
->   
+>
 > If you help - thank you so much
 
 <div style="display: flex; flex-direction: row; gap: 20px">
@@ -78,7 +78,7 @@ Designed for simplicity and educational value, x16-PRos provides a platform for 
 
 The system includes a powerful terminal - **PRos Terminal**. It not only allows you to launch programs but also offers a wide range of built-in commands and utilities.
 
-> [!NOTE]  
+> [!NOTE]
 > To run a program, enter the name of the executable file (.BIN or .COM) with or without an extension. Programs will be launched from any directory if its file is placed in the BIN/ directory, and if the program file is not found there, the system will try to find the program in the current, working directory
 
 <div style="display: flex; flex-direction: row; gap: 20px">
@@ -282,7 +282,7 @@ x16-PRos includes a comprehensive collection of built-in applications:
   <td width="33%" align="center">
     <img src="docs/screenshots/tetris.png" width="100%"><br>
     <b>TETRIS.BIN</b><br>
-    Tetris game 
+    Tetris game
   </td>
   <td width="33%" align="center">
     <img src="docs/screenshots/mandel.png" width="100%"><br>
@@ -322,7 +322,7 @@ You can create custom programs using NASM and the PRos API.
 sudo apt install nasm mtools dosfstools genisoimage
 ```
 
-> [!NOTE]  
+> [!NOTE]
 > cdrtools (including the original mkisofs) is not included in the official Debian/Ubuntu repositories due to licensing issues. Genisoimage (a fork that provides compatibility with mkisofs via symlink) is used instead.
 
 ##### Arch Linux / Manjaro
@@ -330,7 +330,7 @@ sudo apt install nasm mtools dosfstools genisoimage
 sudo pacman -Syu nasm mtools dosfstools cdrtools
 ```
 
-> [!NOTE]  
+> [!NOTE]
 > Arch has a native cdrtools package available, which provides mkisofs.
 
 ##### Fedora / CentOS
@@ -422,7 +422,7 @@ sudo dd if=disk_img/x16pros.img of=/dev/sdX bs=512
 
 **UEFI Systems**: Enable "CSM Support" or "Legacy Boot" in BIOS settings
 
-> [!NOTE]  
+> [!NOTE]
 > More detailed launch instructions are available on the project website: <https://x16-pros.prosdev.org/>
 
 ---
@@ -457,7 +457,7 @@ We welcome contributions! Special thanks to all who have submitted:
 
 **More about contributing:** [contributing guide](CONTRIBUTING.md)
 
-> [!IMPORTANT]  
+> [!IMPORTANT]
 > Please use English when commenting on code and describing changes. This project is designed to be multinational and accessible to everyone.
 
 ### Development Guidelines

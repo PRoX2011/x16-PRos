@@ -39,7 +39,7 @@ And... HAPPY NEW YEAR!!!
 
 6. New programs
 1) MANDEL.BIN
-   - A program that draws the Mandelbrot set 
+   - A program that draws the Mandelbrot set
 2) TETRIS.BIN
    - Tetris game
 3) THEME.BIN
@@ -63,10 +63,10 @@ And... HAPPY NEW YEAR!!!
 9. Added system calls for working with directories
 1) INT 0x22; AH = 0x09: Change current directory (SI = dirname, returns CF flag)
 2) INT 0x22; AH = 0x0A: Go to parent directory (returns CF flag)
-3) INT 0x22; AH = 0x0B: Create directory (SI = dirname, returns CF flag) 
-4) INT 0x22; AH = 0x0C: Remove directory (SI = dirname, returns CF flag) 
-5) INT 0x22; AH = 0x0D: Check if directory (SI = name, returns CF flag)  
-6) INT 0x22; AH = 0x0E: Save current directory 
+3) INT 0x22; AH = 0x0B: Create directory (SI = dirname, returns CF flag)
+4) INT 0x22; AH = 0x0C: Remove directory (SI = dirname, returns CF flag)
+5) INT 0x22; AH = 0x0D: Check if directory (SI = name, returns CF flag)
+6) INT 0x22; AH = 0x0E: Save current directory
 7) INT 0x22; AH = 0x0F: Restore current directory
 
 =======================================================================================

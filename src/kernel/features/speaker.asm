@@ -26,7 +26,7 @@ turn_off_pc_speaker:
     ret
 
 ; -----------------------------
-; Play melody 
+; Play melody
 ; IN  : SI = melody location
 play_melody:
     pusha

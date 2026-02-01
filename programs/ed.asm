@@ -19,7 +19,7 @@ get_opening_file_name_loop:
     je open_file
     cmp cx, FILE_NAME_MAX_LENGTH
     jge err_file_name_lenght
-    
+
     mov byte [di], al
     inc si
     inc cx
@@ -55,7 +55,7 @@ open_file:
         mov ah, 0x01
         mov si, text_file_readed1
         int 0x21
-        
+
         mov ax, cx
         mov di, number_convert_buffer
         call convert_to_string

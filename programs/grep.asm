@@ -1,7 +1,7 @@
 ; ==================================================================
 ; x16-PRos -- GREP. grep utility for x16-PRos
 ; Copyright (C) 2025 PRoX2011
-; 
+;
 ; Usage: grep <filename> <search_string>
 ;
 ; Made by PRoX-dev
@@ -46,7 +46,7 @@ start:
     ; === Load file into file_buffer ===
     mov ah, 0x02
     mov si, [filename_ptr]
-    mov cx, file_buffer    
+    mov cx, file_buffer
     int 0x22
     jc .load_error
 

@@ -236,7 +236,7 @@ string_input_string:
     mov cx, 0
 
     call string_get_cursor_pos
-    mov word [.cursor_col], dx 
+    mov word [.cursor_col], dx
 
 .read_loop:
     mov ah, 0x00
@@ -346,7 +346,7 @@ string_get_time_string:
 ; =======================================================================
 ; STRING_GET_DATE_STRING - Gets current date as formatted string
 ; IN  : BX = pointer to buffer for date string (11 bytes minimum)
-; OUT : Buffer filled with date string 
+; OUT : Buffer filled with date string
 ; =======================================================================
 string_get_date_string:
     pusha
@@ -505,11 +505,11 @@ string_to_int:
     push cx
     push dx
     push si
-    
+
     xor ax, ax
     xor bx, bx
     xor cx, cx
-    
+
 .convert_loop:
     lodsb
     cmp al, 0
@@ -518,7 +518,7 @@ string_to_int:
     jb .invalid
     cmp al, '9'
     ja .invalid
-    
+
     sub al, '0'
     mov cl, al
     mov ax, bx
@@ -527,10 +527,10 @@ string_to_int:
     add ax, cx
     mov bx, ax
     jmp .convert_loop
-    
+
 .invalid:
     mov bx, -1
-    
+
 .done:
     mov ax, bx
     pop si
@@ -554,15 +554,15 @@ parse_prompt:
     push di
 
 .loop:
-    lodsb               
-    cmp al, 0              
+    lodsb
+    cmp al, 0
     je .done
-    cmp al, '$'        
+    cmp al, '$'
     je .check_username
-    cmp al, '%'             
+    cmp al, '%'
     je .check_hex
 .store:
-    stosb        
+    stosb
     jmp .loop
 
 .check_username:
@@ -598,24 +598,24 @@ parse_prompt:
     jmp .loop
 
 .check_hex:
-    mov al, [si]    
-    cmp al, 0                
+    mov al, [si]
+    cmp al, 0
     je .store_percent
     inc si
-    mov ah, [si]     
-    cmp ah, 0                
+    mov ah, [si]
+    cmp ah, 0
     je .store_percent
-    inc si               
+    inc si
 
     call hex_char_to_nibble
-    jc .store_percent        
+    jc .store_percent
     mov bl, al
-    shl bl, 4             
+    shl bl, 4
 
     mov al, ah
     call hex_char_to_nibble
-    jc .store_percent        
-    or bl, al     
+    jc .store_percent
+    or bl, al
 
     mov al, bl
     stosb
@@ -624,14 +624,14 @@ parse_prompt:
 .store_percent:
     mov al, '%'
     stosb
-    dec si     
-    cmp ah, 0       
+    dec si
+    cmp ah, 0
     je .loop
     dec si
     jmp .loop
 
 .done:
-    mov byte [di], 0     
+    mov byte [di], 0
     pop di
     pop si
     pop bx
