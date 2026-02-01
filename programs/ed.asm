@@ -19,7 +19,7 @@ get_opening_file_name_loop:
     je open_file
     cmp cx, FILE_NAME_MAX_LENGTH
     jge err_file_name_lenght
-
+    
     mov byte [di], al
     inc si
     inc cx
@@ -31,6 +31,11 @@ open_file:
     mov byte [di], 0
 
     mov si, cur_file_name
+    mov ah, 0x04
+    int 0x22
+    jc err_file_not_be_opened
+    
+    
     mov di, text_help_command
     call strcmp
     cmp ax, 0
@@ -43,19 +48,12 @@ open_file:
 
     mov si, file_text_buffer
     call strlen
-    cmp cx, 0
-    je err_file_not_be_opened
-
-    ; не отслеживает ошибки
-    ; cmp bx, 0
-    ; jz err_file_not_be_opened
-    ; jc err_file_not_be_opened
 
     ; === put successfully message ===
         mov ah, 0x01
         mov si, text_file_readed1
         int 0x21
-
+        
         mov ax, cx
         mov di, number_convert_buffer
         call convert_to_string

@@ -310,7 +310,58 @@ get_cmd:
     mov ax, input
     call string_input_string
     call print_newline
+    cmp byte [input], 0
+    je .save_input_to_history_skip
 
+    ; append input to command history
+    pusha
+        xor bx, bx
+        mov bl, [command_history_top]
+        cmp bx, 0
+        je .save_input_to_history_done
+        dec bl
+        cmp bx, 15
+        je .shift_last_skip
+        shl bx, 8
+        jmp .shift_history_element_loop
+.shift_last_skip:
+        dec bx
+        shl bx, 8
+.shift_history_element_loop:
+        lea di, [command_history + bx]
+        add bx, 256
+        lea si, [command_history + bx]
+.shift_history_shift_char:
+        mov al, [di]
+        mov [si], al
+        cmp al, 0
+        je .shift_history_next_element
+        inc di
+        inc si
+        jmp .shift_history_shift_char
+
+.shift_history_next_element:
+        cmp bx, 0
+        je .save_input_to_history_done
+        sub bx, 512
+        jmp .shift_history_element_loop
+
+.save_input_to_history_done:
+        inc byte [command_history_top]
+        mov di, command_history
+        mov si, input
+.save_input_loop:
+        mov al, [si]
+        mov [di], al
+        cmp al, 0
+        je .save_input_to_history_end
+        inc si
+        inc di
+        jmp .save_input_loop
+.save_input_to_history_end:
+    popa
+
+.save_input_to_history_skip:
     mov ax, input
     call string_string_chomp
 
@@ -2265,11 +2316,12 @@ login_password_prompt  db 19 dup(' '), 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                        db 19 dup(' '), 0xBA, '    _______________________________    ', 0xBA, 10, 13
                        db 19 dup(' '), 0xC0, 39 dup(0xCD), 0xBC, 10, 13, 0
 
-mt           db '', 10, 13, 0
-Sides        dw 2
-SecsPerTrack dw 18
-bootdev      db 0
-fmt_date     dw 1
+mt                  db '', 10, 13, 0
+Sides               dw 2
+SecsPerTrack        dw 18
+bootdev             db 0
+fmt_date            dw 1
+command_history_top db 0
 
 ; ------ Buffers ------
 current_logo_file resb 13
@@ -2285,5 +2337,6 @@ temp_prompt       resb 64
 input             resb 256
 current_directory resb 256
 temp_saved_dir    resb 256
-dirlist           resb 1024
+dirlist           resb 1024  
 file_buffer       resb 32768
+command_history   resb 256 * 16
