@@ -9,7 +9,7 @@ setup:
 
     mov al, 0x01
     call set_background_color
-    
+
     ; Show welcome message
     mov ah, 0x01
     mov si, setup_welcome_msg
@@ -52,7 +52,7 @@ setup:
     mov dh, 12
     mov dl, 0
     call string_move_cursor
-    
+
     ; Prompt for username
     mov ah, 0x01
     mov si, setup_username_prompt
@@ -61,24 +61,24 @@ setup:
     mov dh, 14
     mov dl, 5
     call string_move_cursor
-    
+
     ; Get username input
-    mov di, 43008  
-    mov byte [di], 0           
-    mov ax, di             
-    call string_input_string  
-    
+    mov di, 43008
+    mov byte [di], 0
+    mov ax, di
+    call string_input_string
+
     ; Check length
     mov si, 43008
     call string_string_length
     cmp ax, 0
     je .skip_copy_user
-    
+
     ; Copy input to 'user' variable
     mov si, 43008
-    mov di, user 
-    mov cx, 31  
-    call string_string_copy 
+    mov di, user
+    mov cx, 31
+    call string_string_copy
 
 .skip_copy_user:
     ; --- SAVE USER.CFG in CONF.DIR ---
@@ -91,11 +91,11 @@ setup:
     mov ah, 0x09
     mov si, conf_dir_name
     int 0x22
-    
+
     ; 3. Save file
     mov ah, 0x03
     mov si, user_cfg_file
-    mov bx, user              
+    mov bx, user
     mov cx, 32
     int 0x22
 
@@ -115,7 +115,7 @@ setup:
     mov dh, 12
     mov dl, 0
     call string_move_cursor
-    
+
     mov ah, 0x01
     mov si, setup_password_prompt
     int 0x21
@@ -123,28 +123,28 @@ setup:
     mov dh, 14
     mov dl, 5
     call string_move_cursor
-    
-    mov di, 43008  
-    mov byte [di], 0           
-    mov ax, di             
-    call string_input_string  
-    
+
+    mov di, 43008
+    mov byte [di], 0
+    mov ax, di
+    call string_input_string
+
     mov si, 43008
     call string_string_length
     cmp ax, 0
     je .encrypt_pass ; use default empty pass
-    
+
     mov si, 43008
-    mov di, password 
-    mov cx, 31  
-    call string_string_copy 
+    mov di, password
+    mov cx, 31
+    call string_string_copy
 
 .encrypt_pass:
     mov si, password
     mov di, encrypted_pass
     mov cx, 31
     call encrypt_string
-    
+
     ; --- SAVE PASSWORD.CFG in CONF.DIR ---
     mov ah, 0x09
     mov si, conf_dir_name
@@ -152,7 +152,7 @@ setup:
 
     mov ah, 0x03
     mov si, password_cfg_file
-    mov bx, encrypted_pass              
+    mov bx, encrypted_pass
     mov cx, 32
     int 0x22
 
@@ -171,7 +171,7 @@ setup:
     mov dh, 12
     mov dl, 0
     call string_move_cursor
-    
+
     mov ah, 0x01
     mov si, setup_timezone_prompt
     int 0x21
@@ -179,22 +179,22 @@ setup:
     mov dh, 14
     mov dl, 5
     call string_move_cursor
-    
-    mov di, 43008  
-    mov byte [di], 0           
-    mov ax, di             
-    call string_input_string  
-    
+
+    mov di, 43008
+    mov byte [di], 0
+    mov ax, di
+    call string_input_string
+
     mov si, 43008
     call string_string_length
     cmp ax, 0
     je .save_timezone
-    
+
     mov si, 43008
-    mov di, timezone 
-    mov cx, 31  
-    call string_string_copy 
-    
+    mov di, timezone
+    mov cx, 31
+    call string_string_copy
+
 .save_timezone:
     ; --- SAVE TIMEZONE.CFG in CONF.DIR ---
     mov ah, 0x09
@@ -203,7 +203,7 @@ setup:
 
     mov ah, 0x03
     mov si, timezone_cfg_file
-    mov bx, timezone              
+    mov bx, timezone
     mov cx, 32
     int 0x22
 
@@ -222,7 +222,7 @@ setup:
     mov dh, 12
     mov dl, 0
     call string_move_cursor
-    
+
     mov ah, 0x01
     mov si, setup_theme_prompt
     int 0x21
@@ -230,12 +230,12 @@ setup:
     mov dh, 14
     mov dl, 5
     call string_move_cursor
-    
+
     mov di, 43008
     mov byte [di], 0
     mov ax, di
     call string_input_string
-    
+
     mov si, 43008
     call string_to_int
     cmp ax, 0
@@ -274,17 +274,17 @@ setup:
     push cx
     rep movsb
     pop cx
-    
+
     ; --- SAVE THEME.CFG in CONF.DIR ---
     mov ah, 0x09
     mov si, conf_dir_name
     int 0x22
-    
+
     mov ah, 0x03
     mov si, theme_cfg_file
     mov bx, 43008
     int 0x22
-    
+
     mov ah, 0x0A
     int 0x22
 
@@ -300,7 +300,7 @@ setup:
     mov dh, 12
     mov dl, 0
     call string_move_cursor
-    
+
     mov ah, 0x01
     mov si, setup_prompt_prompt
     int 0x21
@@ -308,12 +308,12 @@ setup:
     mov dh, 14
     mov dl, 5
     call string_move_cursor
-    
+
     mov di, 43008
     mov byte [di], 0
     mov ax, di
     call string_input_string
-    
+
     mov si, 43008
     call string_to_int
     cmp ax, 0
@@ -340,7 +340,7 @@ setup:
     mov di, 43008
     mov cx, 64
     call string_string_copy
-    
+
     ; --- SAVE PROMPT.CFG in CONF.DIR ---
     mov ah, 0x09
     mov si, conf_dir_name
@@ -367,7 +367,7 @@ setup:
     mov dh, 12
     mov dl, 0
     call string_move_cursor
-    
+
     mov ah, 0x01
     mov si, setup_program_prompt
     int 0x21
@@ -375,12 +375,12 @@ setup:
     mov dh, 14
     mov dl, 5
     call string_move_cursor
-    
+
     mov di, 43008
     mov byte [di], 0
     mov ax, di
     call string_input_string
-    
+
     mov si, 43008
     call string_to_int
     cmp ax, 0
@@ -389,7 +389,7 @@ setup:
     je .essential_programs
     cmp ax, 3
     je .minimal_programs
-    jmp .default_programs  
+    jmp .default_programs
 
 .default_programs:
     jmp .save_settings
@@ -502,8 +502,8 @@ setup:
     mov ah, 0x03
     mov byte [43008], '0'
     mov si, first_boot_file
-    mov bx, 43008             
-    mov cx, 2  
+    mov bx, 43008
+    mov cx, 2
     int 0x22
 
     mov ah, 0x0A
@@ -512,24 +512,24 @@ setup:
     mov dh, 28
     mov dl, 0
     call string_move_cursor
-    
+
     ; Show completion message
     mov ah, 0x01
     mov si, setup_complete_msg
     int 0x21
-    
+
     ; Wait for key press
     mov ah, 0
     int 16h
-    
+
     mov ah, 0x06
     int 0x21
 
     ret
 
 ; ========== INCLUDES ==========
-%INCLUDE "src/kernel/features/encrypt.asm"  
-%INCLUDE "programs/setup/setup_messages.asm"  
+%INCLUDE "src/kernel/features/encrypt.asm"
+%INCLUDE "programs/setup/setup_messages.asm"
 %INCLUDE "programs/setup/helper_functions.asm"
 
 ; ========== DATA SECTION ==========
@@ -556,7 +556,7 @@ prompt_option1       db '[$username@PRos] > ', 0
 prompt_option2       db '%DA%C4%C4 $username%0A%C0%C4 %FE %10 ', 0
 prompt_option3       db '$username@pros:~$ ', 0
 
-; Theme data - Default 
+; Theme data - Default
 theme_default_data:
     db '0,2,3,5', 10
     db '1,25,24,52', 10
@@ -616,7 +616,7 @@ theme_vga_data:
     db '15,63,63,63', 0
 theme_vga_size equ $ - theme_vga_data
 
-; Theme data - Ocean Deep 
+; Theme data - Ocean Deep
 theme_ocean_data:
     db '0,5,8,15', 10
     db '1,10,15,30', 10
@@ -636,7 +636,7 @@ theme_ocean_data:
     db '15,58,60,63', 0
 theme_ocean_size equ $ - theme_ocean_data
 
-; Program file names     
+; Program file names
 brainf_file        db 'BRAINF.BIN', 0
 bchart_file        db 'BCHART.BIN', 0
 calc_file          db 'CALC.BIN', 0
@@ -647,7 +647,7 @@ fetch_file         db 'FETCH.BIN', 0
 fnt_test_file      db 'FNT_TEST.BIN', 0
 grep_file          db 'GREP.BIN', 0
 hello_file         db 'HELLO.BIN', 0
-help_file          db 'HELP.BIN', 0     
+help_file          db 'HELP.BIN', 0
 hexedit_file       db 'HEXEDIT.BIN', 0
 imfplay_file       db 'IMFPLAY.BIN', 0
 mandel_file        db 'MANDEL.BIN', 0

@@ -14,7 +14,7 @@ start:
     xor cx, cx
     mov dx, 184Fh
     int 10h
-    
+
     mov ax, 0x03
     int 0x10
 
@@ -52,7 +52,7 @@ command_loop:
     jz delete_symbol
     cmp ah, 3Ch
     jz save_text
-    
+
     ; Arrow keys
     cmp ah, 48h               ; Up arrow
     jz arrow_up
@@ -285,7 +285,7 @@ draw_hints:
     mov si, msg
     call print_string_blue_bg
 
-    mov dl, 0 
+    mov dl, 0
     mov dh, 0
     call set_cursor_pos
 
@@ -397,7 +397,7 @@ print_string:
 .done:
     popa
     ret
-    
+
 set_cursor_pos:
     mov ah, 2h
     xor bh, bh

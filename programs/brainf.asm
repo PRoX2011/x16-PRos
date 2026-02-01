@@ -12,10 +12,10 @@ start:
     xor cx, cx
     mov dx, 184Fh
     int 10h
-    
+
     mov ax, 0x03
     int 0x10
-    
+
     mov dl, 0
     mov dh, 0
     call set_cursor_pos
@@ -23,7 +23,7 @@ start:
     mov bp, helper
     mov cx, 82
     call print_message
-    
+
     mov dl, 0
     mov dh, 24
     call set_cursor_pos
@@ -31,14 +31,14 @@ start:
     mov bp, msg
     mov cx, 80
     call print_message
-    
+
     mov dl, 0
     mov dh, 17
     call set_cursor_pos
-    
+
     mov si, hr
     call print_string
-    
+
     ; Переход к вводу
     jmp getInput
 
@@ -56,7 +56,7 @@ getInput:
 .read_char:
     mov ah, 00h
     int 16h
-    
+
     cmp al, 1Bh
     jz esc_exit
 
@@ -232,19 +232,19 @@ decrementCursor:
 
 programCounter:
     dw 0
-    
+
 print_message:
     mov bl, 0x1F
     mov ax, 1301h
     int 10h
     ret
-    
+
 print_message2:
     mov bl, 0x0F
     mov ax, 1301h
     int 10h
     ret
-    
+
 print_string:
     mov ah, 0x0E
     mov bh, 0x00
@@ -257,13 +257,13 @@ print_string:
     jmp .print_char
 .done:
     ret
-    
+
 set_cursor_pos:
     mov ah, 2h
     xor bh, bh
     int 10h
     ret
-    
+
 esc_exit:
     mov ax, 0600h
     mov bh, 0x0F
@@ -275,12 +275,12 @@ esc_exit:
     int 0x10
 
     ret
-    
+
 dataPointer:
     dw 0
     msg db 13, 10, 'PRos brainf v0.1                                                                 ', 0
     hr db 13, 10, '________________________________________________________________________________', 0
-                                                                                                    
+
     helper db 13, 10, 'ENTER - run code  ESC - quit                                                      ', 0
 
 sectorEnd:

@@ -1,5 +1,5 @@
 ; ==================================================================
-; x16-PRos - BMP rendering for x16-PRos in VGA mode 0x13 (320x200, 256 colors) 
+; x16-PRos - BMP rendering for x16-PRos in VGA mode 0x13 (320x200, 256 colors)
 ; Copyright (C) 2025 PRoX2011
 ;
 ; ==================================================================
@@ -23,7 +23,7 @@ padding             dw 0
 view_bmp:
     call DisableMouse
     pusha
-    
+
     ; Parse parameters
     mov word si, [param_list]
     call string_string_parse
@@ -40,27 +40,27 @@ view_bmp:
     ; Initialize flags
     mov word [.upscale_flag], 0
     mov word [.stretch_flag], 0
-    
+
     ; Check first parameter
     cmp bx, 0
     je .check_third_param
-    
+
     mov si, bx
     mov di, .upscale_param
     call string_string_compare
     jc .set_upscale_first
-    
+
     mov si, bx
     mov di, .stretch_param
     call string_string_compare
     jc .set_stretch_first
-    
+
     jmp .check_third_param
 
 .set_upscale_first:
     mov word [.upscale_flag], 1
     jmp .check_third_param
-    
+
 .set_stretch_first:
     mov word [.stretch_flag], 1
 
@@ -68,23 +68,23 @@ view_bmp:
     ; Check if there's a third parameter
     cmp cx, 0
     je .load_file
-    
+
     mov si, cx
     mov di, .upscale_param
     call string_string_compare
     jc .set_upscale_second
-    
+
     mov si, cx
     mov di, .stretch_param
     call string_string_compare
     jc .set_stretch_second
-    
+
     jmp .load_file
 
 .set_upscale_second:
     mov word [.upscale_flag], 1
     jmp .load_file
-    
+
 .set_stretch_second:
     mov word [.stretch_flag], 1
 
@@ -94,7 +94,7 @@ view_bmp:
     jne .no_conflict
     cmp word [.stretch_flag], 1
     jne .no_conflict
-    
+
     ; Show warning about conflicting flags
     mov si, .conflict_msg
     call print_string_yellow
@@ -106,7 +106,7 @@ view_bmp:
     mov ax, [param_list]
     call fs_file_exists
     jc .not_found
-    
+
     mov ax, [param_list]
     mov cx, 32768
     call fs_load_file
@@ -121,13 +121,13 @@ view_bmp:
     ; Load and display BMP based on flags
     push bx
     mov si, 32768    ; Point to loaded file data
-    
+
     cmp word [.stretch_flag], 1
     je .display_stretched
-    
+
     cmp word [.upscale_flag], 1
     je .display_upscaled
-    
+
     call display_bmp
     jmp .display_done
 
@@ -139,8 +139,8 @@ view_bmp:
     call display_bmp_stretched
 
 .display_done:
-    pop bx     
-    
+    pop bx
+
     ; Show resolution info
     mov dh, 0
     mov dl, 0
@@ -164,10 +164,10 @@ view_bmp:
     ; Show mode status
     cmp word [.stretch_flag], 1
     je .show_stretch_status
-    
+
     cmp word [.upscale_flag], 1
     je .show_upscale_status
-    
+
     jmp .wait_key
 
 .show_upscale_status:
@@ -184,7 +184,7 @@ view_bmp:
 
     ; Return to original video mode 0x12 (640x480, 16 colors)
     call string_clear_screen
-    
+
     mov byte [_palSet], 0
 
     popa
@@ -425,31 +425,31 @@ display_bmp_stretched:
     mov [padding], dx
 
     add si, BMP_HEADER_SIZE + BMP_PALETTE_SIZE
-    
+
     mov word [.screen_y], 0
     mov word [.src_row], 0
-    
+
 .draw_row:
     mov ax, [.screen_y]
     mul word [bmp_height]
     mov bx, 200
     div bx
-    
+
     mov bx, [bmp_height]
     dec bx
     sub bx, ax
     mov ax, bx
-    
+
     cmp ax, [.src_row]
     je .same_row
-    
+
     mov [.src_row], ax
-    
+
     mov bx, [bmp_width]
     add bx, [padding]
     mul bx
     mov bx, ax
-    
+
     push si
     add si, bx
     mov cx, [bmp_width]
@@ -464,19 +464,19 @@ display_bmp_stretched:
 
 .same_row:
     mov word [.screen_x], 0
-    
+
 .draw_pixel:
     mov ax, [.screen_x]
     mul word [bmp_width]
     mov bx, 320
     div bx
-    
+
     push si
     mov si, _bmpSingleLine
     add si, ax
     lodsb
     pop si
-    
+
     push ax
     mov ah, 0x0C
     mov bh, 0
@@ -484,11 +484,11 @@ display_bmp_stretched:
     mov dx, [.screen_y]
     int 0x10
     pop ax
-    
+
     inc word [.screen_x]
     cmp word [.screen_x], 320
     jl .draw_pixel
-    
+
     inc word [.screen_y]
     cmp word [.screen_y], 200
     jl .draw_row
@@ -504,20 +504,20 @@ display_bmp_stretched:
 
 set_palette:
     pusha
-    add si, BMP_HEADER_SIZE  
+    add si, BMP_HEADER_SIZE
     mov cx, 256
     mov dx, 3C8h
     mov al, 0
-    out dx, al 
-    inc dx 
+    out dx, al
+    inc dx
 .next_color:
-    mov al, [si + 2] 
+    mov al, [si + 2]
     shr al, 2
     out dx, al
-    mov al, [si + 1] 
+    mov al, [si + 1]
     shr al, 2
     out dx, al
-    mov al, [si]  
+    mov al, [si]
     shr al, 2
     out dx, al
     add si, 4

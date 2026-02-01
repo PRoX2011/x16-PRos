@@ -26,10 +26,8 @@ api_output_init:
     push es
     xor ax, ax
     mov es, ax
-    mov word [es:0x21*4], int21_handler 
-    mov word [es:0x21*4+2], cs       
-    mov ax, 0x12               
-    int 0x10
+    mov word [es:0x21*4], int21_handler
+    mov word [es:0x21*4+2], cs
     pop es
     popa
     ret
@@ -86,15 +84,15 @@ int21_handler:
     lodsb
     cmp al, 0
     je .done
-    cmp al, 0x0A       
+    cmp al, 0x0A
     je .handle_newline
-    int 0x10         
+    int 0x10
     jmp .print_char
 
 .handle_newline:
-    mov al, 0x0D      
+    mov al, 0x0D
     int 0x10
-    mov al, 0x0A     
+    mov al, 0x0A
     int 0x10
     jmp .print_char
 

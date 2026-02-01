@@ -26,7 +26,7 @@ draw_interface:
 get_user_input:
     mov di, input_buffer
     mov cx, 0
-    
+
 .read_char:
     mov ah, 0x00
     int 0x16
@@ -36,11 +36,11 @@ get_user_input:
     je .backspace
     cmp cx, 50
     je .read_char
-    
+
     mov ah, 0x0E
     mov bl, 0x0F
     int 0x10
-    
+
     stosb
     inc cx
     jmp .read_char
@@ -50,7 +50,7 @@ get_user_input:
     je .read_char
     dec cx
     dec di
-    
+
     mov ah, 0x0E
     mov al, 0x08
     int 0x10
@@ -73,7 +73,7 @@ parse_input:
     mov si, input_buffer
     mov di, data_buffer
     mov cx, 0
-    
+
 .parse_loop:
     call skip_spaces
     cmp byte [si], 0
@@ -105,7 +105,7 @@ parse_number:
     xor ax, ax
     xor bx, bx
     xor dx, dx
-    
+
 .read_digit:
     mov bl, [si]
     cmp bl, 0
@@ -116,7 +116,7 @@ parse_number:
     jb .error
     cmp bl, '9'
     ja .error
-    
+
     sub bl, '0'
     mov ah, 10
     mul ah
@@ -140,13 +140,13 @@ draw_diagram:
     mov al, 0x0F
     mov cx, 10
     mov dx, 450
-    
+
 .draw_x_axis:
     int 0x10
     inc cx
     cmp cx, 600
     jle .draw_x_axis
-    
+
     mov cx, 10
     mov dx, 40
 .draw_y_axis:
@@ -158,46 +158,46 @@ draw_diagram:
     mov cx, [data_count]
     cmp cx, 0
     je .done
-    
+
     mov si, data_buffer
     mov bx, 50
-    
+
 .draw_bar:
     lodsb
     mov ah, 0
     mov di, ax
     shl di, 1
-    
+
     mov ah, 0x0C
     mov al, 0x0E
     push cx
     push bx
-    
+
     mov cx, bx
     add bx, 25
-    
+
 .width_loop:
     mov dx, 450
     sub dx, di
     cmp dx, 40
     jge .height_loop
     mov dx, 40
-    
+
 .height_loop:
     int 0x10
     inc dx
     cmp dx, 450
     jl .height_loop
-    
+
     inc cx
     cmp cx, bx
     jl .width_loop
-    
+
     pop bx
     pop cx
     add bx, 35
     loop .draw_bar
-    
+
 .done:
     ret
 

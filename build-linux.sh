@@ -204,7 +204,7 @@ for prog in "${programs_root[@]}"; do
         check_error "Cashing of $bin_name failed"
         print_ok "$bin_name cashed successfully"
     fi
-
+    
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/
     check_error "Copy of $bin_name failed"
@@ -213,7 +213,7 @@ done
 
 programs=(
     "programs/help.asm HELP.BIN"
-    "programs/grep.asm GREP.BIN"    
+    "programs/grep.asm GREP.BIN"
     "programs/theme.asm THEME.BIN"
     "programs/fetch.asm FETCH.BIN"
     "programs/imfplay.asm IMFPLAY.BIN"
