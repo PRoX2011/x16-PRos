@@ -232,11 +232,12 @@ string_string_tokenize:
 ; =======================================================================
 string_input_string:
     pusha
+    mov [.start_input_buf_addr], ax
     mov di, ax
     mov cx, 0
 
     call string_get_cursor_pos
-    mov word [.cursor_col], dx 
+    mov word [.cursor_col], dx
 
 .read_loop:
     mov ah, 0x00
@@ -247,6 +248,10 @@ string_input_string:
     je .handle_backspace
     cmp al, 0x7F
     je .handle_ctrl_backspace
+    cmp ah, 0x48
+    je .handle_history_scroll_up
+    cmp ah, 0x50
+    je .handle_history_scroll_down
     cmp cx, 255
     jge .read_loop
     stosb
@@ -254,6 +259,124 @@ string_input_string:
     mov bl, 0x1F
     int 0x10
     inc cx
+    jmp .read_loop
+
+.handle_history_scroll_up:
+    cmp byte [.history_using], 0
+    je .handle_history_scroll_up_to_history_mode
+    mov al, [.current_history_pos]
+    cmp al, [command_history_top]
+    jae .read_loop
+    inc byte [.current_history_pos]
+
+.handle_history_scroll_up_to_history_mode:
+    mov byte [.history_using], 1
+
+    mov di, [.start_input_buf_addr]
+    mov bx, [.current_history_pos]
+    shl bx, 8
+    lea si, [command_history + bx]
+    
+    mov bx, 0x1F
+    mov ah, 0x0E
+.handle_history_scroll_up_clear_loop:
+    cmp cx, 0
+    je .handle_history_scroll_up_loop
+    mov al, 0x08
+    int 0x10
+    mov al, ' '
+    int 0x10
+    mov al, 0x08
+    int 0x10
+    dec cx
+    jmp .handle_history_scroll_up_clear_loop
+
+.handle_history_scroll_up_loop:
+    mov al, [si]
+    mov [di], al
+    cmp al, 0
+    je .handle_history_scroll_up_done
+    mov bx, 0x1F
+    mov ah, 0x0E
+    int 0x10
+    inc di
+    inc si
+    inc cx
+    jmp .handle_history_scroll_up_loop
+
+.handle_history_scroll_up_done:
+    call string_get_cursor_pos
+    mov word [.cursor_col], dx
+    jmp .read_loop
+
+
+.handle_history_scroll_down:
+    cmp byte [.current_history_pos], 0
+    je .handle_history_scroll_down_history_exit
+    mov byte [.history_using], 1
+    dec byte [.current_history_pos]
+
+    mov di, [.start_input_buf_addr]
+    mov bx, [.current_history_pos]
+    shl bx, 8
+    lea si, [command_history + bx]
+    
+    mov bx, 0x1F
+    mov ah, 0x0E
+.handle_history_scroll_down_clear_loop:
+    cmp cx, 0
+    je .handle_history_scroll_down_loop
+    mov al, 0x08
+    int 0x10
+    mov al, ' '
+    int 0x10
+    mov al, 0x08
+    int 0x10
+    dec cx
+    jmp .handle_history_scroll_down_clear_loop
+
+.handle_history_scroll_down_loop:
+    mov al, [si]
+    mov [di], al
+    cmp al, 0
+    je .handle_history_scroll_down_done
+    mov bx, 0x1F
+    mov ah, 0x0E
+    int 0x10
+    inc di
+    inc si
+    inc cx
+    jmp .handle_history_scroll_down_loop
+
+.handle_history_scroll_down_done:
+
+    call string_get_cursor_pos
+    mov word [.cursor_col], dx
+    jmp .read_loop
+
+.handle_history_scroll_down_history_exit:
+    mov byte [.history_using], 0
+    mov di, [.start_input_buf_addr]
+    mov byte [di], 0
+
+    mov bx, 0x1F
+    mov ah, 0x0E
+    mov al, 0x08
+.handle_history_scroll_down_clear_loop_exit:
+    cmp cx, 0
+    je .handle_history_scroll_down_clear_loop_done
+    mov al, 0x08
+    int 0x10
+    mov al, ' '
+    int 0x10
+    mov al, 0x08
+    int 0x10
+    dec cx
+    jmp .handle_history_scroll_down_clear_loop_exit
+
+.handle_history_scroll_down_clear_loop_done:
+    call string_get_cursor_pos
+    mov word [.cursor_col], dx
     jmp .read_loop
 
 .handle_backspace:
@@ -336,8 +459,7 @@ string_input_string:
     ja .handle_ctrl_backspace_end
     jmp .handle_ctrl_backspace_loop
 
-.handle_ctrl_backspace_end
-
+.handle_ctrl_backspace_end:
     cmp byte [.handle_ctrl_backspace_deleting_counter], 1
     jbe .read_loop
     mov byte [di], al
@@ -347,14 +469,18 @@ string_input_string:
     int 0x10
     jmp .read_loop
 
-.handle_ctrl_backspace_deleting_counter db 0
-
 .done_read:
     mov byte [di], 0
     popa
+    mov byte [.current_history_pos], 0
+    mov byte [.history_using], 0
     ret
 
+.start_input_buf_addr dw 0
+.handle_ctrl_backspace_deleting_counter db 0
 .cursor_col dw 0
+.current_history_pos db 0
+.history_using db 0
 
 ; =======================================================================
 ; STRING_CLEAR_SCREEN - Clears the screen and applies theme
