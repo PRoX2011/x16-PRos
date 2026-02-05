@@ -1,7 +1,7 @@
-; =================================================================            
+; =================================================================
 ; x16-PRos Mandelbrot Set Visualizer
 ; Author: Gemini
-; 
+;
 ; Mode: VGA 13h (320x200, 256 colors)
 ; =================================================================
 
@@ -14,15 +14,15 @@ start:
     int 0x10
 
     ; --- Setting up clolor palete ---
-    mov dx, 0x03C8      
-    xor al, al          
+    mov dx, 0x03C8
+    xor al, al
     out dx, al
     mov dx, 0x03C9
     out dx, al          ; R=0
     out dx, al          ; G=0
     out dx, al          ; B=0
 
-    mov cx, 1           
+    mov cx, 1
 palette_loop:
     mov dx, 0x03C8
     mov al, cl
@@ -31,26 +31,26 @@ palette_loop:
 
     ; --- Blue component ---
     mov ax, cx
-    shr ax, 2       
+    shr ax, 2
     add al, 15
     cmp al, 63
     jbe b_ok
     mov al, 63
 b_ok:
-    push ax       
+    push ax
 
     ; --- Red and blue ---
     mov al, cl
     cmp al, 20
     jb no_white
-    sub al, 20          
-    
-    shr al, 1           
+    sub al, 20
+
+    shr al, 1
 
     cmp cl, 110
     jb white_ok
-    add al, 10       
-    
+    add al, 10
+
 white_ok:
     cmp al, 63
     jbe rgb_out
@@ -68,7 +68,7 @@ no_white:
     out dx, al          ; Green = 0
     pop ax
     out dx, al          ; Blue
-    
+
 next_color:
     inc cl
     jnz palette_loop
@@ -97,7 +97,7 @@ x_loop:
 
     xor si, si          ; Zx
     xor bx, bx          ; Zy
-    mov cx, 0   
+    mov cx, 0
 
 iterate:
     ; Zx^2
@@ -129,26 +129,26 @@ iterate:
     mov ax, [zx_sq]
     sub ax, [zy_sq]
     add ax, [cx_val]
-    
+
     mov si, ax
     mov bx, [new_zy]
 
     inc cx
-    cmp cx, 150       
+    cmp cx, 150
     jl iterate
 
 done_iter:
     cmp cx, 150
     je set_black
-    
-    mov al, cl          
-    test al, al         
+
+    mov al, cl
+    test al, al
     jnz draw_pixel
     mov al, 1
     jmp draw_pixel
 
 set_black:
-    xor al, al    
+    xor al, al
 
 draw_pixel:
     mov [es:di], al

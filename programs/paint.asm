@@ -14,7 +14,7 @@ start:
 
     mov byte [CurrentColor], 0x0F
     mov byte [BrushSize], 1
-    
+
     call InitMouse
     call EnableMouse
 
@@ -26,27 +26,27 @@ programLoop:
     mov ah, 0x01
     int 0x16
     jz check_mouse
-    
+
     mov ah, 0x00
     int 0x16
-    
+
     cmp al, '0'
     jb check_other_keys
     cmp al, '9'
-    ja check_other_keys 
-    
+    ja check_other_keys
+
     sub al, '0'
     mov bx, ColorTable
     xlatb
     mov [CurrentColor], al
     jmp check_mouse
-    
+
 check_other_keys:
     cmp al, 'w'
     je increase_size
     cmp al, 'W'
     je increase_size
-    
+
     cmp al, 's'
     je decrease_size
     cmp al, 'S'
@@ -54,7 +54,7 @@ check_other_keys:
 
     cmp al, 0x1B
     je exit
-    
+
     jmp check_mouse
 
 increase_size:
@@ -78,7 +78,7 @@ check_mouse:
 paint:
     mov cx, [MouseX]
     mov dx, [MouseY]
-    sub dx, 2 
+    sub dx, 2
 
     mov al, [BrushSize]
     shr al, 1
@@ -86,27 +86,27 @@ paint:
     sub cx, ax
     sub dx, ax
 
-    mov si, [BrushSize] 
-    mov bh, 0  
+    mov si, [BrushSize]
+    mov bh, 0
 
 draw_row:
-    mov di, [BrushSize] 
-    push cx           
+    mov di, [BrushSize]
+    push cx
 
 draw_column:
     mov ah, 0x0C
     mov al, [CurrentColor]
-    int 0x10          
-    
-    inc cx            
+    int 0x10
+
+    inc cx
     dec di
     jnz draw_column
-    
-    pop cx            
-    inc dx            
+
+    pop cx
+    inc dx
     dec si
     jnz draw_row
-    
+
     jmp programLoop
 
 exit:

@@ -1,5 +1,5 @@
 ; ==================================================================
-; x16-PRos -- CLOCK. Clock. 
+; x16-PRos -- CLOCK. Clock.
 ; Copyright (C) 2025 PRoX2011
 ;
 ; Made by PRoX-dev
@@ -9,13 +9,13 @@
 [ORG 0x8000]
 
 start:
-    pusha 
+    pusha
 
     mov ax, 0x03
     int 0x10
 
     push es
-    
+
     mov ax, 0xB800
     mov es, ax
 
@@ -50,7 +50,7 @@ hour24:
     call paint_digit
 
     mov bl, cl
-    shr bl, 4 
+    shr bl, 4
     mov di, 92
     call paint_digit
 
@@ -60,21 +60,21 @@ hour24:
     call paint_digit
 
     xor ax, ax
-    bt dx, 8                  
+    bt dx, 8
     jnc dot
-    mov ax, [fullchr]      
+    mov ax, [fullchr]
 dot:
-    mov di, 876         
+    mov di, 876
     mov cx, 3
     rep stosw
     mov cx, 3
-    mov di, 1036           
+    mov di, 1036
     rep stosw
     mov cx, 3
-    mov di, 1996             
+    mov di, 1996
     rep stosw
     mov cx, 3
-    mov di, 2156             
+    mov di, 2156
     rep stosw
 
     mov ah, 2
@@ -121,7 +121,7 @@ dot:
 	int 0x10
 
     mov si, help
-    mov di, 3520             
+    mov di, 3520
     mov ah, [col]
 .print_help:
     lodsb
@@ -132,7 +132,7 @@ dot:
 .help_done:
 
     mov ah, 0x02
-    mov dx, 0x1900            
+    mov dx, 0x1900
     mov bh, 0
     int 0x10
 
@@ -140,11 +140,11 @@ dot:
     int 0x16
     jz .no_key
     xor ah, ah
-    int 0x16                 
+    int 0x16
 
-    cmp al, 27          
+    cmp al, 27
     je .exit
-    cmp al, 'f'           
+    cmp al, 'f'
     jne .next_key
     mov al, [col]
     mov ah, al
@@ -154,7 +154,7 @@ dot:
     mov [col], al
     jmp .no_key
 .next_key:
-    cmp al, 'b'              
+    cmp al, 'b'
     jne .next_key1
     mov al, [col]
     mov ah, al
@@ -167,7 +167,7 @@ dot:
     mov [col], al
     jmp .no_key
 .next_key1:
-    cmp al, 'h'            
+    cmp al, 'h'
     jne .no_key
     xor byte [h24], 1
 
@@ -184,56 +184,56 @@ dot:
     xor ah, ah
     int 0x16
     jmp .exit
-.buffer_cleared:        
-    pop es    
+.buffer_cleared:
+    pop es
 
     mov ax, 0x12
     int 0x10
 
-    ret   
+    ret
 
 
 paint_digit:
     pusha
-    movzx dx, byte [pattern+bx] 
+    movzx dx, byte [pattern+bx]
     xor ax, ax
     bt dx, 6
     jnc .b5
-    call bar_horiz         
+    call bar_horiz
 .b5:
     bt dx, 5
     jnc .b4
-    call bar_vert             
+    call bar_vert
 .b4:
     bt dx, 4
     jnc .b3
     push di
-    add di, 24                
+    add di, 24
     call bar_vert
     pop di
 .b3:
     bt dx, 3
     jnc .b2
     mov al, 8
-    call bar_horiz           
+    call bar_horiz
 .b2:
     bt dx, 2
     jnc .b1
     mov al, 8
-    call bar_vert             
+    call bar_vert
 .b1:
     bt dx, 1
     jnc .b0
     mov al, 8
     push di
-    add di, 24                
+    add di, 24
     call bar_vert
     pop di
 .b0:
     bt dx, 0
     jnc .digdone
     mov ax, 16
-    call bar_horiz            
+    call bar_horiz
 .digdone:
     popa
     ret
@@ -242,14 +242,14 @@ paint_digit:
 bar_horiz:
     pusha
     mov bx, 160
-    mul bx                 
-    add di, ax               
-    mov bx, 3             
+    mul bx
+    add di, ax
+    mov bx, 3
 .barh:
-    mov cx, 16               
-    mov ax, [fullchr]       
+    mov cx, 16
+    mov ax, [fullchr]
     rep stosw
-    add di, 128               
+    add di, 128
     dec bx
     jnz .barh
     popa
@@ -258,14 +258,14 @@ bar_horiz:
 bar_vert:
     pusha
     mov bx, 160
-    mul bx                  
-    add di, ax               
-    mov bx, 11               
+    mul bx
+    add di, ax
+    mov bx, 11
 .barv:
-    mov cx, 4                 
+    mov cx, 4
     mov ax, [fullchr]
     rep stosw
-    add di, 152              
+    add di, 152
     dec bx
     jnz .barv
     popa
@@ -274,9 +274,9 @@ bar_vert:
 pattern db 01110111b, 00010010b, 01011101b, 01011011b, 0111010b
         db 01101011b, 01101111b, 01010010b, 01111111b, 01111011b
 fullchr:
-    chr db 0xDB             
-    col db 0x07               
-h24 db 1                      
+    chr db 0xDB
+    col db 0x07
+h24 db 1
 help db 'Hours format: 24h     Use f/b to change clock color     Press ESC to exit', 0
 
 ; -----------------------------

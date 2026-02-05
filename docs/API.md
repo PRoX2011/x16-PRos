@@ -268,9 +268,9 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 
 ### Function 0x09: Change Current Directory
 - **Description**: Navigates into the specified directory.
-- **Input**: 
+- **Input**:
   - `AH` = 0x09
-  - `SI` = Pointer to directory name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR) 
+  - `SI` = Pointer to directory name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR)
 - **Output**: CF set on error
 
 ### Function 0x0A: Go to Parent Directory
@@ -280,21 +280,21 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 
 ### Function 0x0B: Create Directory
 - **Description**: Creates a new directory entry on the disk.
-- **Input**: 
+- **Input**:
   - `AH` = 0x0B
   - `SI` = Pointer to directory name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR)
 - **Output**: CF set on error
 
 ### Function 0x0C: Remove Directory
 - **Description**: Deletes an empty directory.
-- **Input**: 
+- **Input**:
   - `AH` = 0x0C
   - `SI` = Pointer to directory name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR)
 - **Output**: CF set on error
 
 ### Function 0x0D: Check if Directory
 - **Description**: Determines if the specified name is a directory.
-- **Input**: 
+- **Input**:
   - `AH` = 0x0D
   - `SI` = Pointer to name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR)
 - **Output**: CF set if it is a directory
@@ -351,5 +351,5 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 
 The x16-PRos operating system and its API are licensed under the MIT License. See the LICENSE.TXT for details.
 
-**Author**: PRoX (https://github.com/PRoX2011)  
+**Author**: PRoX (https://github.com/PRoX2011)
 **Version**: 0.4, 0.5, 0.6

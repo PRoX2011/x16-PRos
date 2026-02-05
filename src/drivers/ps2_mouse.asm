@@ -51,12 +51,12 @@ MouseCallback:
     pusha
     push es
     push ds
-    
+
     push cs
     pop ds
-    
+
     call HideCursor
-    
+
     mov al, [bp + 12]
     mov bl, al
     mov cl, 3
@@ -65,13 +65,13 @@ MouseCallback:
     cbw
     mov dl, [bp + 8]
     mov al, [bp + 10]
-    
+
     neg dx
     mov cx, [MouseY]
     add dx, cx
     mov cx, [MouseX]
     add ax, cx
-    
+
     cmp ax, 0
     jge .check_x_max
     xor ax, ax
@@ -87,18 +87,18 @@ MouseCallback:
     cmp dx, 479 - HCURSOR
     jle .update_pos
     mov dx, 479 - HCURSOR
-    
+
 .update_pos:
     mov [ButtonStatus], bl
     mov [MouseX], ax
     mov [MouseY], dx
-    
+
     call SaveBackground
-    
+
     mov si, mousebmp
     mov al, 0x0F
     call DrawCursor
-    
+
     pop ds
     pop es
     popa

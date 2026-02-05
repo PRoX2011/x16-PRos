@@ -13,10 +13,10 @@ start:
 	.main_loop:
 		call update_time
 		call update_angles
-		
+
 		mov cx, 15
 		call draw_pointers
-		
+
 		mov ah, 1
 		int 16h ; if key pressed, exit
 		jnz exit_process
@@ -25,7 +25,7 @@ start:
 
 		mov cx, 0
 		call draw_pointers ; clear previous pointers
-		
+
 		jmp .main_loop
 
 sleep_half_s:
@@ -45,7 +45,7 @@ update_pointer:
 		fmul st1
 		fistp word [data.x]
 		ffree st0
-	
+
 		fld qword [di]
 		fsin
 		fld qword [si]
@@ -117,7 +117,7 @@ update_time:
 		mul bx
 		add ax, [data.minutes]
 		mov word [data.hours], ax ; in number of minutes
-		
+
 		ret
 
 ; in:
@@ -182,10 +182,10 @@ draw_circle:
 		add bx, [data.y]
 		call pset
 		popa
-		
+
 		loop .next
 		ret
-		
+
 draw_hours_indications:
 		mov cx, 12
 	.next:
@@ -204,7 +204,7 @@ draw_hours_indications:
 	.draw_square:
 		mov ax, 159
 		mov dx, 99
-	.next_dot:		
+	.next_dot:
 		call .draw_square_dot
 		inc ax
 		cmp ax, 162
@@ -231,7 +231,7 @@ draw_hours_indications:
 		call pset
 		popa
 		ret
-		
+
 draw_background:
 		; draw external circle
 		mov cx, 720
@@ -277,7 +277,7 @@ convert_byte_bcd_to_bin:
 		pop cx
 		pop bx
 		ret
-		
+
 ; bresenham's line algorithm
 ; written by Leonardo Ono (ono.leo@gmail.com)
 ; 26/09/2017
@@ -307,7 +307,7 @@ draw_line:
 		mov word [.dy], dx
 		cmp cx, 0
 		jl .dx_less
-		
+
 	.dx_greater:
 		cmp dx, 0
 		jge .dx_greater_dy_greater
@@ -316,7 +316,7 @@ draw_line:
 		cmp dx, 0
 		jge .dx_less_dy_greater
 		jl .dx_less_dy_less
-		
+
 	.dx_greater_dy_greater:
 		mov ax, [.dx]
 		mov bx, [.dy]
@@ -372,7 +372,7 @@ draw_line:
 		mov dx, [.y2]
 		neg dx
 		mov si, 2 ; quadrant 2
-		
+
 	.continue:
 		call draw_line_quadrant
 		ret
@@ -382,7 +382,7 @@ draw_line:
 		.y2 dw 0
 		.dx dw 0
 		.dy dw 0
-		
+
 ; ax = x1
 ; bx = y1
 ; cx = x2
@@ -412,7 +412,7 @@ draw_line_quadrant:
 		ret
 	.dx dw 0
 	.dy dw 0
-		
+
 ; ax = x1
 ; bx = y1
 ; cx = x2
@@ -423,7 +423,7 @@ draw_line_octant:
 		mov word [.x2], cx
 		sub cx, ax
 		sub dx, bx
-		add dx, dx 
+		add dx, dx
 		mov word [.2dy], dx
 		sub dx, cx ; dx = d = 2 * dy - dx
 		add cx, cx
@@ -507,7 +507,7 @@ pset_octant:
 		pop cx
 		pop bx
 		ret
-		
+
 ; al = color index
 ; bx = row
 ; cx = col
@@ -524,7 +524,7 @@ pset:
 	popa
 	ret
 
-	
+
 
 data:
 		.angle_s	dq 0
@@ -539,18 +539,18 @@ data:
 		.size85		dq 85.0
 		.size80		dq 80.0
 		.size50		dq 50.0
-		
+
 		.pi2		dq 6.28318
-		
+
 		.vhalf_deg	dq 0.00872665
 		.v6deg		dq 0.10472
 		.v90deg		dq 1.5708
 		.v30deg		dq 0.523599
-		
+
 		.v60		dq 60.0
 		.v720		dq 720.0
-		
+
 		.x 			dw 0
 		.y 			dw 0
-		
+
 		.tmp		dw 0

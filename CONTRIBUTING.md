@@ -205,7 +205,7 @@ Closes <link>
 
 ### Questions and Discussions
 
-> [!IMPORTANT]  
+> [!IMPORTANT]
 > Do not create GitHub issues for general questions or discussions.
 
 Instead:
@@ -219,7 +219,7 @@ Instead:
 
 ### Language Requirements
 
-> [!IMPORTANT]  
+> [!IMPORTANT]
 >  All code comments, issue descriptions, pull request descriptions, and documentation must be written in **English**. This ensures the project remains accessible to the international community.
 
 **Acceptable**:

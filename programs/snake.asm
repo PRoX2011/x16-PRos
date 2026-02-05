@@ -24,7 +24,7 @@ init:
     in al, 0x61
     and al, 0xFC
     out 0x61, al
-    
+
 screen:
     mov ax, 0xB800
     mov es, ax
@@ -38,7 +38,7 @@ screen:
     mov ax, 0x0E20
     pusha
     rep stosw
-    
+
 .messages:
     mov di, (160*3)+42
     mov si, msg_name
@@ -49,7 +49,7 @@ screen:
     mov si, msg_controls
     mov di, (160*21)+40
     call print
-    
+
 .rect:
     mov ax, 0x02FE
     mov cx, 38
@@ -79,7 +79,7 @@ game:
     call print
     mov bp, 6
     call place_food
-    
+
 .delay:
     xor eax, eax
     int 0x1A
@@ -92,7 +92,7 @@ game:
     jl .delay
     mov [clockticks], ebx
     in al, 0x60
-    
+
 .direction:
     cmp al, 177     ; 'N' - новая игра
     je start
@@ -112,7 +112,7 @@ game:
     mov al, '>'
     add di, 4
     jmp .move
-    
+
 .up:
     mov al, '^'
     sub di, 160
@@ -122,18 +122,18 @@ game:
     mov al, 'v'
     add di, 160
     jmp .move
-    
+
 .left:
     mov al, '<'
     sub di, 4
-    
-.move:    
+
+.move:
     cmp byte [es:di], 'o'
     sete ah
     je .nofail
     cmp byte [es:di], ' '
     jne .fail
-    
+
 .nofail:
     stosb
     dec di
@@ -164,7 +164,7 @@ game:
     mov al, ' '
     stosb
     jmp .done
-    
+
 .food:
     inc bp
     inc bp
@@ -233,7 +233,7 @@ place_food:
     stosb
     popa
     ret
-    
+
 print:
     pusha
 .loop:
@@ -246,10 +246,10 @@ print:
 .done:
     popa
     ret
-    
+
 esc_exit:
     int 0x19
-    
+
 msg_name: db 'Snake game',0
 msg_controls: db 'WASD - direction N - new Game ESC - quit',0
 msg_fail: db 'You lost =(',0

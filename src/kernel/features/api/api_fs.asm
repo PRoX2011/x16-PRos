@@ -3,7 +3,7 @@
 ; Copyright (C) 2025 PRoX2011
 ;
 ; Function codes in AH:
-;   0x00: Re-Initialize file system 
+;   0x00: Re-Initialize file system
 ;   0x01: Get file list (SI = buffer, returns BX = size low, CX = size high, DX = file count)
 ;   0x02: Load file (SI = filename, CX = load position, returns BX = file size)
 ;   0x03: Write file (SI = filename, BX = buffer, CX = size)
@@ -14,10 +14,10 @@
 ;   0x08: Get file size (SI = filename, returns BX = size)
 ;   0x09: Change current directory (SI = dirname, returns CF flag)
 ;   0x0A: Go to parent directory (returns CF flag)
-;   0x0B: Create directory (SI = dirname, returns CF flag) 
-;   0x0C: Remove directory (SI = dirname, returns CF flag) 
-;   0x0D: Check if directory (SI = name, returns CF flag)  
-;   0x0E: Save current directory 
+;   0x0B: Create directory (SI = dirname, returns CF flag)
+;   0x0C: Remove directory (SI = dirname, returns CF flag)
+;   0x0D: Check if directory (SI = name, returns CF flag)
+;   0x0E: Save current directory
 ;   0x0F: Restore current directory
 ;   0x10: Load huge file (SI = filename, CX = load offset (position), DX = load segment address)
 ; ==================================================================
@@ -43,21 +43,21 @@ int22_handler:
     pusha
     push ds
     push es
-    
+
     mov bp, cs
     mov ds, bp
     mov es, bp
-    
+
     mov al, ah
-    
+
     cmp al, 0x00
     je .init
-    cmp al, 0x01  
+    cmp al, 0x01
     je .get_file_list
     cmp al, 0x02
     je .load_file
     cmp al, 0x03
-    je .write_file  
+    je .write_file
     cmp al, 0x04
     je .file_exists
     cmp al, 0x05
@@ -89,7 +89,7 @@ int22_handler:
 
 .init:
     mov ax, 0
-    call fs_reset_floppy  
+    call fs_reset_floppy
     jmp .done
 
 .get_file_list:
@@ -97,13 +97,13 @@ int22_handler:
     call fs_get_file_list
     jc .done
     mov [.saved_bx], bx
-    mov [.saved_cx], cx  
+    mov [.saved_cx], cx
     mov [.saved_dx], dx
 
     mov bp, sp
     mov bx, [.saved_bx]
     mov [bp+14], bx
-    mov cx, [.saved_cx] 
+    mov cx, [.saved_cx]
     mov [bp+12], cx
     mov dx, [.saved_dx]
     mov [bp+10], dx
@@ -130,7 +130,7 @@ int22_handler:
 
 .create_file:
     mov ax, si
-    call fs_create_file  
+    call fs_create_file
     jmp .done
 
 .remove_file:
@@ -154,7 +154,7 @@ int22_handler:
 .change_directory:
     mov ax, si
     call fs_change_directory
-    jmp .done 
+    jmp .done
 
 .parent_directory:
     call fs_parent_directory
@@ -182,12 +182,12 @@ int22_handler:
 .restore_directory:
     call restore_current_dir
     jmp .done
-    
+
 .load_huge_file:
     mov ax, si
     call fs_load_huge_file
     jmp .done
-    
+
 .done:
     pop es
     pop ds
@@ -195,5 +195,5 @@ int22_handler:
     iret
 
 .saved_bx dw 0
-.saved_cx dw 0  
+.saved_cx dw 0
 .saved_dx dw 0

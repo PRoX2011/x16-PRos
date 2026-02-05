@@ -9,22 +9,22 @@
 [ORG 0x8000]
 
 start:
-    mov ah, 0x06   
-    mov al, 0   
-    mov bh, 0  
-    mov cx, 0   
-    mov dx, 0x1D4F 
+    mov ah, 0x06
+    mov al, 0
+    mov bh, 0
+    mov cx, 0
+    mov dx, 0x1D4F
     int 0x10
 
     mov cx, 0x001E
-    mov dx, 0x8480   
+    mov dx, 0x8480
     mov ah, 0x86
     int 0x15
 
     mov ah, 0x02
-    mov bh, 0      
-    mov dh, 0x1D 
-    mov dl, 0     
+    mov bh, 0
+    mov dh, 0x1D
+    mov dl, 0
     int 0x10
 
     mov si, credit1
@@ -199,13 +199,13 @@ start:
     call print_credit_line
 
     mov ah, 0x02
-    mov bh, 0  
-    mov dh, 0 
-    mov dl, 0    
+    mov bh, 0
+    mov dh, 0
+    mov dl, 0
     int 0x10
 
     mov si, press_key_msg
-    mov ah, 0x01   
+    mov ah, 0x01
     int 0x21
 
     mov ah, 0
@@ -219,14 +219,14 @@ print_credit_line:
     mov ah, 0x01
     int 0x21
 
-    mov cx, 0x0007    
+    mov cx, 0x0007
     mov dx, 0xA120
     mov ah, 0x86
     int 0x15
 
     ret
 
-; Credit lines 
+; Credit lines
 credit1:  db '-------------------------- x16-PRos operating system --------------------------', 13, 10, 13, 10, 0
 credit2:  db '                         ======== By PRoX-dev ========', 13, 10, 13, 10, 0
 credit3:  db '                             --- Special thanks ---', 13, 10, 13, 10, 0

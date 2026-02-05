@@ -35,7 +35,7 @@ start:
 .copy_user:
     rep movsb
     mov byte [di], 0
-    
+
     ret
 
 user_cfg       db 'USER.CFG', 0

@@ -34,7 +34,7 @@ setup_help_msg1       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, '                                       ', 0xBA, 10, 13
                       db 0xBA, 39 dup(0xC4), 0xBA, 10, 13
                       db 0xBA, ' Press any key to continue             ', 0xBA, 10, 13
-                      db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 10, 13, 0 
+                      db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 10, 13, 0
 
 setup_help_msg2       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, ' Setting up a username                 ', 0xBA, 10, 13

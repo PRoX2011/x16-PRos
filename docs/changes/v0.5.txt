@@ -1,10 +1,10 @@
 ----------------------- Key changes x16-PRos v0.5 ----------------------
 
-This update took over five months to develop. As a system developer, 
-it was quite a challenge. I had to fix over 20 bugs, learn a lot, 
+This update took over five months to develop. As a system developer,
+it was quite a challenge. I had to fix over 20 bugs, learn a lot,
 and develop numerous new features. But without my community,it would
-have been a much more difficult task. Thanks to everyone who helped 
-me and gave me advice! When you download my creation, be sure to 
+have been a much more difficult task. Thanks to everyone who helped
+me and gave me advice! When you download my creation, be sure to
 run the CREDITS.BIN program to see the names of everyone who helped me.
                                         -- PRoX
 

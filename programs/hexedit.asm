@@ -26,14 +26,14 @@ start:
     mov cx, file_buffer
     int 22h
     jc .load_error
-    
+
     ; Проверка размера файла (макс 32KB)
     cmp bx, 32768
     jbe .size_ok
     mov si, file_too_big_msg
     call print_string_red
     int 20h
-    
+
 .size_ok:
     mov [file_size], bx
     mov [cursor_pos], word 0
@@ -61,10 +61,10 @@ handle_input:
     ; Ожидать ввода
     mov ah, 0x00
     int 16h
-    
+
     cmp [edit_mode], byte 1
     je .edit_mode
-    
+
     ; Режим навигации
     cmp ah, 0x48 ; Стрелка вверх
     je .move_up
@@ -85,13 +85,13 @@ handle_input:
     cmp ah, 0x3D ; F3 - Показать справку
     je .show_help
     jmp .done
-    
+
 .move_up:
     cmp [cursor_pos], word 16
     jb .done
     sub [cursor_pos], word 16
     jmp .check_view
-    
+
 .move_down:
     mov ax, [file_size]
     sub ax, 16
@@ -99,13 +99,13 @@ handle_input:
     jbe .done
     add [cursor_pos], word 16
     jmp .check_view
-    
+
 .move_left:
     cmp [cursor_pos], word 0
     je .done
     dec word [cursor_pos]
     jmp .check_view
-    
+
 .move_right:
     mov ax, [file_size]
     dec ax
@@ -113,16 +113,16 @@ handle_input:
     jae .done
     inc word [cursor_pos]
     jmp .check_view
-    
+
 .check_view:
     ; Проверить видимость курсора
     mov ax, [cursor_pos]
     mov bx, [view_offset]
-    
+
     ; Если курсор выше видимой области
     cmp ax, bx
     jb .scroll_up
-    
+
     ; Если курсор ниже видимой области
     mov dx, bx
     add dx, 256 - 16
@@ -144,7 +144,7 @@ handle_input:
     jns .set_view
     xor bx, bx ; Если файл меньше 256 байт
     jmp .set_view
-    
+
 .set_view:
     mov [view_offset], bx
     jmp .done
@@ -153,7 +153,7 @@ handle_input:
     ; Начать редактирование
     mov [edit_mode], byte 1
     mov [nibble_flag], byte 0
-    
+
     ; Загрузить текущий байт
     mov si, file_buffer
     add si, [cursor_pos]
@@ -169,7 +169,7 @@ handle_input:
     mov ah, 0x03 ; Функция записи файла
     int 22h
     jc .save_error
-    
+
     mov [modified_flag], byte 0 ; Сбросить флаг изменений
     mov si, save_success_msg
     call print_string_green
@@ -215,26 +215,26 @@ handle_input:
     je .finish_edit
     cmp al, 0x08 ; Backspace
     je .backspace
-    
+
     ; Проверить hex-цифру
     call is_hex_digit
     jnc .done_edit
-    
+
     ; Преобразовать в число
     call char_to_hex
-    
+
     ; Обновить байт
     mov bl, [byte_buffer]
     cmp [nibble_flag], byte 0
     je .high_nibble
-    
+
     ; Младший ниббл
     and bl, 0xF0
     or bl, al
     mov [byte_buffer], bl
     mov [nibble_flag], byte 0
     jmp .update_byte
-    
+
 .high_nibble:
     shl al, 4
     and bl, 0x0F
@@ -262,7 +262,7 @@ handle_input:
     ; Завершить редактирование
     mov [edit_mode], byte 0
     mov [nibble_flag], byte 0
-    
+
     ; Переместить курсор вправо
     mov ax, [cursor_pos]
     inc ax
@@ -270,7 +270,7 @@ handle_input:
     jae .stay
     mov [cursor_pos], ax
     jmp .check_view
-    
+
 .stay:
     dec ax
     mov [cursor_pos], ax
@@ -291,24 +291,24 @@ handle_input:
 ;----------------------------------------------------------
 display_ui:
     ; Очистить экран
-    mov ah, 0x06 
+    mov ah, 0x06
     int 21h
 
     ; Показать заголовок с именем файла
     mov si, [filename_ptr]
     mov di, header_str
     call string_copy
-    
+
     ; Добавить звездочку если были изменения
     cmp [modified_flag], byte 0
     je .no_modify
     mov si, modified_str
     call string_append
-    
+
 .no_modify:
     mov si, header_str
     call print_string_cyan
-    
+
     ; Показать размер файла
     mov si, size_prefix
     call print_string
@@ -316,7 +316,7 @@ display_ui:
     call int_to_string
     mov si, ax
     call print_string
-    
+
     ; Показать позицию курсора
     mov si, pos_prefix
     call print_string
@@ -340,13 +340,13 @@ display_ui:
     push cx
     push di
     push bx
-    
+
     ; Вывести адрес
     mov ax, bx
     call print_hex_word
     mov al, ':'
     call print_char
-    
+
     ; Вывести hex-байты
     mov cx, 16
     mov si, file_buffer
@@ -357,14 +357,14 @@ display_ui:
     push cx
     mov al, ' '
     call print_char
-    
+
     ; Проверить позицию курсора
     mov dx, [cursor_pos]
     cmp dx, bx
     jne .normal_byte
-    
+
     ; Это текущая позиция курсора
-    mov ah, 0x02 
+    mov ah, 0x02
     mov bl, 0x0A ; Зеленый
     int 21h
 
@@ -373,15 +373,15 @@ display_ui:
     push ax
     call print_hex_byte
     pop ax
-    
+
     ; Проверить режим редактирования
     cmp [edit_mode], byte 1
     jne .next_byte
-    
+
     mov dx, [cursor_pos]
     cmp dx, bx
     jne .next_byte
-    
+
     ; Показать редактируемый байт
     push ax
     mov al, '['
@@ -400,13 +400,13 @@ display_ui:
 .skip_advance:
     pop cx
     loop .hex_bytes
-    
+
     ; ASCII представление
     mov al, ' '
     call print_char
     mov al, '|'
     call print_char
-    
+
     pop bx ; Восстановить начало строки
     push bx
     mov cx, 16
@@ -429,12 +429,12 @@ display_ui:
     mov dx, [cursor_pos]
     cmp dx, bx
     jne .normal_ascii
-    
-    mov ah, 0x02 
+
+    mov ah, 0x02
     mov bl, 0x0A ; Зеленый
     int 21h
     call print_char
-    mov ah, 0x02 
+    mov ah, 0x02
     mov bl, 0x0F ; Белый
     int 21h
     jmp .ascii_next
@@ -445,11 +445,11 @@ display_ui:
 .ascii_next:
     inc bx
     loop .ascii_bytes
-    
+
     mov al, '|'
     call print_char
     call print_newline
-    
+
     pop bx
     add bx, 16
     pop di
@@ -457,17 +457,17 @@ display_ui:
     pop cx
     dec cx
     jnz .hex_loop
-    
+
     ; Статус бар
     cmp [edit_mode], byte 1
     je .edit_status
-    
+
     ; Стандартный статус
     mov si, help_msg
     call print_string
     call print_newline
     ret
-    
+
 .edit_status:
     mov si, edit_help_msg
     call print_string
@@ -655,7 +655,7 @@ string_append:
     mov cx, -1
     repne scasb
     dec di ; Вернуться на терминатор
-    
+
     ; Скопировать добавляемую строку
 .append_loop:
     lodsb
@@ -673,10 +673,10 @@ int_to_string:
     add di, 6 ; Буфер на 7 символов
     mov byte [di], 0 ; Терминатор
     dec di
-    
+
     mov cx, 10 ; Основание системы
     mov bx, 0 ; Счетчик цифр
-    
+
 .convert_loop:
     xor dx, dx
     div cx
@@ -684,10 +684,10 @@ int_to_string:
     mov [di], dl
     dec di
     inc bx
-    
+
     test ax, ax
     jnz .convert_loop
-    
+
     ; Сдвинуть результат в начало буфера
     mov si, di
     inc si
@@ -695,7 +695,7 @@ int_to_string:
     mov cx, bx
     rep movsb
     mov byte [di], 0
-    
+
     popa
     mov ax, num_buffer
     ret

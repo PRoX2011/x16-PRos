@@ -10,121 +10,121 @@
 
 start:
     pusha
-    
+
     mov ah, 0x05
     int 0x21
-    
-    mov cx, 0  
-    
+
+    mov cx, 0
+
 .print_loop:
     mov ah, 0x0E
-    mov al, cl                    
-    mov bl, 0x0F           
-    int 0x10
-    
-    mov ah, 0x01
-    mov si, .sep
-    int 0x21
-    
-    inc cx
-    cmp cx, 256
-    je .done
-    
-    mov ah, 0x0E
-    mov al, cl                    
+    mov al, cl
+    mov bl, 0x0F
     int 0x10
 
     mov ah, 0x01
     mov si, .sep
     int 0x21
-    
+
     inc cx
     cmp cx, 256
     je .done
-    
+
     mov ah, 0x0E
-    mov al, cl                    
+    mov al, cl
     int 0x10
 
     mov ah, 0x01
     mov si, .sep
     int 0x21
-    
+
     inc cx
     cmp cx, 256
     je .done
-    
+
     mov ah, 0x0E
-    mov al, cl                    
+    mov al, cl
     int 0x10
 
     mov ah, 0x01
     mov si, .sep
     int 0x21
-    
+
     inc cx
     cmp cx, 256
     je .done
-    
+
     mov ah, 0x0E
-    mov al, cl                    
+    mov al, cl
     int 0x10
 
     mov ah, 0x01
     mov si, .sep
     int 0x21
-    
+
     inc cx
     cmp cx, 256
     je .done
-    
+
     mov ah, 0x0E
-    mov al, cl                    
+    mov al, cl
     int 0x10
 
     mov ah, 0x01
     mov si, .sep
     int 0x21
-    
+
     inc cx
     cmp cx, 256
     je .done
-    
+
     mov ah, 0x0E
-    mov al, cl                    
+    mov al, cl
     int 0x10
 
     mov ah, 0x01
     mov si, .sep
     int 0x21
-    
+
     inc cx
     cmp cx, 256
     je .done
-    
+
     mov ah, 0x0E
-    mov al, cl                    
+    mov al, cl
     int 0x10
 
     mov ah, 0x01
     mov si, .sep
     int 0x21
-    
+
     inc cx
     cmp cx, 256
     je .done
-    
+
     mov ah, 0x0E
-    mov al, cl                    
+    mov al, cl
     int 0x10
-    
+
+    mov ah, 0x01
+    mov si, .sep
+    int 0x21
+
+    inc cx
+    cmp cx, 256
+    je .done
+
+    mov ah, 0x0E
+    mov al, cl
+    int 0x10
+
     mov ah, 0x05
     int 0x21
 
     inc cx
     cmp cx, 256
     jb .print_loop
-    
+
 .done:
     mov ah, 0x05
     int 0x21
@@ -133,7 +133,7 @@ start:
     int 0x21
 
     popa
-    
+
     ret
 
 .sep db '  ', 0

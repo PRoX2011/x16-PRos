@@ -176,5 +176,5 @@ The BPB defines the FAT12 file system parameters:
 
 The x16-PRos bootloader is licensed under the MIT License. See the LICENSE.TXT for details.
 
-**Author**: PRoX (https://github.com/PRoX2011)  
-**Version**: 0.4  
+**Author**: PRoX (https://github.com/PRoX2011)
+**Version**: 0.4
