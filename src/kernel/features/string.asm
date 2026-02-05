@@ -305,8 +305,8 @@ string_input_string:
     jmp .handle_history_scroll_up_loop
 
 .handle_history_scroll_up_done:
-    call string_get_cursor_pos
-    mov word [.cursor_col], dx
+    ; call string_get_cursor_pos
+    ; mov word [.cursor_col], dx
     jmp .read_loop
 
 
@@ -349,9 +349,8 @@ string_input_string:
     jmp .handle_history_scroll_down_loop
 
 .handle_history_scroll_down_done:
-
-    call string_get_cursor_pos
-    mov word [.cursor_col], dx
+    ; call string_get_cursor_pos
+    ; mov word [.cursor_col], dx
     jmp .read_loop
 
 .handle_history_scroll_down_history_exit:
@@ -375,8 +374,8 @@ string_input_string:
     jmp .handle_history_scroll_down_clear_loop_exit
 
 .handle_history_scroll_down_clear_loop_done:
-    call string_get_cursor_pos
-    mov word [.cursor_col], dx
+    ; call string_get_cursor_pos
+    ; mov word [.cursor_col], dx
     jmp .read_loop
 
 .handle_backspace:
