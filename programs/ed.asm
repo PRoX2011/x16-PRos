@@ -35,7 +35,6 @@ open_file:
     int 0x22
     jc err_file_not_be_opened
     
-    
     mov di, text_help_command
     call strcmp
     cmp ax, 0
@@ -65,6 +64,34 @@ open_file:
         int 0x21
     ; ================================
 
+    mov si, file_text_buffer
+get_line_end_type_loop:
+    cmp byte [si], 0x0A
+    je .mb_lf
+    cmp byte [si], 0x0D
+    je .mb_cr
+    inc si
+    jmp get_line_end_type_loop
+
+.mb_lf:
+    cmp byte [si + 1], 0x0D
+    je .is_crlf
+    jmp .is_lf
+
+.mb_cr:
+    cmp byte [si + 1], 0x0A
+    je .is_crlf
+    mov si, err_text_invalid_end_of_line
+    mov ah, 0x01
+    int 0x21
+
+.is_crlf:
+    or byte [flags], 0b10
+    jmp .end
+.is_lf:
+    and byte [flags], 0b11111101
+
+.end:
     call save_buffer_for_undo
     call split_text_by_lines
 

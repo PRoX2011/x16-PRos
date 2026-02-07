@@ -91,12 +91,12 @@ command_w:
     mov ah, 0x03
     int 0x22
 
-    or byte [flags], 1 ; set bit of saving buffer
+    or byte [flags], 0b00000001 ; set bit of saving buffer
     jmp command_loop
 
 
 command_q:
-    test byte [flags], 1
+    test byte [flags], 0b00000001
     jnz exit_prog
     mov si, comm_text_buf_not_saved
     mov ah, 0x01
@@ -175,20 +175,26 @@ command_p:
     int 0x10
 
     cmp al, 0x0A  ; al == '\n'
-    je .to_next_line
+    je .to_next_line_lf
     cmp al, 0x0D  ; al == '\r'
-    je .to_next_line
+    je .to_next_line_cr
     cmp al, 0
     je .end
 
     inc si
     jmp .print_char
 
-.to_next_line:
-    mov ax, [si + 1]
+.to_next_line_cr:
     mov ah, 0x0E
+    mov al, 0x0A
+    int 0x10
+    jmp .to_next_line
+.to_next_line_lf:
+    mov ah, 0x0E
+    mov al, 0x0D
     int 0x10
 
+.to_next_line
     add di, 2
     inc cx
 
@@ -393,10 +399,8 @@ command_a:
     inc di
     jmp .shift_char
 .shift_end:
-    mov byte [di], 0x0A
-    mov byte [di + 1], 0x0D
-    mov byte [di + 2], 0
-    add di, 2
+    call put_NL
+    mov byte [di], 0
     jmp .get_text_prelude
 
 .get_text_char:
@@ -418,8 +422,7 @@ command_a:
     jmp .get_text_char
 
 .push_enter:
-    mov byte [di], 0x0A
-    mov byte [di + 1], 0x0D
+    call put_NL
     xchg ah, dh
     mov bx, 0x0F
     mov al, 0x0A
@@ -427,7 +430,6 @@ command_a:
     mov al, 0x0D
     int 0x10
     xchg ah, dh
-    add di, 2
     add cx, 2
     jmp .get_text_char
 
@@ -436,9 +438,11 @@ command_a:
     jb .push_enter
     cmp byte [di - 1], 0x2E  ; .
     jne .push_enter
-    cmp byte [di - 2], 0x0D  ; \n
-    jne .push_enter
-    jmp .restore_text
+    cmp byte [di - 2], 0x0D  ; \r
+    je .restore_text
+    cmp byte [di - 2], 0x0A  ; \n
+    je .restore_text
+    jmp .push_enter
 
 .bs_handle:
     mov ah, 0x0E
@@ -528,7 +532,7 @@ command_A:
     dec bx
     shl bx, 1
     mov di, [text_lines_buffer + bx]
-.get_text_prelude
+.get_text_prelude:
     push cx
     mov cx, 0
     mov dh, 0x0E
@@ -552,8 +556,7 @@ command_A:
     jmp .get_text_char
 
 .push_enter:
-    mov byte [di], 0x0A
-    mov byte [di + 1], 0x0D
+    call put_NL
     xchg ah, dh
     mov bx, 0x0F
     mov al, 0x0A
@@ -561,7 +564,6 @@ command_A:
     mov al, 0x0D
     int 0x10
     xchg ah, dh
-    add di, 2
     add cx, 2
     jmp .get_text_char
 
@@ -570,9 +572,11 @@ command_A:
     jb .push_enter
     cmp byte [di - 1], 0x2E  ; .
     jne .push_enter
-    cmp byte [di - 2], 0x0D  ; \n
-    jne .push_enter
-    jmp .restore_text
+    cmp byte [di - 2], 0x0D  ; \r
+    je .restore_text
+    cmp byte [di - 2], 0x0A  ; \n
+    je .restore_text
+    jmp .push_enter
 
 .bs_handle:
     mov ah, 0x0E

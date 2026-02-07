@@ -238,7 +238,7 @@ programs=(
     "programs/tetris.asm TETRIS.BIN"
     "programs/chars.asm CHARS.BIN"
     "programs/eye.asm EYE.BIN"
-    "programs/ed.asm ED.BIN"
+    "programs/ed.asm ED.BIN programs/ed-comands.asm programs/ed-common.asm"
 )
 
 for prog in "${programs[@]}"; do
@@ -246,7 +246,21 @@ for prog in "${programs[@]}"; do
     bin_name=$(echo $prog | cut -d' ' -f2)
     cash_file=compcash/$(basename $src .asm).cash
 
-    if ! cmp -s $cash_file $src; then
+    dependency_offset=3
+    need_recomp=0
+    if ! cmp -s $cash_file $src; then need_recomp=1; fi
+    while [ -n $(echo $prog | cut -d' ' -f$dependency_offset) ]; do
+        dependency_file=$(echo $prog | cut -d' ' -f$dependency_offset)
+        dependency_cash_file=compcash/$(basename $dependency_file .asm).cash
+        if ! cmp -s $dependency_cash_file $dependency_file; then
+            need_recomp=1
+            break
+        fi
+        ((dependency_offset++))
+    done
+
+
+    if ! cmp -s $cash_file $src || [ $need_recomp == 1 ]; then
         print_info "Compiling $src => bin/$bin_name..."
         nasm -f bin $src -o bin/$bin_name
         check_error "Compilation of $src failed"

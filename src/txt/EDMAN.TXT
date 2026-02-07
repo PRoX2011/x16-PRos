@@ -20,7 +20,7 @@ LINES OPERANDS:
 
 COMANDS:
     COMMAND EFFECTS:
-        comand effects specifing in after slash ('/') before command name
+        comand effects specifing after slash ('/') before command name
 
         e - edit command - changing file_text_buffer, and save it to undo_buffer
                            set buffer_saved flag to 0
