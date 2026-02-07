@@ -2320,6 +2320,7 @@ mt                  db '', 10, 13, 0
 Sides               dw 2
 SecsPerTrack        dw 18
 bootdev             db 0
+current_disk        db 0 
 fmt_date            dw 1
 command_history_top db 0
 

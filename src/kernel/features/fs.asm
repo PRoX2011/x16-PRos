@@ -26,7 +26,6 @@ fs_get_file_list:
     jmp .list_subdir
 
 .list_root_dir:
-    mov eax, 0
     call fs_reset_floppy
 
     mov ax, 19
@@ -357,7 +356,6 @@ fs_load_file:
     mov [.filename_loc], ax
     mov [.load_position], cx
 
-    mov eax, 0
     call fs_reset_floppy
     jnc .floppy_ok
     stc
@@ -1878,7 +1876,7 @@ fs_reset_floppy:
     push ax
     push dx
     mov ax, 0
-    mov dl, [bootdev]
+    mov dl, [current_disk]
     stc
     int 13h
     pop dx
@@ -1902,7 +1900,7 @@ fs_convert_l2hts:
 	mov ch, al
 	pop ax
 	pop bx
-	mov dl, [bootdev]
+	mov dl, [current_disk]
 	ret
 
 fs_free_space:
@@ -2591,7 +2589,6 @@ fs_load_com:
     mov [.com_filename_loc], ax
     mov [.com_load_segment], dx
     mov word [.com_load_offset], 0x0100
-    mov eax, 0
     call fs_reset_floppy
     jnc .floppy_ok
     stc
