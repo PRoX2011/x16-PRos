@@ -52,8 +52,8 @@ BIN_PROGS := \
 	programs/tetris.asm:TETRIS.BIN \
 	programs/chars.asm:CHARS.BIN \
 	programs/eye.asm:EYE.BIN \
-	programs/ed.asm:ED.BIN \
-	programs/game.asm:GAME.BIN
+	programs/ed.asm:ED.BIN 
+	
 
 COM_PROGS := \
 	programs/COM/hello.asm:HELLO.COM \
