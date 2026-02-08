@@ -1,34 +1,33 @@
 ; HEXEDIT.ASM - Hex Editor for x16-PRos OS
 ; Copyright (C) @cuzhima
 ; Usage: hexedit <filename>
+;
+; WARNING: sirbu12 repaired it, but file is still originally created by @cuzhima
 
 [BITS 16]
-[ORG 0x8000] ; Программы загружаются по адресу 0x8000
+[ORG 0x8000]
 
 start:
-    ; Сохраняем параметры (SI указывает на аргументы командной строки)
+    cld                 ; Ensure string operations move forward
     mov [filename_ptr], si
 
-    ; Проверяем наличие аргумента
+    ; Check if filename argument exists
     mov si, [filename_ptr]
     cmp byte [si], 0
     jne .load_file
 
-    ; Нет аргументов - показать ошибку
     mov si, no_args_msg
     call print_string_red
-    int 20h ; Выход
+    int 20h             ; Exit to OS
 
 .load_file:
-    ; Загружаем файл
-    mov ah, 0x02
+    mov ah, 0x02        ; OS function: Load File
     mov si, [filename_ptr]
     mov cx, file_buffer
-    int 22h
+    int 22h             ; OS Interrupt
     jc .load_error
 
-    ; Проверка размера файла (макс 32KB)
-    cmp bx, 32768
+    cmp bx, 32768       ; Max size check (32KB)
     jbe .size_ok
     mov si, file_too_big_msg
     call print_string_red
@@ -41,9 +40,9 @@ start:
     mov [edit_mode], byte 0
     mov [byte_buffer], byte 0
     mov [nibble_flag], byte 0
-    mov [modified_flag], byte 0 ; Флаг изменений
+    mov [modified_flag], byte 0
+    mov [text_attr], byte 0x07 ; Default Light Grey
 
-    ; Главный цикл редактора
 .main_loop:
     call display_ui
     call handle_input
@@ -52,37 +51,36 @@ start:
 .load_error:
     mov si, load_error_msg
     call print_string_red
-    int 20h ; Выход
+    int 20h
 
 ;----------------------------------------------------------
-; ОБРАБОТКА ВВОДА
+; INPUT HANDLING
 ;----------------------------------------------------------
 handle_input:
-    ; Ожидать ввода
     mov ah, 0x00
-    int 16h
+    int 16h             ; BIOS get keystroke
 
     cmp [edit_mode], byte 1
-    je .edit_mode
+    je .edit_mode_logic
 
-    ; Режим навигации
-    cmp ah, 0x48 ; Стрелка вверх
+    ; Navigation Mode
+    cmp ah, 0x48 ; Up
     je .move_up
-    cmp ah, 0x50 ; Стрелка вниз
+    cmp ah, 0x50 ; Down
     je .move_down
-    cmp ah, 0x4B ; Стрелка влево
+    cmp ah, 0x4B ; Left
     je .move_left
-    cmp ah, 0x4D ; Стрелка вправо
+    cmp ah, 0x4D ; Right
     je .move_right
-    cmp al, 0x1B ; Escape
+    cmp al, 0x1B ; Esc
     je .exit
     cmp al, 0x0D ; Enter
     je .start_edit
-    cmp ah, 0x3B ; F1 - Сохранить
+    cmp ah, 0x3B ; F1 Save
     je .save_file
-    cmp ah, 0x3C ; F2 - Отменить изменения
+    cmp ah, 0x3C ; F2 Revert
     je .discard_changes
-    cmp ah, 0x3D ; F3 - Показать справку
+    cmp ah, 0x3D ; F3 Help
     je .show_help
     jmp .done
 
@@ -115,15 +113,10 @@ handle_input:
     jmp .check_view
 
 .check_view:
-    ; Проверить видимость курсора
     mov ax, [cursor_pos]
     mov bx, [view_offset]
-
-    ; Если курсор выше видимой области
     cmp ax, bx
     jb .scroll_up
-
-    ; Если курсор ниже видимой области
     mov dx, bx
     add dx, 256 - 16
     cmp ax, dx
@@ -138,11 +131,10 @@ handle_input:
 
 .scroll_down:
     add bx, 256
-    ; Проверить не выходит ли за размер файла
     mov ax, [file_size]
     sub ax, 256
     jns .set_view
-    xor bx, bx ; Если файл меньше 256 байт
+    xor bx, bx
     jmp .set_view
 
 .set_view:
@@ -150,11 +142,8 @@ handle_input:
     jmp .done
 
 .start_edit:
-    ; Начать редактирование
     mov [edit_mode], byte 1
     mov [nibble_flag], byte 0
-
-    ; Загрузить текущий байт
     mov si, file_buffer
     add si, [cursor_pos]
     mov al, [si]
@@ -162,15 +151,13 @@ handle_input:
     jmp .done
 
 .save_file:
-    ; Сохранить файл
     mov si, [filename_ptr]
     mov bx, file_buffer
     mov cx, [file_size]
-    mov ah, 0x03 ; Функция записи файла
+    mov ah, 0x03        ; OS function: Save File
     int 22h
     jc .save_error
-
-    mov [modified_flag], byte 0 ; Сбросить флаг изменений
+    mov [modified_flag], byte 0
     mov si, save_success_msg
     call print_string_green
     mov cx, 30
@@ -185,16 +172,9 @@ handle_input:
     jmp .done
 
 .discard_changes:
-    ; Перезагрузить файл
-    mov si, [filename_ptr]
-    mov cx, file_buffer
-    mov ah, 0x02
-    int 22h
-    mov [modified_flag], byte 0 ; Сбросить флаг изменений
-    jmp .done
+    jmp start.load_file ; Fixed jump to outer scope label
 
 .show_help:
-    ; Показать справку (упрощенная версия)
     mov si, help_extended_msg
     call print_string_cyan
     mov cx, 100
@@ -202,33 +182,27 @@ handle_input:
     jmp .done
 
 .exit:
-    int 0x19
+    int 0x19            ; Warm reboot or return to OS
 
 .done:
     ret
 
-; Режим редактирования
-.edit_mode:
-    cmp al, 0x1B ; Escape
+.edit_mode_logic:
+    cmp al, 0x1B ; Esc
     je .cancel_edit
     cmp al, 0x0D ; Enter
     je .finish_edit
     cmp al, 0x08 ; Backspace
     je .backspace
 
-    ; Проверить hex-цифру
     call is_hex_digit
     jnc .done_edit
-
-    ; Преобразовать в число
     call char_to_hex
 
-    ; Обновить байт
     mov bl, [byte_buffer]
     cmp [nibble_flag], byte 0
     je .high_nibble
 
-    ; Младший ниббл
     and bl, 0xF0
     or bl, al
     mov [byte_buffer], bl
@@ -243,63 +217,54 @@ handle_input:
     mov [nibble_flag], byte 1
 
 .update_byte:
-    ; Обновить в буфере
     mov si, file_buffer
     add si, [cursor_pos]
     mov al, [byte_buffer]
     mov [si], al
-    mov [modified_flag], byte 1 ; Установить флаг изменений
+    mov [modified_flag], byte 1
 
 .done_edit:
     ret
 
 .backspace:
-    ; Сбросить редактирование
     mov [nibble_flag], byte 0
-    jmp .done_edit
+    ret
 
 .finish_edit:
-    ; Завершить редактирование
     mov [edit_mode], byte 0
     mov [nibble_flag], byte 0
-
-    ; Переместить курсор вправо
     mov ax, [cursor_pos]
     inc ax
     cmp ax, [file_size]
     jae .stay
     mov [cursor_pos], ax
     jmp .check_view
-
 .stay:
     dec ax
     mov [cursor_pos], ax
-    jmp .done
+    ret
 
 .cancel_edit:
-    ; Восстановить оригинальный байт
     mov si, file_buffer
     add si, [cursor_pos]
     mov al, [si]
     mov [byte_buffer], al
     mov [edit_mode], byte 0
     mov [nibble_flag], byte 0
-    jmp .done
+    ret
 
 ;----------------------------------------------------------
-; ПОЛЬЗОВАТЕЛЬСКИЙ ИНТЕРФЕЙС
+; UI DISPLAY
 ;----------------------------------------------------------
 display_ui:
-    ; Очистить экран
-    mov ah, 0x06
-    int 21h
+    mov ah, 0x06     ; Clear/Scroll screen
+    mov al, 0        ; Full clear
+    int 21h          ; Note: Adjust this if your OS uses BIOS INT 10h for CLS
 
-    ; Показать заголовок с именем файла
     mov si, [filename_ptr]
     mov di, header_str
     call string_copy
 
-    ; Добавить звездочку если были изменения
     cmp [modified_flag], byte 0
     je .no_modify
     mov si, modified_str
@@ -309,7 +274,6 @@ display_ui:
     mov si, header_str
     call print_string_cyan
 
-    ; Показать размер файла
     mov si, size_prefix
     call print_string
     mov ax, [file_size]
@@ -317,7 +281,6 @@ display_ui:
     mov si, ax
     call print_string
 
-    ; Показать позицию курсора
     mov si, pos_prefix
     call print_string
     mov ax, [cursor_pos]
@@ -326,88 +289,72 @@ display_ui:
     call print_string
     call print_newline
 
-    ; Вывести адреса
     mov si, addr_header
     call print_string_green
     call print_newline
 
-    ; Вывести hex-дамп
-    mov cx, 16 ; 16 строк
-    mov bx, [view_offset] ; Текущее смещение
-    xor di, di ; Счетчик строк
+    mov cx, 16
+    mov bx, [view_offset]
 
 .hex_loop:
     push cx
-    push di
     push bx
 
-    ; Вывести адрес
+    mov [text_attr], byte 0x07
     mov ax, bx
     call print_hex_word
     mov al, ':'
     call print_char
 
-    ; Вывести hex-байты
     mov cx, 16
     mov si, file_buffer
     add si, bx
-    xor di, di ; Счетчик байтов в строке
 
 .hex_bytes:
     push cx
     mov al, ' '
     call print_char
 
-    ; Проверить позицию курсора
     mov dx, [cursor_pos]
     cmp dx, bx
     jne .normal_byte
-
-    ; Это текущая позиция курсора
-    mov ah, 0x02
-    mov bl, 0x0A ; Зеленый
-    int 21h
+    mov [text_attr], byte 0x0A ; Highlight cursor green
 
 .normal_byte:
     lodsb
-    push ax
     call print_hex_byte
-    pop ax
 
-    ; Проверить режим редактирования
     cmp [edit_mode], byte 1
-    jne .next_byte
-
+    jne .restore_color
     mov dx, [cursor_pos]
     cmp dx, bx
-    jne .next_byte
+    jne .restore_color
 
-    ; Показать редактируемый байт
-    push ax
+    ; Show edit preview
     mov al, '['
     call print_char
     mov al, [byte_buffer]
     call print_hex_byte
     mov al, ']'
     call print_char
-    pop ax
-    jmp .skip_advance
+    jmp .next_iter
 
-.next_byte:
+.restore_color:
+    mov [text_attr], byte 0x07
+
+.next_iter:
     inc bx
-    inc di
-
-.skip_advance:
     pop cx
     loop .hex_bytes
 
-    ; ASCII представление
+    ; ASCII Section
+    mov [text_attr], byte 0x07
     mov al, ' '
     call print_char
     mov al, '|'
     call print_char
 
-    pop bx ; Восстановить начало строки
+    pop bx
     push bx
     mov cx, 16
     mov si, file_buffer
@@ -416,33 +363,23 @@ display_ui:
 .ascii_bytes:
     lodsb
     cmp al, 32
-    jb .non_printable
+    jb .dot
     cmp al, 126
-    ja .non_printable
+    ja .dot
     jmp .print_ascii
-
-.non_printable:
+.dot:
     mov al, '.'
-
 .print_ascii:
-    ; Выделение текущего символа
     mov dx, [cursor_pos]
     cmp dx, bx
-    jne .normal_ascii
-
-    mov ah, 0x02
-    mov bl, 0x0A ; Зеленый
-    int 21h
+    jne .norm_ascii
+    mov [text_attr], byte 0x0A
     call print_char
-    mov ah, 0x02
-    mov bl, 0x0F ; Белый
-    int 21h
-    jmp .ascii_next
-
-.normal_ascii:
+    mov [text_attr], byte 0x07
+    jmp .a_next
+.norm_ascii:
     call print_char
-
-.ascii_next:
+.a_next:
     inc bx
     loop .ascii_bytes
 
@@ -452,33 +389,23 @@ display_ui:
 
     pop bx
     add bx, 16
-    pop di
-    inc di
     pop cx
     dec cx
     jnz .hex_loop
 
-    ; Статус бар
-    cmp [edit_mode], byte 1
-    je .edit_status
-
-    ; Стандартный статус
     mov si, help_msg
-    call print_string
-    call print_newline
-    ret
-
-.edit_status:
+    cmp [edit_mode], byte 1
+    jne .print_status
     mov si, edit_help_msg
+.print_status:
     call print_string
     call print_newline
     ret
 
 ;----------------------------------------------------------
-; ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+; HELPERS
 ;----------------------------------------------------------
 print_hex_word:
-    ; AX = число для печати
     push ax
     mov al, ah
     call print_hex_byte
@@ -487,7 +414,6 @@ print_hex_word:
     ret
 
 print_hex_byte:
-    ; AL = число для печати
     push ax
     shr al, 4
     call print_hex_digit
@@ -499,91 +425,61 @@ print_hex_byte:
     ret
 
 print_hex_digit:
-    ; AL = цифра (0-15)
     cmp al, 9
     jg .letter
     add al, '0'
-    jmp .print
+    jmp .p
 .letter:
     add al, 'A' - 10
-.print:
+.p:
     call print_char
     ret
 
 print_char:
-    ; AL = символ
     pusha
     mov ah, 0x0E
-    mov bx, 0007h ; Цвет по умолчанию
-    int 10h
+    mov bh, 0x00
+    mov bl, [text_attr]
+    int 10h             ; BIOS TTY Output
     popa
     ret
 
 print_string:
-    ; SI = указатель на строку
     pusha
     mov ah, 0x0E
-    mov bx, 0007h ; Белый на черном
-.print_loop:
+    mov bx, 0007h
+.l:
     lodsb
     test al, al
-    jz .done
+    jz .d
     int 10h
-    jmp .print_loop
-.done:
+    jmp .l
+.d:
     popa
     ret
 
 print_string_red:
-    ; SI = указатель на строку
-    pusha
-    mov ah, 0x0E
-    mov bx, 0004h ; Красный на черном
-.print_loop:
-    lodsb
-    test al, al
-    jz .done
-    int 10h
-    jmp .print_loop
-.done:
-    popa
+    mov byte [text_attr], 0x04
+    call print_string
+    mov byte [text_attr], 0x07
     ret
 
 print_string_green:
-    ; SI = указатель на строку
-    pusha
-    mov ah, 0x0E
-    mov bx, 0002h ; Зеленый на черном
-.print_loop:
-    lodsb
-    test al, al
-    jz .done
-    int 10h
-    jmp .print_loop
-.done:
-    popa
+    mov byte [text_attr], 0x02
+    call print_string
+    mov byte [text_attr], 0x07
     ret
 
 print_string_cyan:
-    ; SI = указатель на строку
-    pusha
-    mov ah, 0x0E
-    mov bx, 0003h ; Голубой на черном
-.print_loop:
-    lodsb
-    test al, al
-    jz .done
-    int 10h
-    jmp .print_loop
-.done:
-    popa
+    mov byte [text_attr], 0x03
+    call print_string
+    mov byte [text_attr], 0x07
     ret
 
 print_newline:
     pusha
     mov ah, 0x0E
     mov al, 0x0D
-    mov bx, 0007h
     int 10h
     mov al, 0x0A
     int 10h
@@ -591,139 +487,114 @@ print_newline:
     ret
 
 is_hex_digit:
-    ; AL = символ
     cmp al, '0'
-    jb .not_hex
+    jb .n
     cmp al, '9'
-    jbe .is_hex
+    jbe .y
     cmp al, 'A'
-    jb .not_hex
+    jb .n
     cmp al, 'F'
-    jbe .is_hex
+    jbe .y
     cmp al, 'a'
-    jb .not_hex
+    jb .n
     cmp al, 'f'
-    jbe .is_hex
-.not_hex:
-    clc
+    jbe .y
+.n: clc
     ret
-.is_hex:
-    stc
+.y: stc
     ret
 
 char_to_hex:
-    ; AL = hex символ
     cmp al, '9'
-    jle .digit
+    jle .dig
     cmp al, 'F'
-    jle .upper
-    sub al, 'a' - 10 ; a-f
+    jle .up
+    sub al, 'a' - 10
     ret
-.upper:
-    sub al, 'A' - 10 ; A-F
+.up: sub al, 'A' - 10
     ret
-.digit:
-    sub al, '0' ; 0-9
+.dig: sub al, '0'
     ret
 
 delay:
-    ; CX = время ожидания (примерно 1 единица = 1 мс)
     pusha
+    xor dx, dx          ; DX must be 0 for short delays in INT 15h
     mov ah, 0x86
     int 15h
     popa
     ret
 
-; Копирование строки
 string_copy:
-    ; SI = источник, DI = назначение
     pusha
-.copy_loop:
-    lodsb
+.c: lodsb
     stosb
     test al, al
-    jnz .copy_loop
+    jnz .c
     popa
     ret
 
-; Конкатенация строк
 string_append:
-    ; SI = добавляемая строка, DI = целевая строка
     pusha
-    ; Найти конец целевой строки
-    mov al, 0
+    xor al, al
     mov cx, -1
     repne scasb
-    dec di ; Вернуться на терминатор
-
-    ; Скопировать добавляемую строку
-.append_loop:
-    lodsb
+    dec di
+.a: lodsb
     stosb
     test al, al
-    jnz .append_loop
+    jnz .a
     popa
     ret
 
-; Преобразование числа в строку
 int_to_string:
-    ; AX = число
     pusha
     mov di, num_buffer
-    add di, 6 ; Буфер на 7 символов
-    mov byte [di], 0 ; Терминатор
+    add di, 6
+    mov byte [di], 0
     dec di
-
-    mov cx, 10 ; Основание системы
-    mov bx, 0 ; Счетчик цифр
-
-.convert_loop:
+    mov cx, 10
+.conv:
     xor dx, dx
     div cx
     add dl, '0'
     mov [di], dl
     dec di
-    inc bx
-
     test ax, ax
-    jnz .convert_loop
-
-    ; Сдвинуть результат в начало буфера
+    jnz .conv
+    inc di
     mov si, di
-    inc si
     mov di, num_buffer
-    mov cx, bx
-    rep movsb
-    mov byte [di], 0
-
+.mv: lodsb
+    stosb
+    test al, al
+    jnz .mv
     popa
     mov ax, num_buffer
     ret
 
 ;----------------------------------------------------------
-; ДАННЫЕ
+; DATA
 ;----------------------------------------------------------
 filename_ptr dw 0
 file_size dw 0
 cursor_pos dw 0
 view_offset dw 0
-edit_mode db 0 ; 0=навигация, 1=редактирование
+edit_mode db 0
 byte_buffer db 0
-nibble_flag db 0 ; 0=старший ниббл, 1=младший
-modified_flag db 0 ; 0=не изменен, 1=изменен
+nibble_flag db 0
+modified_flag db 0
+text_attr db 0x07
 
-; Сообщения
-no_args_msg db 'Error: No arguments!    Usage: hexedit <filename>', 0
-load_error_msg db 'Error loading file', 0
-file_too_big_msg db 'Error: File >32KB!', 0
-save_success_msg db 'File saved!', 0
-save_error_msg db 'Save error!', 0
+no_args_msg db 'Error: No filename provided!', 0
+load_error_msg db 'Error: Could not load file!', 0
+file_too_big_msg db 'Error: File exceeds 32KB!', 0
+save_success_msg db 'File saved successfully!', 0
+save_error_msg db 'Error: Save failed!', 0
 modified_str db ' *', 0
 
-; Строки интерфейса
-help_msg db 'Arrows:Navigate  Enter:Edit  F1:Save  F2:Revert  F3:Help  Esc:Exit', 0
-edit_help_msg db 'Edit: Hex digits  Enter:Accept  Esc:Cancel', 0
-help_extended_msg db 'Hex Editor Help: Arrows navigate, Enter edit, F1 save, F2 revert changes, Esc exit', 0
+help_msg db 'Arrows:Move Enter:Edit F1:Save F2:Reload Esc:Exit', 0
+edit_help_msg db 'HEX:Input Enter:Finish Esc:Abort', 0
+help_extended_msg db 'HexEdit 1.0 - Use Hex keys to modify data.', 0
 
 header_str times 32 db 0
 size_prefix db 'Size:', 0
@@ -731,5 +602,4 @@ pos_prefix db ' Pos:', 0
 addr_header db 'Offset  00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F  ASCII', 0
 num_buffer times 8 db 0
 
-; Буфер для файла (32 КБ)
 file_buffer:
