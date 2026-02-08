@@ -23,6 +23,7 @@ start:
     call set_video_mode        ; Set video mode
     call init_system           ; Init system (segments, timer, api, configs, display, security, start autoexec)
     call load_and_apply_theme  ; Load and aply theme from THEME.CFG file
+    call fs_list_drives
     call shell                 ; Start PRos terminal
 
     jmp $
@@ -158,6 +159,16 @@ print_decimal:
     dec cx
     jmp .print_char
 .return:
+    ret
+
+print_drive_prefix:
+    mov ah, 0x0E
+    mov al, [current_drive_char]
+    int 0x10
+    mov al, ':'
+    int 0x10
+    mov al, '/'
+    int 0x10
     ret
 
 print_interface:
@@ -315,49 +326,49 @@ get_cmd:
 
     ; append input to command history
     pusha
-        xor bx, bx
-        mov bl, [command_history_top]
-        cmp bx, 0
-        je .save_input_to_history_done
-        dec bl
-        cmp bx, 15
-        je .shift_last_skip
-        shl bx, 8
-        jmp .shift_history_element_loop
+    xor bx, bx
+    mov bl, [command_history_top]
+    cmp bx, 0
+    je .save_input_to_history_done
+    dec bl
+    cmp bx, 15
+    je .shift_last_skip
+    shl bx, 8
+    jmp .shift_history_element_loop
 .shift_last_skip:
-        dec bx
-        shl bx, 8
+    dec bx
+    shl bx, 8
 .shift_history_element_loop:
-        lea di, [command_history + bx]
-        add bx, 256
-        lea si, [command_history + bx]
+    lea di, [command_history + bx]
+    add bx, 256
+    lea si, [command_history + bx]
 .shift_history_shift_char:
-        mov al, [di]
-        mov [si], al
-        cmp al, 0
-        je .shift_history_next_element
-        inc di
-        inc si
-        jmp .shift_history_shift_char
+    mov al, [di]
+    mov [si], al
+    cmp al, 0
+    je .shift_history_next_element
+    inc di
+    inc si
+    jmp .shift_history_shift_char
 
 .shift_history_next_element:
-        cmp bx, 0
-        je .save_input_to_history_done
-        sub bx, 512
-        jmp .shift_history_element_loop
+    cmp bx, 0
+    je .save_input_to_history_done
+    sub bx, 512
+    jmp .shift_history_element_loop
 
 .save_input_to_history_done:
-        inc byte [command_history_top]
-        mov di, command_history
-        mov si, input
+    inc byte [command_history_top]
+    mov di, command_history
+    mov si, input
 .save_input_loop:
-        mov al, [si]
-        mov [di], al
-        cmp al, 0
-        je .save_input_to_history_end
-        inc si
-        inc di
-        jmp .save_input_loop
+    mov al, [si]
+    mov [di], al
+    cmp al, 0
+    je .save_input_to_history_end
+    inc si
+    inc di
+    jmp .save_input_loop
 .save_input_to_history_end:
     popa
 
@@ -381,9 +392,33 @@ get_cmd:
     mov ax, command
     call string_string_uppercase
 
+    ; ============ Drive Change Check (A:, B:, C:) ============
     mov si, command
+    
+    call string_string_length
+    cmp ax, 2
+    jne .not_drive_change
 
+    cmp byte [si+1], ':'
+    jne .not_drive_change
+
+    mov al, [si]
+    call fs_change_drive_letter
+    call print_newline
+    mov si, .success_disk_change_msg
+    call print_string_green
+    call print_newline
+    call print_newline
+    jnc get_cmd
+
+    mov si, bad_drive_msg
+    call print_string_red
+    call print_newline
+    jmp get_cmd
+
+.not_drive_change:
     ; ============ kernel shell comands ============
+    mov si, command
 
     mov di, exit_string
     call string_string_compare
@@ -460,14 +495,6 @@ get_cmd:
     mov di, view_string
     call string_string_compare
     jc near view_bmp
-
-    mov di, head_string
-    call string_string_compare
-    jc near head_file
-
-    mov di, tail_string
-    call string_string_compare
-    jc near tail_file
 
     mov di, mkdir_string
     call string_string_compare
@@ -558,6 +585,9 @@ get_cmd:
     ; If not found, try /BIN directory
     call save_current_dir
 
+    mov al, 'A'
+    call fs_change_drive_letter
+
     mov di, temp_saved_dir
     mov si, current_directory
     call string_string_copy
@@ -616,6 +646,8 @@ get_cmd:
     mov si, temp_saved_dir
     call string_string_copy
     jmp total_fail
+
+.success_disk_change_msg db 'Disk changed', 0
 
 ; ============ Execute BIN Program ============
 
@@ -1020,8 +1052,7 @@ list_directory:
     jmp .show_path_done
 
 .show_root:
-    mov si, root
-    call print_string
+    call print_drive_prefix
 
 .show_path_done:
     call print_newline
@@ -1565,241 +1596,6 @@ wait_for_key:
 .tmp_buf    dw 0
 
 
-; ===================== HEAD Command =====================
-
-head_file:
-    call print_newline
-    pusha
-
-    mov word si, [param_list]
-    call string_string_parse
-    cmp ax, 0
-    je .show_help
-
-    mov [.filename], ax
-
-    mov ax, [.filename]
-    call fs_file_exists
-    jc .file_not_found
-
-    mov ax, [.filename]
-    mov cx, 32768
-    call fs_load_file
-    jc .load_error
-
-    cmp bx, 0
-    je .empty_file
-
-    mov word [.file_ptr], 32768
-    mov word [.file_size], bx
-    mov word [.lines_printed], 0
-
-.print_loop:
-    cmp word [.lines_printed], 10
-    jge .done
-    cmp word [.file_size], 0
-    je .done
-
-    mov si, [.file_ptr]
-    mov al, [si]
-
-    cmp al, 10
-    je .print_newline
-    cmp al, 13
-    je .skip_char
-    cmp al, 32
-    jb .skip_char
-    cmp al, 126
-    ja .skip_char
-
-    mov ah, 0x0E
-    mov bl, 0x07
-    int 0x10
-    jmp .next_char
-
-.print_newline:
-    inc word [.lines_printed]
-    call print_newline
-    jmp .next_char
-
-.skip_char:
-    jmp .next_char
-
-.next_char:
-    inc word [.file_ptr]
-    dec word [.file_size]
-    jmp .print_loop
-
-.done:
-    call print_newline
-    popa
-    jmp get_cmd
-
-.show_help:
-    mov si, .help_msg
-    call print_string
-    call print_newline
-    jmp .done
-
-.file_not_found:
-    mov si, notfound_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.load_error:
-    mov si, .load_error_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.empty_file:
-    mov si, .empty_file_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.filename        dw 0
-.file_ptr        dw 0
-.file_size       dw 0
-.lines_printed   dw 0
-
-.help_msg          db 'Usage: head <filename>', 10, 13
-.load_error_msg    db 'Error loading file', 0
-.empty_file_msg    db 'File is empty', 0
-
-
-; ===================== TAIL Command Implementation =====================
-
-tail_file:
-    call print_newline
-    pusha
-
-    mov word si, [param_list]
-    call string_string_parse
-    cmp ax, 0
-    je .show_help
-
-    mov [.filename], ax
-
-    mov ax, [.filename]
-    call fs_file_exists
-    jc .file_not_found
-
-    mov ax, [.filename]
-    mov cx, 32768
-    call fs_load_file
-    jc .load_error
-
-    cmp bx, 0
-    je .empty_file
-
-    mov word [.file_start], 32768
-    mov word [.file_size], bx
-    mov word [.file_end], 32768
-    add [.file_end], bx
-    mov word [.lines_to_show], 10
-    mov word [.lines_found], 0
-
-    mov si, [.file_end]
-    dec si
-
-.find_lines:
-    mov ax, [.lines_found]
-    cmp ax, [.lines_to_show]
-    jge .found_all_lines
-    cmp si, [.file_start]
-    jb .found_all_lines
-
-    mov al, [si]
-    cmp al, 10
-    jne .continue_search
-
-    inc word [.lines_found]
-
-.continue_search:
-    dec si
-    jmp .find_lines
-
-.found_all_lines:
-    inc si
-    mov [.print_start], si
-
-    mov si, [.print_start]
-
-.print_loop:
-    cmp si, [.file_end]
-    jge .done
-
-    mov al, [si]
-
-    cmp al, 10
-    je .print_newline
-    cmp al, 13
-    je .skip_char
-    cmp al, 32
-    jb .skip_char
-    cmp al, 126
-    ja .skip_char
-
-    mov ah, 0x0E
-    mov bl, 0x07
-    int 0x10
-    jmp .next_char
-
-.print_newline:
-    call print_newline
-    jmp .next_char
-
-.skip_char:
-    jmp .next_char
-
-.next_char:
-    inc si
-    jmp .print_loop
-
-.done:
-    call print_newline
-    popa
-    jmp get_cmd
-
-.show_help:
-    mov si, .help_msg
-    call print_string
-    call print_newline
-    jmp .done
-
-.file_not_found:
-    mov si, notfound_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.load_error:
-    mov si, .load_error_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.empty_file:
-    mov si, .empty_file_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.filename        dw 0
-.file_start      dw 0
-.file_end        dw 0
-.file_size       dw 0
-.print_start     dw 0
-.lines_to_show   dw 10
-.lines_found     dw 0
-
-.help_msg          db 'Usage: tail <filename>', 10, 13
-.load_error_msg    db 'Error loading file', 0
-.empty_file_msg    db 'File is empty', 0
-
-
 mkdir_command:
     call print_newline
     pusha
@@ -2054,8 +1850,7 @@ cd_command:
     cmp byte [current_directory], 0
     jne .show_path
 
-    mov si, root
-    call print_string_cyan
+    call print_drive_prefix
     jmp .show_done
 
 .show_path:
@@ -2156,8 +1951,6 @@ kshell_comands db 'HELP               - get list of commands', 10, 13
                db 'TOUCH  <f>         - create empty file', 10, 13
                db 'WRITE  <f> <text>  - write to file', 10, 13
                db 'VIEW   <f> <flags> - view BMP image', 10, 13
-               db 'HEAD   <f>         - first 10 lines of TXT', 10, 13
-               db 'TAIL   <f>         - last 10 lines of TXT', 10, 13
                db 'CD     <dir>       - change directory', 10, 13
                db 'MKDIR  <dir>       - create directory', 10, 13
                db 'DELDIR <dir>       - delete directory', 10, 13
@@ -2199,8 +1992,6 @@ cpu_string     db 'CPU', 0
 touch_string   db 'TOUCH', 0
 write_string   db 'WRITE', 0
 view_string    db 'VIEW', 0
-head_string    db 'HEAD', 0
-tail_string    db 'TAIL', 0
 mkdir_string   db 'MKDIR', 0
 deldir_string  db 'DELDIR', 0
 cd_string      db 'CD', 0
@@ -2215,6 +2006,7 @@ kern_warn_msg     db 'Cannot execute kernel file!', 0
 kern_warn2_msg    db 'Cannot delete kernel file!', 0
 notext_msg        db 'No text provided for writing', 0
 APM_error_msg     db "APM error or APM not available",0
+bad_drive_msg     db 'Drive not ready or does not exist!', 0
 
 ; ------ CPU info ------
 flags_str          db '  FLAGS: ', 0
@@ -2249,7 +2041,6 @@ time_msg  db 'Current time: ', 0
 date_msg  db 'Current date: ', 0
 
 files_msg db ' files', 0
-root      db 'A:/', 0
 
 ; ------ Sounds ------
 start_melody:
@@ -2310,6 +2101,7 @@ cfg_logo_stretch     db 0  ; 1 = Stretch, 0 = Centered
 bin_dir_name         db 'BIN.DIR', 0
 conf_dir_name        db 'CONF.DIR', 0
 
+current_drive_char db 'A'
 
 login_password_prompt  db 19 dup(' '), 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                        db 19 dup(' '), 0xBA, '        Enter your password:           ', 0xBA, 10, 13
@@ -2324,6 +2116,9 @@ current_disk        db 0
 fmt_date            dw 1
 command_history_top db 0
 
+saved_disk          db 0
+saved_drive_char    db 0
+
 ; ------ Buffers ------
 current_logo_file resb 13
 tmp_string        resb 15
@@ -2335,6 +2130,7 @@ timezone          resb 32
 saved_directory   resb 32
 final_prompt      resb 64
 temp_prompt       resb 64
+save_dir_buffer   resb 128 
 input             resb 256
 current_directory resb 256
 temp_saved_dir    resb 256

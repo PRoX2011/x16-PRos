@@ -8,6 +8,7 @@ init_system:
     cld
 
     call init_segments
+    call init_disks
     call init_timer
     call init_api
     call init_configs
@@ -22,6 +23,17 @@ init_segments:
     mov es, ax
 
     mov si, segment_init_msg
+    call log_okay
+
+    ret
+
+init_disks:
+    call fs_init_drives
+
+    mov al, 'A'
+    call fs_change_drive_letter
+
+    mov si, disk_init_msg
     call log_okay
 
     ret
@@ -891,6 +903,7 @@ load_password_cfg:
 
 ; Initialization messages
 segment_init_msg         db 'Segment initialization', 0
+disk_init_msg            db 'Disks initialisation', 0
 timer_init_msg           db 'Timer initialization', 0
 api_init_msg             db 'API initialization', 0
 api_output_init_msg      db 'Output API (INT 0x21)', 0

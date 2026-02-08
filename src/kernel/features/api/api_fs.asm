@@ -20,6 +20,7 @@
 ;   0x0E: Save current directory
 ;   0x0F: Restore current directory
 ;   0x10: Load huge file (SI = filename, CX = load offset (position), DX = load segment address)
+;   0x11: List drives
 ; ==================================================================
 
 [BITS 16]
@@ -84,6 +85,8 @@ int22_handler:
     je .restore_directory
     cmp al, 0x10
     je .load_huge_file
+    cmp al, 0x11
+    je .list_drives
     stc
     jmp .done
 
@@ -188,6 +191,10 @@ int22_handler:
     call fs_load_huge_file
     jmp .done
 
+.list_drives:
+    call fs_list_drives
+    jmp .done
+    
 .done:
     pop es
     pop ds

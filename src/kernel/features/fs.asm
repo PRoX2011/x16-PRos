@@ -2014,12 +2014,12 @@ fs_create_directory:
     call fs_write_fat
     jc .failure
 
-    mov di, 32768
+    mov di, disk_buffer
     mov cx, 512
     xor ax, ax
     rep stosb
 
-    mov di, 32768
+    mov di, disk_buffer
     mov byte [di], '.'
     mov cx, 10
     mov al, ' '
@@ -2033,7 +2033,7 @@ fs_create_directory:
     mov ax, [.cluster]
     mov word [di], ax
 
-    mov di, 32768 + 32
+    mov di, disk_buffer + 32
     mov byte [di], '.'
     mov byte [di+1], '.'
     mov cx, 9
@@ -2051,7 +2051,7 @@ fs_create_directory:
     mov ax, [.cluster]
     add ax, 31
     call fs_convert_l2hts
-    mov bx, 32768
+    mov bx, disk_buffer
     mov ah, 3
     mov al, 1
     stc
@@ -2320,14 +2320,14 @@ fs_remove_directory:
     add ax, 31
     call fs_convert_l2hts
 
-    mov bx, 32768
+    mov bx, disk_buffer
     mov ah, 2
     mov al, 1
     stc
     int 13h
     jc .failure
 
-    mov si, 32768 + 64
+    mov si, disk_buffer + 64
     mov cx, 14
 
 .check_empty_loop:
@@ -2475,25 +2475,39 @@ fs_parent_directory:
 
 save_current_dir:
     pusha
+    mov al, [current_disk]
+    mov [saved_disk], al
+    mov al, [current_drive_char]
+    mov [saved_drive_char], al
+
     mov si, current_directory
-    mov di, saved_directory
-.copy:
+    mov di, save_dir_buffer
+.copy_path:
     lodsb
     stosb
     cmp al, 0
-    jne .copy
+    jne .copy_path
+    
     popa
     ret
 
 restore_current_dir:
     pusha
-    mov si, saved_directory
+    mov al, [saved_disk]
+    mov [current_disk], al
+    mov al, [saved_drive_char]
+    mov [current_drive_char], al
+
+    call fs_update_geometry
+
+    mov si, save_dir_buffer
     mov di, current_directory
-.copy:
+.copy_path:
     lodsb
     stosb
     cmp al, 0
-    jne .copy
+    jne .copy_path
+
     popa
     ret
 
@@ -2756,3 +2770,236 @@ fs_load_com:
 .com_file_size dw 0
 .com_cluster dw 0
 .com_current_cluster dw 0
+
+; ==================================================================
+; FS_INIT_DRIVES - Detects available drives
+; OUT: Fills internal structures
+; ==================================================================
+fs_init_drives:
+    pusha
+    mov byte [drive_count], 0
+    mov di, drives_table
+
+    mov dl, 0x00
+    call .check_drive
+    jc .check_floppy_b
+    call .add_drive_a
+
+.check_floppy_b:
+    mov dl, 0x01
+    call .check_drive
+    jc .check_hdd_c
+    call .add_drive_b
+
+.check_hdd_c:
+    mov dl, 0x80
+    call .check_drive
+    jc .done_init
+    call .add_drive_c
+
+.done_init:
+    call fs_reset_floppy 
+    popa
+    ret
+
+.check_drive:
+    push es
+    push di
+    
+    mov ah, 08h
+    mov al, 0
+    int 13h
+    
+    pop di
+    pop es
+    ret
+
+.add_drive_a:
+    mov byte [di], 'A'
+    mov byte [di+1], 0x00
+    mov byte [di+2], 1 
+    add di, 3
+    inc byte [drive_count]
+    ret
+
+.add_drive_b:
+    mov byte [di], 'B'
+    mov byte [di+1], 0x01
+    mov byte [di+2], 1
+    add di, 3
+    inc byte [drive_count]
+    ret
+
+.add_drive_c:
+    mov byte [di], 'C'
+    mov byte [di+1], 0x80
+    mov byte [di+2], 2
+    add di, 3
+    inc byte [drive_count]
+    ret
+
+; ========================================================================
+; FS_LIST_DRIVES - Prints available drives
+; ========================================================================
+fs_list_drives:
+    call print_newline
+    mov si, .header_msg
+    call print_string_cyan
+    call print_newline
+    mov si, .separator
+    call print_string
+    call print_newline
+
+    mov cx, 0
+    mov cl, [drive_count]
+    mov si, drives_table
+
+.list_loop:
+    cmp cx, 0
+    je .done_list
+
+    mov al, [si]
+    mov ah, 0Eh
+    int 10h
+
+    mov ah, 0Eh
+    mov al, ':'
+    int 10h
+
+    push si
+    mov si, .tab
+    call print_string
+    pop si
+
+    cmp byte [si+2], 1
+    je .print_floppy
+    cmp byte [si+2], 2
+    je .print_hdd
+    jmp .next_item
+
+.print_floppy:
+    push si
+    mov si, .type_floppy
+    call print_string
+    pop si
+    jmp .next_item
+
+.print_hdd:
+    push si
+    mov si, .type_hdd
+    call print_string
+    pop si
+
+.next_item:
+    push si
+    call print_newline
+    pop si
+    add si, 3
+    dec cx
+    jmp .list_loop
+
+.done_list:
+    call print_newline
+    ret
+
+.header_msg   db 'Drive   Type', 0
+.separator    db '-----   ----', 0
+.tab          db '      ', 0
+.type_floppy  db 'Floppy Disk', 0
+.type_hdd     db 'Hard Disk', 0
+
+; ========================================================================
+; FS_CHANGE_DRIVE_LETTER - Switch drive by letter (AL = Char)
+; IN: AL = Drive letter
+; OUT: CF = 1 if error, 0 if success
+; ========================================================================
+fs_change_drive_letter:
+    pusha
+    
+    cmp al, 'a'
+    jb .find_drive
+    cmp al, 'z'
+    ja .find_drive
+    sub al, 32
+
+.find_drive:
+    mov si, drives_table
+    mov cx, 0
+    mov cl, [drive_count]
+
+.scan_loop:
+    cmp cx, 0
+    je .not_found
+
+    cmp al, [si]
+    je .found
+    add si, 3
+    dec cx
+    jmp .scan_loop
+
+.found:
+    mov bl, [si+1]
+    mov [current_disk], bl
+    mov bl, [si]
+    mov [current_drive_char], bl
+
+    mov byte [current_directory], 0
+    
+    call fs_update_geometry
+
+    popa
+    clc
+    ret
+
+.not_found:
+    popa
+    stc
+    ret
+
+; ========================================================================
+; FS_UPDATE_GEOMETRY - Reads Sector 0 to update Sides/SecsPerTrack
+; ========================================================================
+fs_update_geometry:
+    pusha
+    
+    mov ah, 0
+    mov dl, [current_disk]
+    int 13h
+
+    mov ah, 02h
+    mov al, 1
+    mov ch, 0
+    mov cl, 1
+    mov dh, 0
+    mov dl, [current_disk]
+    mov bx, disk_buffer
+    int 13h
+    jc .error
+
+    mov bx, disk_buffer
+    
+    mov ax, [bx + 24]
+    cmp ax, 0
+    je .keep_default
+    mov [SecsPerTrack], ax
+
+    mov ax, [bx + 26]
+    cmp ax, 0
+    je .keep_default
+    mov [Sides], ax
+
+    popa
+    ret
+
+.error:
+    popa
+    ret
+
+.keep_default:
+    mov word [SecsPerTrack], 18
+    mov word [Sides], 2
+    popa
+    ret
+
+drive_count db 0
+drives_table times 30 db 0

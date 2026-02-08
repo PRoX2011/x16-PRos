@@ -24,4 +24,5 @@ qemu-system-x86_64 \
     -fda disk_img/x16pros.img \
     -machine pcspk-audiodev=snd0 \
     -device adlib,audiodev=snd0 \
-    -audiodev pa,id=snd0
+    -audiodev pa,id=snd0 \
+    -drive format=raw,file=FLOPPY2.img,if=floppy,index=1

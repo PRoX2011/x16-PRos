@@ -6,6 +6,9 @@ load_and_apply_theme:
     pusha
 
     call save_current_dir
+    
+    mov al, 'A'
+    call fs_change_drive_letter
 
     call fs_parent_directory
 

@@ -214,6 +214,9 @@ done
 programs=(
     "programs/help.asm HELP.BIN"
     "programs/grep.asm GREP.BIN"
+    "programs/head.asm HEAD.BIN"
+    "programs/tail.asm TAIL.BIN"
+    "programs/dlist.asm DLIST.BIN"
     "programs/theme.asm THEME.BIN"
     "programs/fetch.asm FETCH.BIN"
     "programs/imfplay.asm IMFPLAY.BIN"
