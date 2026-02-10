@@ -121,6 +121,7 @@ help_menu_1 db 0xC9, 18 dup(0xCD), ' PRos help ', 18 dup(0xCD), 0xBB, 10, 13
      db 0xBA, '  info   - print system information            ', 0xBA, 10, 13
      db 0xBA, '  ver    - print PRos terminal version         ', 0xBA, 10, 13
      db 0xBA, '  cls    - clear terminal                      ', 0xBA, 10, 13
+     db 0xBA, '  hist   - show command history                ', 0xBA, 10, 13
      db 0xBA, '  shut   - shutdown PC                         ', 0xBA, 10, 13
      db 0xBA, '  reboot - restart system                      ', 0xBA, 10, 13
      db 0xBA, '  date   - print current date (DD/MM/YY)       ', 0xBA, 10, 13
