@@ -1100,7 +1100,9 @@ get_cmd:
     rep stosb
 
     mov ax, input
+    mov byte [history_mode_enabled], 1
     call string_input_string
+    mov byte [history_mode_enabled], 0
     call print_newline
 
     mov ax, input
@@ -1110,6 +1112,10 @@ get_cmd:
     cmp byte [si], 0
     je get_cmd
 
+    ; Store non-empty command in history
+    call add_history_entry
+
+process_input:
     mov si, input
     mov al, ' '
     call string_string_tokenize
@@ -1133,6 +1139,10 @@ get_cmd:
     mov di, help_string
     call string_string_compare
     jc near print_help
+
+    mov di, history_string
+    call string_string_compare
+    jc near show_history
 
     mov di, info_string
     call string_string_compare
@@ -1414,6 +1424,210 @@ execute_com:
 
 .com_return:
     jmp int20_handler
+
+; ===================== Command history =====================
+;
+; Maintains a ring buffer of the last 10 commands entered in `input`
+; and allows the user to pick one to re-execute via the HIST command.
+
+show_history:
+    call print_newline
+
+    mov al, [history_count]
+    cmp al, 0
+    jne .has_history
+
+    mov si, history_empty_msg
+    call print_string_yellow
+    call print_newline
+    jmp get_cmd
+
+.has_history:
+    mov si, history_title
+    call print_string
+
+    ; CL = remaining entries to print
+    mov cl, [history_count]
+
+    ; BX = index of most recent entry (history_head - 1 mod 10)
+    mov bl, [history_head]
+    cmp bl, 0
+    jne .head_ok
+    mov bl, 10
+.head_ok:
+    dec bl
+    mov bh, 0
+
+    xor si, si              ; SI = entry number (1..history_count)
+
+.print_loop:
+    cmp cl, 0
+    je .after_list
+
+    inc si                  ; entry number
+
+    ; Print entry number
+    push cx
+    push bx
+    push si
+
+    mov ax, si
+    call string_int_to_string
+    mov si, ax
+    call print_string_cyan
+
+    mov si, history_sep_msg
+    call print_string
+
+    ; Compute pointer to history entry in BX (index 0..9)
+    mov di, history_buffer
+    mov ax, bx
+    shl ax, 6               ; *64 bytes per entry
+    add di, ax
+    mov si, di
+    call print_string
+    call print_newline
+
+    pop si
+    pop bx
+    pop cx
+
+    ; Move BX to previous entry in ring buffer
+    cmp bl, 0
+    jne .dec_index
+    mov bl, 9
+    jmp .index_done
+.dec_index:
+    dec bl
+.index_done:
+
+    dec cl
+    jmp .print_loop
+
+.after_list:
+    ; Ask user to choose entry
+    mov si, history_prompt_msg
+    call print_string
+
+    mov ax, input
+    call string_input_string
+    call print_newline
+
+    mov ax, input
+    call string_string_chomp
+
+    mov si, input
+    cmp byte [si], 0
+    je get_cmd              ; empty -> cancel
+
+    call string_to_int
+
+    cmp ax, 0
+    je get_cmd              ; 0 -> cancel
+
+    mov bx, ax              ; BX = selection
+    mov al, [history_count]
+    cmp bl, al
+    jbe .selection_ok
+
+    ; Invalid selection
+    mov si, history_invalid_msg
+    call print_string_red
+    call print_newline
+    jmp get_cmd
+
+.selection_ok:
+    ; Convert 1-based selection to 0-based offset from newest
+    dec bx                  ; BX = offset from latest (0 = latest)
+
+    ; DL = index of most recent entry
+    mov dl, [history_head]
+    cmp dl, 0
+    jne .head_ok2
+    mov dl, 10
+.head_ok2:
+    dec dl
+
+    ; Move backwards BX steps in ring buffer
+    cmp bx, 0
+    je .sel_index_ready
+
+.sel_back_loop:
+    cmp dl, 0
+    jne .dec_dl
+    mov dl, 9
+    jmp .cont_dl
+.dec_dl:
+    dec dl
+.cont_dl:
+    dec bx
+    jnz .sel_back_loop
+
+.sel_index_ready:
+    ; Compute address of selected history entry
+    mov bx, 0
+    mov bl, dl              ; BL = selected index 0..9
+    mov si, history_buffer
+    shl bx, 6               ; *64
+    add si, bx
+
+    ; Copy selected command into input buffer
+    mov di, input
+.copy_sel:
+    lodsb
+    stosb
+    cmp al, 0
+    jne .copy_sel
+
+    ; Process copied command as if typed
+    jmp process_input
+
+add_history_entry:
+    pusha
+
+    ; Skip if input is empty
+    mov si, input
+    cmp byte [si], 0
+    je .done
+
+    ; DI = destination in history_buffer
+    mov di, history_buffer
+    mov bx, 0
+    mov bl, [history_head]  ; index 0..9
+    shl bx, 6               ; *64 bytes per entry
+    add di, bx
+
+    ; Copy up to 63 characters plus null terminator
+    mov cx, 63
+.copy_loop:
+    lodsb
+    cmp al, 0
+    je .terminate
+    stosb
+    loop .copy_loop
+
+.terminate:
+    mov byte [di], 0
+
+    ; Advance head index
+    mov al, [history_head]
+    inc al
+    cmp al, 10
+    jb .store_head
+    xor al, al
+.store_head:
+    mov [history_head], al
+
+    ; Increment count up to 10
+    mov al, [history_count]
+    cmp al, 10
+    jae .done
+    inc al
+    mov [history_count], al
+
+.done:
+    popa
+    ret
 
 
 total_fail:
@@ -2881,6 +3095,7 @@ kshell_comands db 'HELP               - get list of commands', 10, 13
                db 'INFO               - system information', 10, 13
                db 'VER                - terminal version', 10, 13
                db 'CLS                - clear screen', 10, 13
+               db 'HIST               - command history', 10, 13
                db 'SHUT               - shutdown', 10, 13
                db 'REBOOT             - restart', 10, 13
                db 'DATE               - current date (DD/MM/YY)', 10, 13
@@ -2918,6 +3133,12 @@ info db 10, 13
 
 version_msg db 'PRos Terminal v0.2', 10, 13, 0
 
+history_title       db 'Command history:', 10, 13, 0
+history_prompt_msg  db 'Select history entry (number, 0=cancel): ', 0
+history_empty_msg   db 'History is empty', 0
+history_invalid_msg db 'Invalid selection', 0
+history_sep_msg     db ': ', 0
+
 ; ------ Commands ------
 exit_string    db 'EXIT', 0
 help_string    db 'HELP', 0
@@ -2943,6 +3164,7 @@ tail_string    db 'TAIL', 0
 mkdir_string   db 'MKDIR', 0
 deldir_string  db 'DELDIR', 0
 cd_string      db 'CD', 0
+history_string db 'HIST', 0
 
 ; ------ Errors ------
 invalid_msg       db 'No such command or program', 0
@@ -3088,3 +3310,8 @@ current_directory resb 256
 temp_saved_dir    resb 256
 dirlist           resb 1024  
 file_buffer       resb 32768
+
+; Command history buffer: 10 entries * 64 bytes
+history_buffer    resb 10*64
+history_head      db 0
+history_count     db 0
