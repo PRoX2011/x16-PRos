@@ -234,13 +234,27 @@ string_input_string:
     pusha
     mov di, ax
     mov cx, 0
+    mov word [.input_base], di
 
     call string_get_cursor_pos
     mov word [.cursor_col], dx 
+    mov byte [history_nav_active], 0
+    mov byte [history_nav_offset], 0
 
 .read_loop:
     mov ah, 0x00
     int 0x16
+    ; Handle history navigation with arrow keys if enabled
+    cmp al, 0
+    jne .check_enter_backspace
+    cmp byte [history_mode_enabled], 0
+    je .check_enter_backspace
+    cmp ah, 0x48           ; Up arrow
+    je .history_up
+    cmp ah, 0x50           ; Down arrow
+    je .history_down
+
+.check_enter_backspace:
     cmp al, 0x0D
     je .done_read
     cmp al, 0x08
@@ -271,12 +285,164 @@ string_input_string:
     int 0x10
     jmp .read_loop
 
+.history_up:
+    ; Navigate to older history entry
+    cmp byte [history_mode_enabled], 0
+    je .read_loop
+    mov al, [history_count]
+    cmp al, 0
+    je .read_loop
+
+    cmp byte [history_nav_active], 0
+    jne .hu_active
+    mov byte [history_nav_active], 1
+    mov byte [history_nav_offset], 0
+    jmp .hu_load
+
+.hu_active:
+    mov al, [history_nav_offset]
+    mov bl, al
+    mov al, [history_count]
+    dec al                  ; max offset = count-1
+    cmp bl, al
+    jae .read_loop          ; already at oldest
+    inc byte [history_nav_offset]
+
+.hu_load:
+    call .load_history_entry
+    jmp .read_loop
+
+.history_down:
+    ; Navigate to newer history entry or clear line
+    cmp byte [history_mode_enabled], 0
+    je .read_loop
+    cmp byte [history_nav_active], 0
+    je .read_loop
+
+    mov al, [history_nav_offset]
+    cmp al, 0
+    jne .hd_older
+
+    ; Leave history mode: clear line and buffer
+    mov byte [history_nav_active], 0
+    call .clear_current_line
+    mov di, [.input_base]
+    mov cx, 0
+    mov byte [di], 0
+    jmp .read_loop
+
+.hd_older:
+    dec byte [history_nav_offset]
+    call .load_history_entry
+    jmp .read_loop
+
+.clear_current_line:
+    ; Clear current input line on screen, using CX as current length
+    push ax
+    push bx
+    push dx
+
+    mov bx, cx              ; BX = current length
+    mov dx, [.cursor_col]
+    call string_move_cursor
+
+    mov cx, bx
+    cmp cx, 0
+    je .ccl_done_spaces
+
+    mov ah, 0x0E
+    mov al, ' '
+    mov bl, 0x1F
+.ccl_space_loop:
+    int 0x10
+    loop .ccl_space_loop
+
+.ccl_done_spaces:
+    mov dx, [.cursor_col]
+    call string_move_cursor
+
+    pop dx
+    pop bx
+    pop ax
+    ret
+
+.load_history_entry:
+    ; Load history entry selected by history_nav_offset into input buffer
+    push ax
+    push bx
+    push dx
+    push si
+
+    ; Clear current line visually
+    call .clear_current_line
+
+    ; Compute index of latest entry
+    mov al, [history_head]
+    cmp al, 0
+    jne .lhe_head_ok
+    mov al, 10
+.lhe_head_ok:
+    dec al                  ; AL = latest index (0..9)
+
+    ; Move back history_nav_offset steps
+    mov bl, [history_nav_offset]
+    mov dl, al              ; DL = current index
+    cmp bl, 0
+    je .lhe_index_ready
+
+.lhe_back_loop:
+    cmp dl, 0
+    jne .lhe_dec_dl
+    mov dl, 9
+    jmp .lhe_cont
+.lhe_dec_dl:
+    dec dl
+.lhe_cont:
+    dec bl
+    jnz .lhe_back_loop
+
+.lhe_index_ready:
+    mov bx, 0
+    mov bl, dl              ; BL = selected index 0..9
+    mov si, history_buffer
+    shl bx, 6               ; *64 bytes per entry
+    add si, bx
+
+    ; Load entry into input buffer and echo it
+    mov di, [.input_base]
+    mov cx, 0
+
+.lhe_copy:
+    lodsb
+    mov [di], al
+    cmp al, 0
+    je .lhe_done_copy
+    mov ah, 0x0E
+    mov bl, 0x1F
+    int 0x10
+    inc di
+    inc cx
+    jmp .lhe_copy
+
+.lhe_done_copy:
+    ; Ensure null terminator already written by last store
+
+    pop si
+    pop dx
+    pop bx
+    pop ax
+    ret
+
 .done_read:
     mov byte [di], 0
     popa
     ret
 
-.cursor_col dw 0
+.cursor_col         dw 0
+.input_base         dw 0
+history_mode_enabled db 0
+history_nav_active   db 0
+history_nav_offset   db 0
 
 ; =======================================================================
 ; STRING_CLEAR_SCREEN - Clears the screen and applies theme
