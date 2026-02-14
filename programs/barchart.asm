@@ -2,10 +2,48 @@
 [ORG 0x8000]
 
 start:
+    cmp si, 0
+    je .use_default
+    cmp byte [si], 0
+    je .use_default
+    
+    push si
+    mov di, filename
+    call copy_string
+    pop si
+    
+.use_default:
     call clear_screen
     call draw_interface
+    call show_menu
+
+    cmp al, '1'
+    je .load
+
+    cmp al, '2'
+    je .input
+
+    jmp start
+
+.load:
+    call load_file
+    jc .load_error
+    jmp .draw
+
+.load_error:
+    call clear_screen
+    mov si, error_load_msg
+    call print_string
+    call wait_for_key
+    jmp start
+
+.input:
     call get_user_input
     call parse_input
+    call create_file
+    call save_to_file
+
+.draw:
     call draw_diagram
     call wait_for_key
     call clear_screen
@@ -135,6 +173,33 @@ parse_number:
     stc
     ret
 
+create_file:
+    mov ah, 0x05
+    mov si, filename
+    int 0x22
+    ret
+
+save_to_file:
+    mov ah, 0x03
+    mov si, filename
+    mov bx, data_buffer
+    mov cx, [data_count]
+    int 0x22
+    ret
+
+load_file:
+    mov ah, 0x02
+    mov si, filename
+    mov cx, data_buffer
+    int 0x22
+    jc .error
+    mov [data_count], bx
+    clc
+    ret
+.error:
+    stc
+    ret
+
 draw_diagram:
     mov ah, 0x0C
     mov al, 0x0F
@@ -219,14 +284,54 @@ print_string:
 .done:
     ret
 
+show_menu:
+    mov si, menu_msg
+    call print_string
+
+    mov ah, 0x00
+    int 0x16
+
+    mov ah, 0x0E
+    mov bl, 0x0F
+    int 0x10
+
+    ret
+
+copy_string:
+    push ax
+.loop:
+    lodsb
+    cmp al, 0
+    je .done
+    cmp al, 0x0D
+    je .done
+    cmp al, 0x0A
+    je .done
+    cmp al, ' '
+    je .check_end
+    stosb
+    jmp .loop
+.check_end:
+    cmp byte [si], 0
+    je .done
+    cmp byte [si], 0x0D
+    je .done
+    stosb
+    jmp .loop
+.done:
+    mov byte [di], 0
+    pop ax
+    ret
+
 exit:
     ret
 
-welcome_msg    db '-PRos Bar Chart Program v0.1-', 0x0D, 0x0A, 0
+welcome_msg    db '-PRos Bar Chart Program v0.2-', 0x0D, 0x0A, 0
 input_prompt   db 'Enter numbers (0-200, use space between, Enter to finish): ', 0
+menu_msg       db 13,10,"1 - Load file",13,10,"2 - New input (press space and enter the data)",13,10,"> ",0
+error_load_msg db "File not found! Press any key...",0
+
 input_buffer   db 51 dup(0)
 data_buffer    db 20 dup(0)
 data_count     dw 0
-
-times 510-($-$$) db 0
-dw 0xAA55
+filename       db "DATA.bin",0
