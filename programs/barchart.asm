@@ -2,10 +2,35 @@
 [ORG 0x8000]
 
 start:
+
     call clear_screen
     call draw_interface
+
+    call show_menu
+
+    cmp al, '1'
+    je .load
+
+    cmp al, '2'
+    je .input
+
+    jmp start      ; If the user entered something wrong 
+
+.load:
+
+    call load_file
+    jmp .draw
+
+.input:
+
     call get_user_input
     call parse_input
+
+    call create_file
+    call save_to_file
+
+.draw:
+
     call draw_diagram
     call wait_for_key
     call clear_screen
@@ -135,6 +160,36 @@ parse_number:
     stc
     ret
 
+
+create_file:
+    mov ah, 0x05 ; api_fs creates an empty file, and then i load data into it
+    mov si, filename
+    int 0x22
+    ret
+
+
+save_to_file:
+    mov ah, 0x03        ; WRITE FILE
+    mov si, filename   ; file name 
+    mov bx, data_buffer ; where to write from
+    mov cx, [data_count] ; how many bytes
+    int 0x22
+    ret
+
+load_file:
+	mov ah, 0x02 ; load file
+	mov si, filename 
+	mov cx, data_buffer
+	int 0x22
+
+	jc .error
+
+	mov [data_count], bx
+	ret
+.error:
+	ret
+	
+
 draw_diagram:
     mov ah, 0x0C
     mov al, 0x0F
@@ -219,14 +274,31 @@ print_string:
 .done:
     ret
 
+show_menu:
+
+    mov si, menu_msg
+    call print_string
+
+    mov ah, 0x00
+    int 0x16        
+
+    mov ah, 0x0E    
+    mov bl, 0x0F
+    int 0x10
+
+    ret           
+
+
 exit:
     ret
 
-welcome_msg    db '-PRos Bar Chart Program v0.1-', 0x0D, 0x0A, 0
+welcome_msg    db '-PRos Bar Chart Program v0.2-', 0x0D, 0x0A, 0
 input_prompt   db 'Enter numbers (0-200, use space between, Enter to finish): ', 0
+menu_msg db 13,10,"1 - Load file",13,10,"2 - New input (press space and enter the data)",13,10,"> ",0
+
 input_buffer   db 51 dup(0)
 data_buffer    db 20 dup(0)
 data_count     dw 0
+filename db "DATA.bin",0
 
-times 510-($-$$) db 0
-dw 0xAA55
+
