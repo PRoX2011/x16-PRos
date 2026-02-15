@@ -512,10 +512,6 @@ selected_index db 0
 input_buffer   db 51 dup(0)
 data_buffer    db 20 dup(0)
 data_count     db 0
-<<<<<<< HEAD
-filename       db "DATA.bin",0
-temp_buffer    db 4 dup(0)
-=======
+
 filename       db "DATA.BIN",0
 temp_buffer    db 4 dup(0)
->>>>>>> 5ba7c7e (x16-PRos v0.7 pre-release version)
