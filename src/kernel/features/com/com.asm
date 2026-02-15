@@ -134,8 +134,10 @@ int20_handler:
 
     sti
 
-    mov dx, .finished_msg
-    mov ah, 0x09
+    call api_output_init
+
+    mov si, .finished_msg
+    mov ah, 0x01
     int 0x21
 
     ; Wait for key press
@@ -147,7 +149,7 @@ int20_handler:
 
     jmp get_cmd
 
-.finished_msg db 'Program finished. Press any key to continue...', 10, 13, '$'
+.finished_msg db 'Program finished. Press any key to continue...', 10, 13, 0
 
 api_dos_init:
     pusha
@@ -187,330 +189,41 @@ api_dos_init:
     ret
 
 int21_dos_handler:
-    enable_interrupts:
     sti
-
     cmp ah, 0x00
-    je .terminate
+    je com_00h
     cmp ah, 0x01
-    je .input_char_echo
+    je com_01h
     cmp ah, 0x02
-    je .output_char
+    je com_02h
     cmp ah, 0x03
-    je .aux_input
+    je com_03h
     cmp ah, 0x04
-    je .aux_output
+    je com_04h
     cmp ah, 0x06
-    je .direct_console_io
+    je com_06h
     cmp ah, 0x07
-    je .input_char_no_echo
+    je com_07h
     cmp ah, 0x08
-    je .input_char_no_echo
+    je com_08h
     cmp ah, 0x09
-    je .output_string_dollar
+    je com_09h
     cmp ah, 0x0A
-    je .buffered_input
+    je com_0Ah
     cmp ah, 0x0B
-    je .check_input_status
-    cmp ah, 0x2A
-    je .get_system_date
-    cmp ah, 0x2C
-    je .get_system_time
+    je com_0Bh
     cmp ah, 0x25
-    je .set_interrupt
+    je com_25h
+    cmp ah, 0x2A
+    je com_2Ah
+    cmp ah, 0x2C
+    je com_2Ch
     cmp ah, 0x35
-    je .get_interrupt
+    je com_35h
     cmp ah, 0x4C
-    je .terminate
-
+    je com_4Ch
     iret
 
-.input_char_echo:
-    mov ah, 0x00
-    int 0x16
-    push ax
-    mov dl, al
-    mov ah, 0x02
-    int 0x21
-    pop ax
-    iret
-
-.output_char:
-    push ax
-    push bx
-    mov ah, 0x0E
-    mov al, dl
-    mov bl, 0x0F
-    int 0x10
-    pop bx
-    pop ax
-    iret
-
-.aux_input:
-    xor dx, dx
-    mov ah, 02h
-    int 14h
-
-    test ah, 80h
-    jnz .aux_read_error
-
-    clc
-    iret
-
-.aux_read_error:
-    xor al, al
-    stc
-    iret
-
-.aux_output:
-    xor dx, dx
-    mov ah, 01h
-    mov al, dl
-    int 14h
-
-    test ah, 80h
-    jnz .aux_write_timeout
-    clc
-    iret
-
-.aux_write_timeout:
-    stc
-    iret
-
-.input_char_no_echo:
-    mov ah, 0x00
-    int 0x16
-    iret
-
-.check_input_status:
-    mov ah, 0x01
-    int 0x16
-    jz .no_key_available
-    mov al, 0xFF
-    iret
-.no_key_available:
-    mov al, 0x00
-    iret
-
-.direct_console_io:
-    cmp dl, 0xFF
-    je .direct_input
-
-    push ax
-    push bx
-    mov ah, 0x0E
-    mov al, dl
-    mov bl, 0x0F
-    int 0x10
-    pop bx
-    pop ax
-    iret
-
-.direct_input:
-    mov ah, 0x01
-    int 0x16
-    jz .no_char_ready
-
-    mov ah, 0x00
-    int 0x16
-    clc
-    iret
-
-.no_char_ready:
-    xor al, al
-    or al, al
-    iret
-
-.output_string_dollar:
-    push ax
-    push bx
-    push si
-
-    mov si, dx
-.dos_print_loop:
-    lodsb
-    cmp al, '$'
-    je .dos_print_done
-
-    mov ah, 0x0E
-    mov bl, 0x0F
-    int 0x10
-    jmp .dos_print_loop
-
-.dos_print_done:
-    pop si
-    pop bx
-    pop ax
-    iret
-
-.buffered_input:
-    pusha
-    mov si, dx
-
-    xor cx, cx
-    mov cl, [si]
-    cmp cl, 0
-    je .buf_done
-
-    mov di, dx
-    add di, 2
-    xor bx, bx
-
-.buf_input_loop:
-    mov ah, 0x00
-    int 0x16
-
-    cmp al, 0x0D
-    je .buf_enter
-
-    cmp al, 0x08
-    je .buf_backspace
-
-    cmp bl, cl
-    jae .buf_input_loop
-
-    mov ah, 0x0E
-    push bx
-    mov bl, 0x0F
-    int 0x10
-    pop bx
-
-    mov [di + bx], al
-    inc bx
-    jmp .buf_input_loop
-
-.buf_backspace:
-    cmp bx, 0
-    je .buf_input_loop
-
-    dec bx
-    mov ah, 0x0E
-    mov al, 0x08
-    int 0x10
-    mov al, ' '
-    int 0x10
-    mov al, 0x08
-    int 0x10
-    jmp .buf_input_loop
-
-.buf_enter:
-    mov byte [di + bx], 0x0D
-
-    mov ah, 0x0E
-    mov al, 0x0D
-    int 0x10
-    mov al, 0x0A
-    int 0x10
-
-    mov [si + 1], bl
-
-.buf_done:
-    popa
-    iret
-
-.get_system_time:
-    push bx
-    push ax
-
-    mov ah, 0x02
-    int 0x1A
-
-    mov al, ch
-    call bcd_to_bin
-    mov ch, al
-
-    mov al, cl
-    call bcd_to_bin
-    mov cl, al
-
-    mov al, dh
-    call bcd_to_bin
-    mov dh, al
-
-    push es
-    xor bx, bx
-    mov es, bx
-    mov al, [es:0x046C]
-    pop es
-    and al, 99
-    mov dl, al
-
-    pop ax
-    pop bx
-    iret
-
-.get_system_date:
-    push bx
-    push ax
-
-    mov ah, 0x04
-    int 0x1A
-
-    mov al, cl
-    call bcd_to_bin
-    mov cl, al
-
-    mov al, ch
-    call bcd_to_bin
-    mov ch, al
-
-    mov al, dh
-    call bcd_to_bin
-    mov dh, al
-
-    mov al, dl
-    call bcd_to_bin
-    mov dl, al
-
-    mov al, 0
-
-    pop ax
-    pop bx
-    iret
-
-.set_interrupt:
-    push es
-    push bx
-    push ax
-
-    xor bx, bx
-    mov es, bx
-
-    mov bl, al
-    xor bh, bh
-    shl bx, 1
-    shl bx, 1
-
-    mov word [es:bx], dx
-    mov word [es:bx+2], ds
-
-    pop ax
-    pop bx
-    pop es
-    iret
-
-.get_interrupt:
-    push ds
-    push ax
-
-    xor bx, bx
-    mov ds, bx
-
-    mov bl, al
-    xor bh, bh
-    shl bx, 1
-    shl bx, 1
-
-    mov bx, word [ds:bx]
-    mov es, word [ds:bx+2]
-
-    pop ax
-    pop ds
-    iret
-
-.terminate:
-    int 0x20
-    iret
 
 saved_interrupt_table resb 1024
 
@@ -529,4 +242,22 @@ bcd_to_bin:
 
     pop bx
     pop cx
+
     ret
+
+%include "src/kernel/features/com/00h.asm"
+%include "src/kernel/features/com/01h.asm"
+%include "src/kernel/features/com/02h.asm"
+%include "src/kernel/features/com/03h.asm"
+%include "src/kernel/features/com/04h.asm"
+%include "src/kernel/features/com/06h.asm"
+%include "src/kernel/features/com/07h.asm"
+%include "src/kernel/features/com/08h.asm"
+%include "src/kernel/features/com/09h.asm"
+%include "src/kernel/features/com/0Ah.asm"
+%include "src/kernel/features/com/0Bh.asm"
+%include "src/kernel/features/com/25h.asm"
+%include "src/kernel/features/com/2Ah.asm"
+%include "src/kernel/features/com/2Ch.asm"
+%include "src/kernel/features/com/35h.asm"
+%include "src/kernel/features/com/4Ch.asm"

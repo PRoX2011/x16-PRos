@@ -1,0 +1,55 @@
+----------------------- Key changes x16-PRos v0.7 ----------------------
+
+This release brings significant improvements to multi-disk support, shell 
+terminal enhancements, and build system optimization. Several important bug 
+fixes and kernel optimizations make this version more stable and performant.
+                                        -- PRoX
+
+=======================================================================================
+
+1. Multi-Disk Support (Complete Redesign)
+1) Full kernel support for multiple disk drives
+   - Kernel now properly handles operations with multiple disks
+   - File system operations adapted for multi-disk environments
+2) New system calls for disk management
+   - INT 0x22; AH = 0x11: List available disk drives
+   - INT 0x22; AH = 0x12: Change current drive (SI = Drive letter pointer)
+3) New dlist program
+   - Displays list of currently available disks in the system
+4) Test files removed from secondary disk images
+   - Improved disk image cleanliness and reduced size
+
+=======================================================================================
+
+2. Kernel Optimization & Core Programs Refactoring
+1) head and tail commands moved to separate programs
+   - head.asm: Display first lines of a file
+   - tail.asm: Display last lines of a file  
+   - This refactoring significantly reduced kernel size (~300 lines removed)
+2) Enhanced string library (string.inc)
+   - Improved utilities for text processing in standalone programs
+
+=======================================================================================
+
+3. Terminal Shell Improvements
+1) Command history feature
+   - Users can now navigate through previously executed commands using arrow keys
+   - Improves productivity when working with the command line
+   - 136 new lines of history tracking code
+2) Ctrl+Backspace keyboard shortcut
+   - New key combination for deleting the previous word
+   - Useful for quick command line editing
+3) Bugfixes for keyboard input
+   - Fixed issues with Ctrl+Backspace functionality
+   - Improved overall keyboard input stability
+
+=======================================================================================
+
+4. Build System Enhancements
+1) New compilation optimization flags (check out build-linux.sh)
+2) Caching system
+3) Build script refactoringy
+
+=======================================================================================
+
+Copyright (C) 2024-2026 PRoX2011

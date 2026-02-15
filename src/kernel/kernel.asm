@@ -1916,7 +1916,7 @@ cd_command:
 %INCLUDE "src/kernel/features/bmp_rendering.asm"    ; BMP rendering functions
 %INCLUDE "src/kernel/features/themes.asm"           ; Themes
 %INCLUDE "src/kernel/features/encrypt.asm"          ; Encryption
-%INCLUDE "src/kernel/features/com.asm"              ; COM
+%INCLUDE "src/kernel/features/com/com.asm"          ; COM
 
 ; ====== DRIVERS ======
 %INCLUDE "src/drivers/ps2_mouse.asm"                ; Mouse driver

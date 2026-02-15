@@ -21,6 +21,7 @@
 ;   0x0F: Restore current directory
 ;   0x10: Load huge file (SI = filename, CX = load offset (position), DX = load segment address)
 ;   0x11: List drives
+;   0x12: Change drive (SI = Drive letter pointer)
 ; ==================================================================
 
 [BITS 16]
@@ -87,6 +88,8 @@ int22_handler:
     je .load_huge_file
     cmp al, 0x11
     je .list_drives
+    cmp al, 0x12
+    je .change_drive
     stc
     jmp .done
 
@@ -193,6 +196,11 @@ int22_handler:
 
 .list_drives:
     call fs_list_drives
+    jmp .done
+
+.change_drive:
+    mov al, [si]               
+    call fs_change_drive_letter
     jmp .done
     
 .done:

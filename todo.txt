@@ -1,0 +1,4 @@
+[ IN PROGRESS ] Implement all MS-DOS system calls for the compatibility layer (16/87)
+[     TODO    ] Implement cooperative multitasking
+[     TODO    ] Add the ability to compile x16-PRos to ISO image
+[     TODO    ] Add internet driver
