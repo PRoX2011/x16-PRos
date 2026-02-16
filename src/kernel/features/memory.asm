@@ -6,6 +6,7 @@
 [BITS 16]
 
 heap_seg equ 0x9000
+max_alloc equ 0xFFEB
 
 memory_init:
     pusha
@@ -48,7 +49,7 @@ int23_handler:
 .malloc:
     cmp cx, 0
     je .m_error
-    cmp cx, 0xFFF0 - 5
+    cmp cx, max_alloc
     ja .m_error
 
     add cx, 5
