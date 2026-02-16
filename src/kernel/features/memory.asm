@@ -5,8 +5,15 @@
 
 [BITS 16]
 
-heap_seg equ 0x9000
-max_alloc equ 0xFFEB
+HEAP_SEG    equ 0x9000
+MAX_ALLOC   equ 0xFFEB
+
+; ========================================================================
+; memory_init - Initialize heap and register INT 0x23 handler
+; IN:  None
+; OUT: None
+; NOTE: Creates initial free block of 0xFFF0 bytes at segment 0x9000
+; ========================================================================
 
 memory_init:
     pusha
@@ -17,28 +24,35 @@ memory_init:
     mov word [es:0x23*4], int23_handler
     mov word [es:0x23*4+2], cs
     
-    mov ax, heap_seg
+    mov ax, HEAP_SEG
     mov es, ax
-    mov word [es:0], 0xFFF0    ; Initial block size
-    mov byte [es:2], 0         ; Status: Free
-    mov word [es:3], 0         ; Next: Null
+    mov word [es:0], 0xFFF0
+    mov byte [es:2], 0
+    mov word [es:3], 0
     
     pop es
     popa
     ret
 
+; ========================================================================
+; int23_handler - Dynamic memory allocation interrupt handler
+; IN:  AH = 0x01 for malloc, CX = requested size in bytes
+;      AH = 0x02 for free, BX = pointer to block
+; OUT: AX = offset to allocated block (malloc), 0 on failure
+; NOTE: Uses first-fit strategy with automatic coalescing on free
+; ========================================================================
 int23_handler:
     push ds
     push es
     pusha
     mov bp, sp
     
-    mov bx, heap_seg
+    mov bx, HEAP_SEG
     mov ds, bx
     mov es, bx
     
-    mov ah, [bp+15]            ; Function code
-    mov cx, [bp+12]            ; Requested size
+    mov ah, [bp+15]
+    mov cx, [bp+12]
     
     cmp ah, 0x01
     je .malloc
@@ -49,7 +63,7 @@ int23_handler:
 .malloc:
     cmp cx, 0
     je .m_error
-    cmp cx, max_alloc
+    cmp cx, MAX_ALLOC
     ja .m_error
 
     add cx, 5
@@ -70,7 +84,7 @@ int23_handler:
 .m_found:
     mov dx, ax
     sub dx, cx
-    cmp dx, 10                 ; Minimum split threshold
+    cmp dx, 10
     jb .m_no_split
     
     mov di, si
@@ -95,13 +109,13 @@ int23_handler:
 
 .free:
     mov bx, [bp+8]
-    cmp bx, 5                  ; Null check
+    cmp bx, 5
     jb .done
     
     sub bx, 5
     mov si, bx
     
-    cmp byte [si+2], 0         ; Double-free check
+    cmp byte [si+2], 0
     je .done
     
     mov byte [si+2], 0
