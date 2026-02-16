@@ -64,6 +64,11 @@ init_api:
 
     mov si, api_fs_init_msg
     call log_okay
+
+    call memory_init
+
+    mov si, api_mem_init_msg
+    call log_okay
     ret
 
 init_configs:
@@ -908,6 +913,7 @@ timer_init_msg           db 'Timer initialization', 0
 api_init_msg             db 'API initialization', 0
 api_output_init_msg      db 'Output API (INT 0x21)', 0
 api_fs_init_msg          db 'File System API (INT 0x22)', 0
+api_mem_init_msg         db 'Memory API (INT 0x23)', 0
 config_init_msg          db 'Configuration loading', 0
 display_init_msg         db 'Display initialization', 0
 mouse_init_msg           db 'Mouse driver loaded', 0
