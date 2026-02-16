@@ -7,6 +7,7 @@ APIs are organized into three categories, each accessible via a specific interru
 
 - **INT 0x21**: Output API for screen output and video mode initialization.
 - **INT 0x22**: File System API for managing files on a FAT12 file system.
+- **INT 0x23**: Dynamic Memory API for managing heap memory allocations.
 
 Each interrupt handler uses the `AH` register to specify the function code, with other registers used for input and
 output parameters as described below. Unless specified, all functions preserve registers not used for output and set the
@@ -192,12 +193,12 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
     - Carry flag set on error (e.g., file not found, disk error)
 - **Preserves**: All registers except `BX`
 - **Error Handling**: Sets CF if the file is not found or disk read fails
-- **Notes**: Converts the filename to uppercase and FAT12’s 11-character format. Reads the root directory and FAT to
+- **Notes**: Converts the filename to uppercase and FAT12's 11-character format. Reads the root directory and FAT to
   locate and load file sectors.
 
 ### Function 0x03: Write File
 
-- **Description**: Writes data from a memory buffer to a file, creating it if it doesn’t exist.
+- **Description**: Writes data from a memory buffer to a file, creating it if it doesn't exist.
 - **Input**:
     - `AH` = 0x03
     - `SI` = Pointer to null-terminated filename (8.3 format)
@@ -320,8 +321,37 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Output**:
     - Carry flag set on error (e.g., file not found, disk error)
 - **Error Handling**: Sets CF if the file is not found or disk read fails
-- **Notes**: Converts the filename to uppercase and FAT12’s 11-character format. Reads the root directory and FAT to
+- **Notes**: Converts the filename to uppercase and FAT12's 11-character format. Reads the root directory and FAT to
   locate and load file sectors.
+
+---
+
+## INT 0x23 - Dynamic Memory API
+
+The Dynamic Memory API provides functions for managing a 64KB heap area in segment `0x9000`. It uses interrupt `0x23` and handles memory allocation and deallocation with automatic coalescing of free blocks.
+
+### Function 0x01: Allocate Memory (malloc)
+
+- **Description**: Allocates a block of memory from the heap.
+- **Input**:
+    - `AH` = 0x01
+    - `CX` = Requested size in bytes
+- **Output**:
+    - `AX` = Offset to the allocated block in segment `0x9000` (returns 0 on failure)
+- **Preserves**: All registers except `AX`
+- **Error Handling**: Returns `AX = 0` if no block large enough is found.
+- **Notes**: Uses a first-fit strategy. Allocates an additional 5 bytes for the block header. Blocks are automatically split if the remaining space is large enough.
+
+### Function 0x02: Free Memory (free)
+
+- **Description**: Releases a previously allocated block of memory back to the heap.
+- **Input**:
+    - `AH` = 0x02
+    - `BX` = Offset to the block to be freed (as returned by malloc)
+- **Output**: None
+- **Preserves**: All registers
+- **Error Handling**: Invalid pointers may cause memory corruption.
+- **Notes**: Marks the block as free and immediately performs coalescing (merging) with adjacent free blocks to reduce fragmentation.
 
 ---
 

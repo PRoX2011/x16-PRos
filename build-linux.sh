@@ -242,6 +242,7 @@ programs=(
     "programs/chars.asm CHARS.BIN"
     "programs/eye.asm EYE.BIN"
     "programs/ed.asm ED.BIN programs/ed-comands.asm programs/ed-common.asm"
+    "programs/memtest.asm MEMTEST.BIN"
 )
 
 for prog in "${programs[@]}"; do
