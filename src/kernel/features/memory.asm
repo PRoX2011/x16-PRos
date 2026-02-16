@@ -1,5 +1,5 @@
 ; ==================================================================
-; x16-PRos - Dynamic Memory Allocator (Linked List)
+; x16-PRos - Dynamic Memory Allocator
 ; Copyright (C) 2026 PRoX2011
 ; ==================================================================
 
@@ -18,9 +18,9 @@ memory_init:
     
     mov ax, heap_seg
     mov es, ax
-    mov word [es:0], 0xFFF0
-    mov byte [es:2], 0
-    mov word [es:3], 0
+    mov word [es:0], 0xFFF0    ; Initial block size
+    mov byte [es:2], 0         ; Status: Free
+    mov word [es:3], 0         ; Next: Null
     
     pop es
     popa
@@ -36,8 +36,8 @@ int23_handler:
     mov ds, bx
     mov es, bx
     
-    mov ah, [bp+15]
-    mov cx, [bp+12]
+    mov ah, [bp+15]            ; Function code
+    mov cx, [bp+12]            ; Requested size
     
     cmp ah, 0x01
     je .malloc
@@ -46,6 +46,11 @@ int23_handler:
     jmp .done
 
 .malloc:
+    cmp cx, 0
+    je .m_error
+    cmp cx, 0xFFF0 - 5
+    ja .m_error
+
     add cx, 5
     xor si, si
 .m_loop:
@@ -64,7 +69,7 @@ int23_handler:
 .m_found:
     mov dx, ax
     sub dx, cx
-    cmp dx, 10
+    cmp dx, 10                 ; Minimum split threshold
     jb .m_no_split
     
     mov di, si
@@ -89,8 +94,15 @@ int23_handler:
 
 .free:
     mov bx, [bp+8]
+    cmp bx, 5                  ; Null check
+    jb .done
+    
     sub bx, 5
     mov si, bx
+    
+    cmp byte [si+2], 0         ; Double-free check
+    je .done
+    
     mov byte [si+2], 0
     
     xor si, si
