@@ -338,8 +338,17 @@ setup:
 
 .save_prompt:
     mov di, 43008
+    xor al, al
     mov cx, 64
+    rep stosb
+
+    mov di, 43008
     call string_string_copy
+
+    mov ax, 43008
+    call string_string_length
+    inc ax
+    mov cx, ax
 
     ; --- SAVE PROMPT.CFG in CONF.DIR ---
     mov ah, 0x09
@@ -349,7 +358,6 @@ setup:
     mov ah, 0x03
     mov si, prompt_cfg_file
     mov bx, 43008
-    mov cx, 64
     int 0x22
 
     mov ah, 0x0A
@@ -501,6 +509,7 @@ setup:
 
     mov ah, 0x03
     mov byte [43008], '0'
+    mov byte [43009], 0
     mov si, first_boot_file
     mov bx, 43008
     mov cx, 2

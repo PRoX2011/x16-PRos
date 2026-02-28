@@ -255,9 +255,8 @@ string_input_string:
     cmp cx, 255
     jge .read_loop
     stosb
-    mov ah, 0x0E
     mov bl, 0x1F
-    int 0x10
+    call print_char
     inc cx
     jmp .read_loop
 
@@ -277,17 +276,16 @@ string_input_string:
     shl bx, 8
     lea si, [command_history + bx]
     
-    mov bx, 0x1F
-    mov ah, 0x0E
+    mov bl, 0x1F
 .handle_history_scroll_up_clear_loop:
     cmp cx, 0
     je .handle_history_scroll_up_loop
     mov al, 0x08
-    int 0x10
+    call print_char
     mov al, ' '
-    int 0x10
+    call print_char
     mov al, 0x08
-    int 0x10
+    call print_char
     dec cx
     jmp .handle_history_scroll_up_clear_loop
 
@@ -296,9 +294,8 @@ string_input_string:
     mov [di], al
     cmp al, 0
     je .handle_history_scroll_up_done
-    mov bx, 0x1F
-    mov ah, 0x0E
-    int 0x10
+    mov bl, 0x1F
+    call print_char
     inc di
     inc si
     inc cx
@@ -319,17 +316,16 @@ string_input_string:
     shl bx, 8
     lea si, [command_history + bx]
     
-    mov bx, 0x1F
-    mov ah, 0x0E
+    mov bl, 0x1F
 .handle_history_scroll_down_clear_loop:
     cmp cx, 0
     je .handle_history_scroll_down_loop
     mov al, 0x08
-    int 0x10
+    call print_char
     mov al, ' '
-    int 0x10
+    call print_char
     mov al, 0x08
-    int 0x10
+    call print_char
     dec cx
     jmp .handle_history_scroll_down_clear_loop
 
@@ -338,9 +334,8 @@ string_input_string:
     mov [di], al
     cmp al, 0
     je .handle_history_scroll_down_done
-    mov bx, 0x1F
-    mov ah, 0x0E
-    int 0x10
+    mov bl, 0x1F
+    call print_char
     inc di
     inc si
     inc cx
@@ -354,18 +349,16 @@ string_input_string:
     mov di, [.start_input_buf_addr]
     mov byte [di], 0
 
-    mov bx, 0x1F
-    mov ah, 0x0E
-    mov al, 0x08
+    mov bl, 0x1F
 .handle_history_scroll_down_clear_loop_exit:
     cmp cx, 0
     je .handle_history_scroll_down_clear_loop_done
     mov al, 0x08
-    int 0x10
+    call print_char
     mov al, ' '
-    int 0x10
+    call print_char
     mov al, 0x08
-    int 0x10
+    call print_char
     dec cx
     jmp .handle_history_scroll_down_clear_loop_exit
 
@@ -381,13 +374,13 @@ string_input_string:
     call string_get_cursor_pos
     cmp dl, [.cursor_col]
     jbe .read_loop
-    mov ah, 0x0E
+    mov bl, 0x1F
     mov al, 0x08
-    int 0x10
+    call print_char
     mov al, ' '
-    int 0x10
+    call print_char
     mov al, 0x08
-    int 0x10
+    call print_char
     jmp .read_loop
 
 
@@ -408,13 +401,13 @@ string_input_string:
     call string_get_cursor_pos
     cmp dl, [.cursor_col]
     jbe .read_loop
-    mov ah, 0x0E
+    mov bl, 0x1F
     mov al, 0x08
-    int 0x10
+    call print_char
     mov al, ' '
-    int 0x10
+    call print_char
     mov al, 0x08
-    int 0x10
+    call print_char
 
     inc byte [.handle_ctrl_backspace_deleting_counter]
 
@@ -458,8 +451,8 @@ string_input_string:
     mov byte [di], al
     inc di
     inc cx
-    mov ah, 0x0E
-    int 0x10
+    mov bl, 0x1F
+    call print_char
     jmp .read_loop
 
 .done_read:
@@ -747,8 +740,10 @@ string_to_int:
 parse_prompt:
     push ax
     push bx
+    push cx
     push si
     push di
+    mov cx, 63
 
 .loop:
     lodsb               
@@ -759,7 +754,8 @@ parse_prompt:
     cmp al, '%'             
     je .check_hex
 .store:
-    stosb        
+    call .store_char
+    jc .done
     jmp .loop
 
 .check_username:
@@ -783,7 +779,8 @@ parse_prompt:
     lodsb
     cmp al, 0
     je .user_done
-    stosb
+    call .store_char
+    jc .done
     jmp .copy_user
 .user_done:
     pop si
@@ -791,7 +788,8 @@ parse_prompt:
 
 .store_dollar:
     mov al, '$'
-    stosb
+    call .store_char
+    jc .done
     jmp .loop
 
 .check_hex:
@@ -815,12 +813,14 @@ parse_prompt:
     or bl, al     
 
     mov al, bl
-    stosb
+    call .store_char
+    jc .done
     jmp .loop
 
 .store_percent:
     mov al, '%'
-    stosb
+    call .store_char
+    jc .done
     dec si     
     cmp ah, 0       
     je .loop
@@ -831,8 +831,20 @@ parse_prompt:
     mov byte [di], 0     
     pop di
     pop si
+    pop cx
     pop bx
     pop ax
+    ret
+
+.store_char:
+    cmp cx, 0
+    je .store_full
+    stosb
+    dec cx
+    clc
+    ret
+.store_full:
+    stc
     ret
 
 ; =======================================================================
