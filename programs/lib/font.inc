@@ -5,8 +5,6 @@
 ; Provides pixel-level character rendering with foreground and
 ; background colors via direct VGA planar memory access using
 ; the BIOS 8x16 ROM font.
-;
-; All public functions have the font_ prefix.
 ; ==================================================================
 
 %ifndef FONT_INC
