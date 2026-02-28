@@ -2,196 +2,212 @@
 ; x16-PRos -- PROCENTC. Precentages calculator.
 ;
 ; Made by Gabriel
-; =================================================================
-
+; ==================================================================
 [BITS 16]
 [ORG 0x8000]
 
+; ------------------------------------------------------------------
+; BSS (uninitialized data)
+; ------------------------------------------------------------------
 section .bss
-mode         resw 1
-step         resw 1
 input_buffer resb 6
 num1         resw 1
 num2         resw 1
-exit         resw 1
-result_str   resb 7
+result_str   resb 8
 
+; ------------------------------------------------------------------
+; Entry point
+; ------------------------------------------------------------------
 section .text
-
 start:
     pusha
 
-    mov ax, 0x12
+    ; Set VGA mode 0x12 (640x480, 16 colors)
+    mov ax, 0x0012
     int 0x10
 
-    mov ah, 0x01
-    mov si, welcome_msg
-    int 0x21
-    mov ah, 0x05
-    int 0x21
+    call tui_init
+    call tui_clear_screen
 
-    mov ah, 0x02
-    mov si, help_msg
-    int 0x21
-    mov ah, 0x05
-    int 0x21
+    ; Draw title bar + shortcut bar
+    mov ax, title_str
+    mov bx, shortcut_str
+    call tui_draw_background
 
-    mov ah, 0x01
-    mov si, input_msg
-    int 0x21
-    mov si, input_buffer
-    mov bx, 5
-    call scan_string
-    mov ah, 0x05
-    int 0x21
+    ; Draw main content box
+    mov cl, 17             ; x
+    mov ch, 5              ; y
+    mov dl, 46             ; width
+    mov dh, 18             ; height
+    mov bl, TUI_DIALOG_ATTR
+    call tui_draw_box
+
+    ; Print help text inside box
+    mov si, help_l1
+    mov cl, 20
+    mov ch, 7
+    mov bl, TUI_DIALOG_ATTR
+    call tui_print_at
+
+    mov si, help_l2
+    mov cl, 20
+    mov ch, 8
+    mov bl, TUI_DIALOG_ATTR
+    call tui_print_at
+
+    ; --- Input Number 1 ---
+    mov ax, input1_prompt
     mov di, input_buffer
-    mov bx, num1
-    call convert_to_number
+    mov si, 5
+    call tui_input_dialog
+    jc .cancelled
 
-    mov ah, 0x01
-    mov si, input2_msg
-    int 0x21
-    mov si, input_buffer
-    mov bx, 5
-    call scan_string
-    mov ah, 0x05
-    int 0x21
     mov di, input_buffer
-    mov bx, num2
     call convert_to_number
+    mov [num1], ax
 
+    ; --- Input Number 2 ---
+    mov ax, input2_prompt
+    mov di, input_buffer
+    mov si, 5
+    call tui_input_dialog
+    jc .cancelled
+
+    mov di, input_buffer
+    call convert_to_number
+    mov [num2], ax
+
+    ; --- Calculate: (num1 * 100) / num2 ---
     mov ax, [num1]
     xor dx, dx
     mov bx, 100
     mul bx
     mov bx, [num2]
+    test bx, bx
+    jz .div_zero
     div bx
 
+    ; Convert result to string, then append '%' before the null
     mov di, result_str
     call convert_to_string
+    ; di points AT the null written by convert_to_string -- overwrite it with '%'
+    mov byte [di], '%'
+    inc di
+    mov byte [di], 0
 
-    mov ah, 0x01
-    mov si, result_msg
-    int 0x21
-    mov ah, 0x01
-    mov si, result_str
-    int 0x21
-    mov ah, 0x01
-    mov si, percent_msg
-    int 0x21
-    mov ah, 0x05
-    int 0x21
-    
-    mov ah, 0x01
-    mov si, when_done
-    int 0x21
-    mov ah, 0x05
-    int 0x21
-    mov ah, 0
-    int 0x16
+    mov ax, result_str
+    mov bx, result_note
+    xor cx, cx
+    xor dx, dx
+    call tui_dialog_box
+    jmp .done
 
+.div_zero:
+    mov ax, err_l1
+    mov bx, err_l2
+    xor cx, cx
+    xor dx, dx
+    call tui_dialog_box
+    jmp .done
+
+.cancelled:
+    mov ax, cancel_l1
+    xor bx, bx
+    xor cx, cx
+    xor dx, dx
+    call tui_dialog_box
+
+.done:
+    ; Restore text mode and return
+    mov ax, 0x0012
+    int 0x10
     popa
     ret
 
-; Convert String to Number
-; di - buffer
-; bx - to save
+; ------------------------------------------------------------------
+; strcpy_inline -- Copy null-terminated string from SI to DI
+; ------------------------------------------------------------------
+strcpy_inline:
+    push ax
+.lp:
+    lodsb
+    stosb
+    test al, al
+    jnz .lp
+    pop ax
+    ret
+
+; ------------------------------------------------------------------
+; convert_to_number -- Parse decimal string at DI into AX
+; ------------------------------------------------------------------
 convert_to_number:
     mov si, di
     xor ax, ax
     xor cx, cx
-.convert_loop:
+.loop:
     lodsb
     cmp al, 0
-    je .done_convert
+    je .done
     sub al, '0'
     imul cx, 10
     add cx, ax
-    jmp .convert_loop
-.done_convert:
-    mov [bx], cx
+    jmp .loop
+.done:
+    mov ax, cx
     ret
 
-; Scan String From Input
-; si - buffer
-; bx - max count
-scan_string:
-    mov di, si
+; ------------------------------------------------------------------
+; convert_to_string -- Convert AX to decimal string at DI
+; ------------------------------------------------------------------
+convert_to_string:
+    test ax, ax
+    jnz .non_zero
+    mov byte [di], '0'
+    inc di
+    jmp .terminate
+.non_zero:
+    mov bx, 10
     xor cx, cx
-.read_loop:
-    mov ah, 0x00
-    int 0x16
-    cmp al, 0x0D
-    je .done_read
-    cmp al, 0x08
-    je .handle_backspace
-    cmp cx, bx
-    jge .done_read
-    stosb
-    mov ah, 0x0E
-    mov bl, 0x1F
-    int 0x10
+.extract:
+    xor dx, dx
+    div bx
+    add dl, '0'
+    push dx
     inc cx
-    jmp .read_loop
-
-.handle_backspace:
-    cmp di, si
-    je .read_loop
-    dec di
-    dec cx
-    mov ah, 0x0E
-    mov al, 0x08
-    int 0x10
-    mov al, ' '
-    int 0x10
-    mov al, 0x08
-    int 0x10
-    jmp .read_loop
-
-.done_read:
+    test ax, ax
+    jnz .extract
+.reverse:
+    pop dx
+    mov [di], dl
+    inc di
+    loop .reverse
+.terminate:
     mov byte [di], 0
     ret
 
-; Number To String
-; ax - number
-; di - buffer [6 bytes]
-convert_to_string:
-    mov si, di          
-    test ax, ax         
-    jnz .non_zero       
-    mov byte [di], '0'  
-    inc di              
-    jmp .terminate      
-
-.non_zero:
-    mov bx, 10          
-    xor cx, cx          
-
-.extract_digits:
-    xor dx, dx          
-    div bx              
-    add dl, '0'         
-    push dx             
-    inc cx              
-    test ax, ax         
-    jnz .extract_digits 
-
-.reverse_digits:
-    pop dx              
-    mov [di], dl        
-    inc di              
-    loop .reverse_digits
-
-.terminate:
-    mov byte [di], 0              
-    ret
-
+; ------------------------------------------------------------------
+; Data
+; ------------------------------------------------------------------
 section .data
-welcome_msg db '---------- [ Percentages v0.1 ] -----------', 13, 10, 0
-input_msg   db 'Number 1: ', 0
-input2_msg  db 'Number 2: ', 0
-result_msg  db 'Result: ', 0
-percent_msg db '%', 0
-help_msg    db 'This programm will calculate how many percent is num 1 out of num 2. If ', 13, 10
-            db 'malfunctioning then make sure num 2 is greater than num 1', 13, 10, 0
-when_done   db 'When done press any key', 13, 10, 0
+
+title_str     db 'Percentages v0.2', 0
+shortcut_str  db 'Enter=Confirm   Esc=Cancel', 0
+
+help_l1       db 'Calculates what percent Num1 is of Num2', 0
+help_l2       db 'Note: Num2 must be greater than Num1.', 0
+
+input1_prompt db 'Enter Number 1 (base):', 0
+input2_prompt db 'Enter Number 2 (total):', 0
+
+result_note   db 'Calculation complete.', 0
+
+err_l1        db 'Error: Division by zero!', 0
+err_l2        db 'Number 2 cannot be zero.', 0
+
+cancel_l1     db 'Cancelled. No result computed.', 0
+
+; ------------------------------------------------------------------
+; Includes
+; ------------------------------------------------------------------
+%include "programs/lib/font.inc"
+%include "programs/lib/tui.inc"
