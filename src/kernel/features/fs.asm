@@ -277,6 +277,10 @@ fs_get_file_list:
 ; OUT : BX = file size, CF = error flag
 ; ========================================================================
 fs_load_file:
+    push es
+    push ds
+    pop es
+
     call string_string_uppercase
     call int_filename_convert
 
@@ -285,6 +289,7 @@ fs_load_file:
 
     call fs_reset_floppy
     jnc .floppy_ok
+    pop es
     stc
     ret
 
@@ -418,6 +423,7 @@ fs_load_file:
     jmp .root_problem
 
 .root_problem:
+    pop es
     stc
     ret
 
@@ -464,6 +470,7 @@ fs_load_file:
 
 .end_load:
     mov bx, [.file_size]
+    pop es
     clc
     ret
 
@@ -2529,6 +2536,10 @@ fs_get_next_directory_cluster:
 ; OUT : BX = file size, CF = error flag
 ; ========================================================================
 fs_load_com:
+    push es
+    push ds
+    pop es
+
     call string_string_uppercase
     call int_filename_convert
     mov [.com_filename_loc], ax
@@ -2536,6 +2547,7 @@ fs_load_com:
     mov word [.com_load_offset], 0x0100
     call fs_reset_floppy
     jnc .floppy_ok
+    pop es
     stc
     ret
 .floppy_ok:
@@ -2647,6 +2659,7 @@ fs_load_com:
     loop .search_entries_loop
     jmp .root_problem
 .root_problem:
+    pop es
     stc
     ret
 .found_file_to_load:
@@ -2690,6 +2703,7 @@ fs_load_com:
     jmp .load_file_sector_loop
 .end_load:
     mov bx, [.com_file_size]
+    pop es
     clc
     ret
 .com_filename_loc dw 0

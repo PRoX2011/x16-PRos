@@ -203,26 +203,28 @@ load_prompt_from_config:
     call build_default_prompt
     ret
 
-build_default_prompt:
-    mov di, final_prompt
-    mov al, '['
-    stosb
-    mov si, user
-.copy_user:
-    lodsb
-    cmp al, 0
-    je .done
-    stosb
-    jmp .copy_user
-.done:
-    mov si, .suffix
-.copy_suffix:
-    lodsb
-    stosb
-    cmp al, 0
-    jne .copy_suffix
+refresh_prompt:
+    cmp byte [temp_prompt], 0
+    jne .parse_from_template
+    call build_default_prompt
     ret
-.suffix db '@PRos] > ', 0
+
+.parse_from_template:
+    mov si, temp_prompt
+    mov di, final_prompt
+    call parse_prompt
+    ret
+
+build_default_prompt:
+    mov si, .template
+    mov di, temp_prompt
+    call string_string_copy
+
+    mov si, temp_prompt
+    mov di, final_prompt
+    call parse_prompt
+    ret
+.template db '[$username@PRos] > ', 0
 
 handle_password_check:
     mov si, password_cfg_load_msg
@@ -243,6 +245,10 @@ handle_password_check:
 decrypt_and_verify_password:
     mov si, program_load_addr
     mov di, decrypted_pass
+    cmp bx, 31
+    jbe .len_ok
+    mov bx, 31
+.len_ok:
     mov cx, bx
     call decrypt_string
 
@@ -838,13 +844,12 @@ load_user_cfg:
     mov ax, user_cfg_file
     mov cx, program_load_addr
     call fs_load_file
+    mov [user_cfg_size], bx
 
     pushf
-    push bx
 
     call fs_parent_directory
 
-    pop bx
     popf
 
     jnc .done
@@ -856,6 +861,7 @@ load_user_cfg:
 
 .done:
     popa
+    mov bx, [user_cfg_size]
     ret
 
 ; Load PROMPT.CFG
@@ -868,12 +874,14 @@ load_prompt_cfg:
     mov ax, prompt_cfg_file
     mov cx, program_load_addr
     call fs_load_file
+    mov [prompt_cfg_size], bx
 
     pushf
     call fs_parent_directory
     popf
     jc .fail
     popa
+    mov bx, [prompt_cfg_size]
     clc
     ret
 .fail:
@@ -893,12 +901,14 @@ load_password_cfg:
     mov ax, password_cfg_file
     mov cx, program_load_addr
     call fs_load_file
+    mov [password_cfg_size], bx
 
     pushf
     call fs_parent_directory
     popf
     jc .fail
     popa
+    mov bx, [password_cfg_size]
     clc
     ret
 .fail:
@@ -940,3 +950,6 @@ user_cfg_missed          db 'USER.CFG not found', 0
 pass_cfg_missed          db 'PASSWORD.CFG not found', 0
 prompt_cfg_missed        db 'PROMPT.CFG not found', 0
 logo_missed              db 'LOGO.BMP not found', 0
+user_cfg_size            dw 0
+prompt_cfg_size          dw 0
+password_cfg_size        dw 0

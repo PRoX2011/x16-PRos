@@ -673,6 +673,11 @@ trampoline_code:
     xor si, si
 
 .t_run:
+    ; Run launched program in the directory that was active
+    ; before launcher switched to BIN.DIR.
+    mov ah, 0x0F
+    int 0x22
+
     mov ax, 0x8000
     xor bx, bx
     xor cx, cx

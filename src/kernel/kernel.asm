@@ -9,10 +9,9 @@
 [ORG 0x0000]
 
 disk_buffer          equ 0x6000
-dirlist              equ 0x8C00
-command_history      equ 0xC000
 program_load_addr    equ 0x8000
-program_scratch_addr equ 0xA800
+dirlist              equ 0xA800
+command_history      equ 0xD000
 
 section .text
 
@@ -311,6 +310,7 @@ print_info:
 
 shell:
 get_cmd:
+    call refresh_prompt
     mov si, final_prompt
     call print_string
 
