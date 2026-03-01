@@ -997,11 +997,11 @@ load_file:
     int 0x22
     jc .fail
 
-    cmp dx, FILE_BUFFER_SIZE
+    cmp bx, FILE_BUFFER_SIZE
     jbe .ok
-    mov dx, FILE_BUFFER_SIZE
+    mov bx, FILE_BUFFER_SIZE
 .ok:
-    mov [file_size], dx
+    mov [file_size], bx
     mov byte [modified], 0
     call clear_dirty
     jmp .done
