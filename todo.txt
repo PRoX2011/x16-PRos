@@ -2,4 +2,3 @@
 [     TODO    ] Implement cooperative multitasking
 [     TODO    ] Add the ability to compile x16-PRos to ISO image
 [     TODO    ] Add internet driver
-[     TODO    ] Add simple GUI launcher for programs
