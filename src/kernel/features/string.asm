@@ -490,18 +490,18 @@ string_clear_screen:
 string_get_time_string:
     pusha
     mov di, bx
-    clc
-    mov ah, 2
-    int 1Ah
-    jnc .read
-    clc
-    mov ah, 2
-    int 1Ah
+    call timezone_get_local_datetime
 
-.read:
-    mov al, ch
-    call string_bcd_to_int
-    mov dx, ax
+    mov al, [timezone_local_hour]
+    call .bin_to_bcd
+    mov ch, al
+    mov al, [timezone_local_minute]
+    call .bin_to_bcd
+    mov cl, al
+    mov al, [timezone_local_second]
+    call .bin_to_bcd
+    mov dh, al
+
     mov al, ch
     shr al, 4
     and ch, 0Fh
@@ -528,6 +528,14 @@ string_get_time_string:
     popa
     ret
 
+.bin_to_bcd:
+    xor ah, ah
+    mov bl, 10
+    div bl
+    shl al, 4
+    or al, ah
+    ret
+
 .add_digit:
     add al, '0'
     stosb
@@ -543,15 +551,21 @@ string_get_date_string:
     mov di, bx
     mov bx, [fmt_date]
     and bx, 7F03h
-    clc
-    mov ah, 4
-    int 1Ah
-    jnc .read
-    clc
-    mov ah, 4
-    int 1Ah
+    call timezone_get_local_datetime
 
-.read:
+    mov al, [timezone_local_century]
+    call .bin_to_bcd
+    mov ch, al
+    mov al, [timezone_local_year]
+    call .bin_to_bcd
+    mov cl, al
+    mov al, [timezone_local_month]
+    call .bin_to_bcd
+    mov dh, al
+    mov al, [timezone_local_day]
+    call .bin_to_bcd
+    mov dl, al
+
     cmp bl, 2
     jne .try_fmt1
     mov ah, ch
@@ -635,6 +649,14 @@ string_get_date_string:
 .add_digit:
     add al, '0'
     stosb
+    ret
+
+.bin_to_bcd:
+    xor ah, ah
+    mov bl, 10
+    div bl
+    shl al, 4
+    or al, ah
     ret
 
 ; =======================================================================

@@ -2042,6 +2042,7 @@ cd_command:
 %INCLUDE "src/kernel/log.asm"                       ; Log functions
 %INCLUDE "src/kernel/features/fs.asm"               ; FAT12 filesystem functions
 %INCLUDE "src/kernel/features/string.asm"           ; String functions
+%INCLUDE "src/kernel/features/timezone.asm"         ; Timezone config/time helpers
 %INCLUDE "src/kernel/features/speaker.asm"          ; PC speaker functions
 %INCLUDE "src/kernel/features/bmp_rendering.asm"    ; BMP rendering functions
 %INCLUDE "src/kernel/features/themes.asm"           ; Themes

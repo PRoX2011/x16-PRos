@@ -69,6 +69,7 @@ init_api:
 
 init_configs:
     call load_system_cfg
+    call load_timezone_cfg
 
     mov si, config_init_msg
     call log_okay
