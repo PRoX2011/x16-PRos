@@ -108,7 +108,7 @@ view_bmp:
     jc .not_found
 
     mov ax, [param_list]
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
     mov word [file_size], bx
     cmp bx, 0
@@ -120,7 +120,7 @@ view_bmp:
 
     ; Load and display BMP based on flags
     push bx
-    mov si, 32768    ; Point to loaded file data
+    mov si, program_load_addr    ; Point to loaded file data
 
     cmp word [.stretch_flag], 1
     je .display_stretched

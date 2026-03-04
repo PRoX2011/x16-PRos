@@ -186,6 +186,7 @@ dot:
     jmp .exit
 .buffer_cleared:
     pop es
+    popa
 
     mov ax, 0x12
     int 0x10

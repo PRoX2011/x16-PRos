@@ -102,6 +102,7 @@
 
 int20_handler:
     cli
+    cld
 
     push ds
     push es

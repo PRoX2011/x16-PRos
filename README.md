@@ -4,13 +4,19 @@
 
 <h1>x16-PRos Operating System</h1>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
-[![Version](https://img.shields.io/badge/version-0.6.5-blue.svg)](#)
-[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](#contributing)
+[![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE.TXT)
+[![Version](https://img.shields.io/badge/version-0.7-blue?style=for-the-badge)](docs/changes/v0.7.txt)
+[![Assembler](https://img.shields.io/badge/assembler-NASM-1f425f?style=for-the-badge)](https://nasm.us/)
+[![Boot Mode](https://img.shields.io/badge/boot-BIOS%20Legacy-orange?style=for-the-badge)](#running-x16-pros)
+
+[![GitHub stars](https://img.shields.io/github/stars/PRoX2011/x16-PRos?style=flat-square)](https://github.com/PRoX2011/x16-PRos/stargazers)
+[![Last commit](https://img.shields.io/github/last-commit/PRoX2011/x16-PRos?style=flat-square)](https://github.com/PRoX2011/x16-PRos/commits)
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
+
 
 **A minimalistic 16-bit operating system written in NASM for x86 architecture**
 
-[Website](https://x16-pros.prosdev.org/) • [Programs Repository](https://github.com/PRoX2011/programs4pros/) • [API Documentation](docs/API.md)
+[Website](https://x16-pros.prosdev.org/) • [API Documentation](docs/API.md) • [Configs Documentation](docs/CONFIGURATION.md)
 
 <img src="docs/screenshots/terminal.png" width=75%>
 
@@ -49,6 +55,11 @@ Designed for simplicity and educational value, x16-PRos provides a platform for 
 
 ---
 
+Developing this project requires a lot of time and effort. The project is completely open source. Everything is being done out of pure passion, so if you like it, I'd like to ask you to support me (PRoX2011) financially using this link: [support me](https://dalink.to/proxdev)
+
+Thanks to everyone who supported me financially. All your nicknames will appear in the project's sponsors list.
+
+---
 
 ## Key Features
 
@@ -70,6 +81,7 @@ Designed for simplicity and educational value, x16-PRos provides a platform for 
 - **Parameter Passing**: Command-line argument support for applications
 - **API Access**: Comprehensive kernel API for file, string, and output operations
 - **Debugging Tools**: CPU info display, memory viewer, register inspection
+- **Multiple disk support**: detect/list available drives and switch drives in the terminal
 
 ---
 
@@ -119,12 +131,6 @@ The system includes a powerful terminal - **PRos Terminal**. It not only allows 
 | `touch` | `touch <filename>` | Create empty file |
 | `write` | `write <file> <text>` | Write text to file |
 
-#### Text Processing
-| Command | Syntax | Description |
-|---------|--------|-------------|
-| `head` | `head <filename>` | Display first 10 lines of file |
-| `tail` | `tail <filename>` | Display last 10 lines of file |
-
 #### Directory Operations
 | Command | Syntax | Description |
 |---------|--------|-------------|
@@ -143,50 +149,8 @@ The system includes a powerful terminal - **PRos Terminal**. It not only allows 
 | `shut` | Shutdown system via APM |
 | `reboot` | Restart system |
 
----
-
-
-## ⚙️ Configuration Files
-
-x16-PRos uses several configuration files in the CONF directory:
-
-| File | Purpose | Format |
-|------|---------|--------|
-| `SYSTEM.CFG` | System boot settings | Key=Value properties |
-| `FIRST_B.CFG` | First boot flag | `0` or `1` (triggers SETUP.BIN on `1`) |
-| `USER.CFG` | Username | Plain text (max 31 chars) |
-| `PASSWORD.CFG` | Encrypted password | XOR-encrypted password |
-| `PROMPT.CFG` | Command prompt format | Template string (max 63 chars)<br>Supports `$user` placeholder |
-| `THEME.CFG` | Active color theme |16 lines, each containing the RGB code for a particular terminal color. |
-| `TIMEZONE.CFG` | Timezone offset | Integer value (hours from UTC) |
-
-### Prompt Customization
-In the x16-PRos operating system, the command line prompt is configured using the PROMPT.CFG file, which is located in the CONF directory of the drive.
-
-By default, if the PROMPT.CFG file is missing, a prompt of the following format is used:
-`[$username@PRos] >`
-(where the `$username` is taken from the `USER.CFG` file created during the first boot via SETUP).
-
-#### How to create or edit a prompt
-
-1. Create (or edit an existing) file `PROMPT.CFG` in the CONF directory.
-2. Write a prompt string without the terminating null byte (plain text) into it.
-3. The maximum string length is 63 characters. Anything longer will be truncated.
-4. Reboot the OS.
-
-### System Configuration (SYSTEM.CFG)
-This file controls the visual and audio aspects of the boot process.
-- **LOGO**: Path to the BMP file displayed at startup (e.g., `LOGO=BMP/LOGO.BMP`).
-- **LOGO_STRETCH**: Scales the logo to full screen if set to `TRUE`.
-- **START_SOUND**: Enables (`TRUE`) or disables (`FALSE`) the startup melody.
-
-### Password Encryption
-Passwords are encrypted using XOR cipher with a custom key defined in `src/kernel/features/encrypt.asm`. To set a password:
-1. Use SETUP.BIN on first boot, or
-2. Manually create PASSWORD.CFG with encrypted content
 
 ---
-
 
 ## 📦 Standard Software Package
 
@@ -200,14 +164,14 @@ x16-PRos includes a comprehensive collection of built-in applications:
     Simple editor for text files
   </td>
   <td width="33%" align="center">
-    <img src="docs/screenshots/bchart.png" width="100%"><br>
-    <b>BCHART.BIN</b><br>
-    Barchart software for creating simple diagrams
+    <img src="docs/screenshots/hexedit.png" width="100%"><br>
+    <b>HEXEDIT.BIN</b><br>
+    Hex editor
   </td>
   <td width="33%" align="center">
-    <img src="docs/screenshots/brainf.png" width="100%"><br>
-    <b>BRAINF.BIN</b><br>
-    Brainfuck interpreter
+    <img src="docs/screenshots/launch.png" width="100%"><br>
+    <b>LAUNCH.BIN</b><br>
+    TUI program launcher
   </td>
 </tr>
 <tr>
@@ -222,9 +186,9 @@ x16-PRos includes a comprehensive collection of built-in applications:
     Simple piano to play melodies using PC Speaker
   </td>
   <td width="33%" align="center">
-    <img src="docs/screenshots/procentc.png" width="100%"><br>
-    <b>PROCENTC.BIN</b><br>
-    Percentages calculator
+    <img src="docs/screenshots/bchart.png" width="100%"><br>
+    <b>BCHART.BIN</b><br>
+    Barchart software for creating simple diagrams
   </td>
 </tr>
 <tr>
@@ -273,9 +237,9 @@ x16-PRos includes a comprehensive collection of built-in applications:
     Clock application
   </td>
   <td width="33%" align="center">
-    <img src="docs/screenshots/hexedit.png" width="100%"><br>
-    <b>HEXEDIT.BIN</b><br>
-    Hex editor
+    <img src="docs/screenshots/procentc.png" width="100%"><br>
+    <b>PROCENTC.BIN</b><br>
+    Percentages calculator
   </td>
 </tr>
 <tr>
@@ -289,10 +253,17 @@ x16-PRos includes a comprehensive collection of built-in applications:
     <b>MANDEL.BIN</b><br>
     Mandelbrot-Menge
   </td>
-  <td width="33%" align="center">
+    <td width="33%" align="center">
+    <img src="docs/screenshots/brainf.png" width="100%"><br>
+    <b>BRAINF.BIN</b><br>
+    Brainfuck interpreter
+  </td>
+</tr>
+<tr>
+<td width="33%" align="center">
     <br>
     <b>And more...</b><br>
-    SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, THEME.BIN, CHARS.BIN, WAVPLAY.BIN, ED.BIN, HELLO.COM, FRACTAL.COM
+    SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, HEAD, TAIL, THEME.BIN, CHARS.BIN, WAVPLAY.BIN, FDISK.BIN, ED.BIN, HELLO.COM, FRACTAL.COM
   </td>
 </tr>
 </table>
@@ -358,7 +329,8 @@ chmod +x build-linux.sh
 ./build-linux.sh
 ```
 
-> [!FOR ADVANSED USERS]\
+> [!NOTE]
+> FOR ADVANSED USERS
 > build-linux have special flags:
 > ```
 > -quiet            - disable all script messages, but not disable nasm's warnings and errors
@@ -476,40 +448,6 @@ We welcome contributions! Special thanks to all who have submitted:
 - Test changes in QEMU before submitting
 - Document new features in comments
 - Update README.md for user-facing changes
-
-### Support the Project
-
-<a href="https://dalink.to/proxdev">
-  <img src="https://img.shields.io/badge/Support%20Development-blue.svg?style=for-the-badge" height="35">
-</a>
-
----
-
-
-## 📄 License
-
-x16-PRos is distributed under the **MIT License**.
-```
-Copyright (c) 2025 PRoX2011
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
 
 ---
 

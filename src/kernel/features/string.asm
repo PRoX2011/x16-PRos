@@ -255,9 +255,8 @@ string_input_string:
     cmp cx, 255
     jge .read_loop
     stosb
-    mov ah, 0x0E
     mov bl, 0x1F
-    int 0x10
+    call print_char
     inc cx
     jmp .read_loop
 
@@ -277,17 +276,16 @@ string_input_string:
     shl bx, 8
     lea si, [command_history + bx]
     
-    mov bx, 0x1F
-    mov ah, 0x0E
+    mov bl, 0x1F
 .handle_history_scroll_up_clear_loop:
     cmp cx, 0
     je .handle_history_scroll_up_loop
     mov al, 0x08
-    int 0x10
+    call print_char
     mov al, ' '
-    int 0x10
+    call print_char
     mov al, 0x08
-    int 0x10
+    call print_char
     dec cx
     jmp .handle_history_scroll_up_clear_loop
 
@@ -296,9 +294,8 @@ string_input_string:
     mov [di], al
     cmp al, 0
     je .handle_history_scroll_up_done
-    mov bx, 0x1F
-    mov ah, 0x0E
-    int 0x10
+    mov bl, 0x1F
+    call print_char
     inc di
     inc si
     inc cx
@@ -319,17 +316,16 @@ string_input_string:
     shl bx, 8
     lea si, [command_history + bx]
     
-    mov bx, 0x1F
-    mov ah, 0x0E
+    mov bl, 0x1F
 .handle_history_scroll_down_clear_loop:
     cmp cx, 0
     je .handle_history_scroll_down_loop
     mov al, 0x08
-    int 0x10
+    call print_char
     mov al, ' '
-    int 0x10
+    call print_char
     mov al, 0x08
-    int 0x10
+    call print_char
     dec cx
     jmp .handle_history_scroll_down_clear_loop
 
@@ -338,9 +334,8 @@ string_input_string:
     mov [di], al
     cmp al, 0
     je .handle_history_scroll_down_done
-    mov bx, 0x1F
-    mov ah, 0x0E
-    int 0x10
+    mov bl, 0x1F
+    call print_char
     inc di
     inc si
     inc cx
@@ -354,18 +349,16 @@ string_input_string:
     mov di, [.start_input_buf_addr]
     mov byte [di], 0
 
-    mov bx, 0x1F
-    mov ah, 0x0E
-    mov al, 0x08
+    mov bl, 0x1F
 .handle_history_scroll_down_clear_loop_exit:
     cmp cx, 0
     je .handle_history_scroll_down_clear_loop_done
     mov al, 0x08
-    int 0x10
+    call print_char
     mov al, ' '
-    int 0x10
+    call print_char
     mov al, 0x08
-    int 0x10
+    call print_char
     dec cx
     jmp .handle_history_scroll_down_clear_loop_exit
 
@@ -381,13 +374,13 @@ string_input_string:
     call string_get_cursor_pos
     cmp dl, [.cursor_col]
     jbe .read_loop
-    mov ah, 0x0E
+    mov bl, 0x1F
     mov al, 0x08
-    int 0x10
+    call print_char
     mov al, ' '
-    int 0x10
+    call print_char
     mov al, 0x08
-    int 0x10
+    call print_char
     jmp .read_loop
 
 
@@ -408,13 +401,13 @@ string_input_string:
     call string_get_cursor_pos
     cmp dl, [.cursor_col]
     jbe .read_loop
-    mov ah, 0x0E
+    mov bl, 0x1F
     mov al, 0x08
-    int 0x10
+    call print_char
     mov al, ' '
-    int 0x10
+    call print_char
     mov al, 0x08
-    int 0x10
+    call print_char
 
     inc byte [.handle_ctrl_backspace_deleting_counter]
 
@@ -458,8 +451,8 @@ string_input_string:
     mov byte [di], al
     inc di
     inc cx
-    mov ah, 0x0E
-    int 0x10
+    mov bl, 0x1F
+    call print_char
     jmp .read_loop
 
 .done_read:
@@ -497,18 +490,18 @@ string_clear_screen:
 string_get_time_string:
     pusha
     mov di, bx
-    clc
-    mov ah, 2
-    int 1Ah
-    jnc .read
-    clc
-    mov ah, 2
-    int 1Ah
+    call timezone_get_local_datetime
 
-.read:
-    mov al, ch
-    call string_bcd_to_int
-    mov dx, ax
+    mov al, [timezone_local_hour]
+    call .bin_to_bcd
+    mov ch, al
+    mov al, [timezone_local_minute]
+    call .bin_to_bcd
+    mov cl, al
+    mov al, [timezone_local_second]
+    call .bin_to_bcd
+    mov dh, al
+
     mov al, ch
     shr al, 4
     and ch, 0Fh
@@ -535,6 +528,14 @@ string_get_time_string:
     popa
     ret
 
+.bin_to_bcd:
+    xor ah, ah
+    mov bl, 10
+    div bl
+    shl al, 4
+    or al, ah
+    ret
+
 .add_digit:
     add al, '0'
     stosb
@@ -550,15 +551,21 @@ string_get_date_string:
     mov di, bx
     mov bx, [fmt_date]
     and bx, 7F03h
-    clc
-    mov ah, 4
-    int 1Ah
-    jnc .read
-    clc
-    mov ah, 4
-    int 1Ah
+    call timezone_get_local_datetime
 
-.read:
+    mov al, [timezone_local_century]
+    call .bin_to_bcd
+    mov ch, al
+    mov al, [timezone_local_year]
+    call .bin_to_bcd
+    mov cl, al
+    mov al, [timezone_local_month]
+    call .bin_to_bcd
+    mov dh, al
+    mov al, [timezone_local_day]
+    call .bin_to_bcd
+    mov dl, al
+
     cmp bl, 2
     jne .try_fmt1
     mov ah, ch
@@ -642,6 +649,14 @@ string_get_date_string:
 .add_digit:
     add al, '0'
     stosb
+    ret
+
+.bin_to_bcd:
+    xor ah, ah
+    mov bl, 10
+    div bl
+    shl al, 4
+    or al, ah
     ret
 
 ; =======================================================================
@@ -747,8 +762,10 @@ string_to_int:
 parse_prompt:
     push ax
     push bx
+    push cx
     push si
     push di
+    mov cx, 63
 
 .loop:
     lodsb               
@@ -759,7 +776,8 @@ parse_prompt:
     cmp al, '%'             
     je .check_hex
 .store:
-    stosb        
+    call .store_char
+    jc .done
     jmp .loop
 
 .check_username:
@@ -783,7 +801,8 @@ parse_prompt:
     lodsb
     cmp al, 0
     je .user_done
-    stosb
+    call .store_char
+    jc .done
     jmp .copy_user
 .user_done:
     pop si
@@ -791,7 +810,8 @@ parse_prompt:
 
 .store_dollar:
     mov al, '$'
-    stosb
+    call .store_char
+    jc .done
     jmp .loop
 
 .check_hex:
@@ -815,12 +835,14 @@ parse_prompt:
     or bl, al     
 
     mov al, bl
-    stosb
+    call .store_char
+    jc .done
     jmp .loop
 
 .store_percent:
     mov al, '%'
-    stosb
+    call .store_char
+    jc .done
     dec si     
     cmp ah, 0       
     je .loop
@@ -831,8 +853,20 @@ parse_prompt:
     mov byte [di], 0     
     pop di
     pop si
+    pop cx
     pop bx
     pop ax
+    ret
+
+.store_char:
+    cmp cx, 0
+    je .store_full
+    stosb
+    dec cx
+    clc
+    ret
+.store_full:
+    stc
     ret
 
 ; =======================================================================

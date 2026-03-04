@@ -62,6 +62,17 @@ check_error() {
     fi
 }
 
+print_kernel_size() {
+    local label="$1"
+    local size_bytes
+    size_bytes=$(stat -c%s bin/KERNEL.BIN 2>/dev/null)
+    if [ -n "$size_bytes" ]; then
+        local size_kib
+        size_kib=$(( (size_bytes + 1023) / 1024 ))
+        print_info "$label kernel size: ${size_bytes} bytes (~${size_kib} KiB)"
+    fi
+}
+
 mkdir -p bin
 mkdir -p disk_img
 mkdir -p compcash
@@ -82,10 +93,21 @@ fi
 
 # Compile kernel
 if [ $FLAG_NO_KERNEL_RECOMP == 0 ]; then
+    baseline_kernel_size=$(stat -c%s bin/KERNEL.BIN 2>/dev/null || echo 0)
     print_info "Compiling kernel (kernel.asm => bin/KERNEL.BIN)..."
     nasm -f bin src/kernel/kernel.asm -o bin/KERNEL.BIN
     check_error "Kernel compilation failed"
     print_ok "Kernel compiled successfully"
+    current_kernel_size=$(stat -c%s bin/KERNEL.BIN 2>/dev/null || echo 0)
+    if [ "$baseline_kernel_size" -gt 0 ]; then
+        delta_kernel_size=$((current_kernel_size - baseline_kernel_size))
+        delta_sign="+"
+        if [ "$delta_kernel_size" -lt 0 ]; then
+            delta_sign=""
+        fi
+        print_info "Kernel size delta: ${delta_sign}${delta_kernel_size} bytes (baseline ${baseline_kernel_size})"
+    fi
+    print_kernel_size "Current"
 fi
 
 # Create and format disk image
@@ -241,8 +263,10 @@ programs=(
     "programs/tetris.asm TETRIS.BIN"
     "programs/chars.asm CHARS.BIN"
     "programs/eye.asm EYE.BIN"
-    "programs/ed.asm ED.BIN programs/ed-comands.asm programs/ed-common.asm"
+    "programs/ed.asm ED.BIN programs/ed-commands.inc programs/ed-common.inc"
     "programs/memtest.asm MEMTEST.BIN"
+    "programs/fdisk.asm FDISK.BIN"
+    "programs/launch.asm LAUNCH.BIN"
 )
 
 for prog in "${programs[@]}"; do

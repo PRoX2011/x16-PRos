@@ -46,9 +46,40 @@ fixes and kernel optimizations make this version more stable and performant.
 =======================================================================================
 
 4. Build System Enhancements
-1) New compilation optimization flags (check out build-linux.sh)
+1) New compilation flags (check out build-linux.sh)
 2) Caching system
 3) Build script refactoringy
+
+=======================================================================================
+
+5. New text-based user interface (TUI) system and kernel optimization
+1) New shared TUI library for programs (programs/lib/tui.inc)
+2) Interface and rendering updates for hexedit and writer
+3) Kernel optimization
+   - The kernel now weighs 40kib less
+
+=======================================================================================
+
+6. Program bugfixes and behavior improvements
+1) ED editor now correctly works with LF line endings
+2) Fixed file loading in HEXEDIT
+3) Additional bugfixes in kernel FS/init and launch program
+4) Command history stability improvements
+
+=======================================================================================
+
+7. BARCHART program updates
+1) Added support for loading and saving chart data files
+2) Added chart name support
+3) Added navigation through columns and value editing
+4) Minor barchart bugfixes and polishing
+
+=======================================================================================
+
+8. Project documentation and metadata updates
+1) Updated screenshots in docs
+2) README and CONFIGURATION docs updated
+3) Credits list updated
 
 =======================================================================================
 

@@ -1,4 +1,15 @@
-log_buffer_addr resb 1024 
+log_buf         times 1024 db 0
+log_buf_used    dw 0
+
+log_clear_on_boot:
+    pusha
+    mov word [log_buf_used], 0
+    mov ax, log_filename
+    mov bx, log_buf
+    xor cx, cx
+    call fs_write_file
+    popa
+    ret
 
 log_okay:
     push si
@@ -60,91 +71,103 @@ log_delay:
 
 log_write_to_file:
     pusha
-    push ds
-    push es
-    
+
+    mov di, log_buf
+    mov ax, [log_buf_used]
+    cmp ax, 0
+    jne .buf_ready
+
     mov ax, log_filename
     call fs_file_exists
-    jc .create_new_buffer
+    jc .buf_ready
 
     mov ax, log_filename
-    mov cx, log_buffer_addr
+    call fs_get_file_size
+    jc .buf_ready
+
+    mov ax, bx
+    cmp ax, 900
+    ja .buf_ready
+
+    mov [log_buf_used], ax
+    mov ax, log_filename
+    mov cx, log_buf
     call fs_load_file
-    
-    jc .create_new_buffer
-    
-    mov di, log_buffer_addr
-    add di, bx
-    jmp .append_current_msg
+    jc .reset_buf
 
-.create_new_buffer:
-    mov di, log_buffer_addr
+    mov ax, [log_buf_used]
+    jmp .buf_positioned
 
-.append_current_msg:
+.reset_buf:
+    mov word [log_buf_used], 0
+    xor ax, ax
+
+.buf_ready:
+    mov ax, [log_buf_used]
+
+.buf_positioned:
+    mov di, log_buf
+    add di, ax
+
     mov al, [log_type_flag]
     cmp al, 1
-    je .add_okay_prefix
+    je .prefix_okay
     cmp al, 2
-    je .add_warn_prefix
+    je .prefix_warn
     cmp al, 3
-    je .add_error_prefix
-    jmp .add_message_text
+    je .prefix_error
+    jmp .write_msg
 
-.add_okay_prefix:
+.prefix_okay:
     mov si, okay_message
-    call .copy_string_to_buffer
-    jmp .add_message_text
+    call .append
+    jmp .write_msg
 
-.add_warn_prefix:
+.prefix_warn:
     mov si, warn_message
-    call .copy_string_to_buffer
-    jmp .add_message_text
+    call .append
+    jmp .write_msg
 
-.add_error_prefix:
+.prefix_error:
     mov si, error_message
-    call .copy_string_to_buffer
+    call .append
 
-.add_message_text:
+.write_msg:
     mov si, [log_message_ptr]
-    call .copy_string_to_buffer
-    
+    call .append
+
     mov byte [di], 0x0D
     inc di
     mov byte [di], 0x0A
     inc di
-    
+
     mov cx, di
-    sub cx, log_buffer_addr
-    
+    sub cx, log_buf
+    mov [log_buf_used], cx
+
     mov ax, log_filename
-    mov bx, log_buffer_addr
+    mov bx, log_buf
     call fs_write_file
-    
-    pop es
-    pop ds
+
     popa
     ret
 
-.copy_string_to_buffer:
+.append:
     push ax
-.copy_loop:
+.app_loop:
     lodsb
     cmp al, 0
-    je .copy_done
+    je .app_done
     mov [di], al
     inc di
-    jmp .copy_loop
-.copy_done:
+    jmp .app_loop
+.app_done:
     pop ax
     ret
 
-; ================= Data Section =================
-
-error_message           db '[ ERROR ] ', 0
-okay_message            db '[ OKAY ]  ', 0
-warn_message            db '[ WARN ]  ', 0
-
-log_filename            db 'LOG.TXT', 0
-
-log_type_flag           db 0
-log_message_ptr         dw 0
+error_message   db '[ ERROR ] ', 0
+okay_message    db '[ OKAY ]  ', 0
+warn_message    db '[ WARN ]  ', 0
+log_filename    db 'LOG.TXT', 0
+log_type_flag   db 0
+log_message_ptr dw 0
