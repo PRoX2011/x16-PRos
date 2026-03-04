@@ -4,7 +4,7 @@
 ;
 ; Function codes in AH:
 ;   0x00: Re-Initialize file system
-;   0x01: Get file list (SI = buffer, returns BX = size low, CX = size high, DX = file count)
+;   0x01: Get file list (SI = buffer for 18-byte entries, returns BX = size low, CX = size high, DX = file count)
 ;   0x02: Load file (SI = filename, CX = load position, returns BX = file size)
 ;   0x03: Write file (SI = filename, BX = buffer, CX = size)
 ;   0x04: Check if file exists (SI = filename)
@@ -49,6 +49,7 @@ int22_handler:
     mov bp, cs
     mov ds, bp
     mov es, bp
+    cld
 
     mov al, ah
 
@@ -108,11 +109,11 @@ int22_handler:
 
     mov bp, sp
     mov bx, [.saved_bx]
-    mov [bp+14], bx
+    mov [bp+12], bx
     mov cx, [.saved_cx]
-    mov [bp+12], cx
+    mov [bp+16], cx
     mov dx, [.saved_dx]
-    mov [bp+10], dx
+    mov [bp+14], dx
     jmp .done
 
 .load_file:
@@ -121,7 +122,7 @@ int22_handler:
     jc .done
 
     mov bp, sp
-    mov [bp+14], bx
+    mov [bp+12], bx
     jmp .done
 
 .write_file:
@@ -154,7 +155,7 @@ int22_handler:
     mov ax, si
     call fs_get_file_size
     mov bp, sp
-    mov [bp+14], bx
+    mov [bp+12], bx
     jmp .done
 
 .change_directory:
@@ -204,6 +205,18 @@ int22_handler:
     jmp .done
     
 .done:
+    jc .set_cf
+    push bp
+    mov bp, sp
+    and word [bp+26], 0xFFFE
+    pop bp
+    jmp .do_iret
+.set_cf:
+    push bp
+    mov bp, sp
+    or word [bp+26], 0x0001
+    pop bp
+.do_iret:
     pop es
     pop ds
     popa

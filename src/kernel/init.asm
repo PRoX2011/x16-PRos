@@ -32,6 +32,7 @@ init_disks:
 
     mov al, 'A'
     call fs_change_drive_letter
+    call log_clear_on_boot
 
     mov si, disk_init_msg
     call log_okay
@@ -73,6 +74,7 @@ init_api:
 
 init_configs:
     call load_system_cfg
+    call load_timezone_cfg
 
     mov si, config_init_msg
     call log_okay
@@ -115,7 +117,7 @@ init_autoexec:
 
 check_first_boot:
     call load_first_boot_cfg
-    mov al, [32768]
+    mov al, [program_load_addr]
     cmp al, '1'
     je .first_boot
     call load_user_from_config
@@ -145,7 +147,7 @@ run_setup_wizard:
     mov dx, 0
     mov word si, [param_list]
     mov di, 0
-    call 32768
+    call program_load_addr
     ret
 
 .setup_failed:
@@ -158,9 +160,11 @@ load_user_from_config:
     call load_user_cfg
     jc .use_default
 
+    push bx
     call log_okay
+    pop bx
 
-    mov si, 32768
+    mov si, program_load_addr
     mov di, user
     mov cx, bx
     cmp cx, 31
@@ -181,13 +185,15 @@ load_prompt_from_config:
     call load_prompt_cfg
     jc .use_default_prompt
 
+    push bx
     call log_okay
+    pop bx
 
     cmp bx, 63
     jbe .copy
     mov bx, 63
 .copy:
-    mov si, 32768
+    mov si, program_load_addr
     mov di, temp_prompt
     mov cx, bx
     rep movsb
@@ -203,26 +209,28 @@ load_prompt_from_config:
     call build_default_prompt
     ret
 
-build_default_prompt:
-    mov di, final_prompt
-    mov al, '['
-    stosb
-    mov si, user
-.copy_user:
-    lodsb
-    cmp al, 0
-    je .done
-    stosb
-    jmp .copy_user
-.done:
-    mov si, .suffix
-.copy_suffix:
-    lodsb
-    stosb
-    cmp al, 0
-    jne .copy_suffix
+refresh_prompt:
+    cmp byte [temp_prompt], 0
+    jne .parse_from_template
+    call build_default_prompt
     ret
-.suffix db '@PRos] > ', 0
+
+.parse_from_template:
+    mov si, temp_prompt
+    mov di, final_prompt
+    call parse_prompt
+    ret
+
+build_default_prompt:
+    mov si, .template
+    mov di, temp_prompt
+    call string_string_copy
+
+    mov si, temp_prompt
+    mov di, final_prompt
+    call parse_prompt
+    ret
+.template db '[$username@PRos] > ', 0
 
 handle_password_check:
     mov si, password_cfg_load_msg
@@ -230,7 +238,9 @@ handle_password_check:
     call load_password_cfg
     jc .no_password
 
+    push bx
     call log_okay
+    pop bx
     call decrypt_and_verify_password
     ret
 
@@ -239,8 +249,12 @@ handle_password_check:
     ret
 
 decrypt_and_verify_password:
-    mov si, 32768
+    mov si, program_load_addr
     mov di, decrypted_pass
+    cmp bx, 31
+    jbe .len_ok
+    mov bx, 31
+.len_ok:
     mov cx, bx
     call decrypt_string
 
@@ -356,7 +370,7 @@ execute_autoexec_if_exists:
 
     mov ax, autoexec_file
     mov bx, 0
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
     jc .skip
 
@@ -368,7 +382,7 @@ execute_autoexec_if_exists:
     mov di, 0
 
     call DisableMouse
-    call 32768
+    call program_load_addr
     call EnableMouse
     ret
 
@@ -390,11 +404,11 @@ load_system_cfg:
     call string_string_copy
 
     mov ax, system_cfg_file
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
     jc .done
 
-    mov si, 32768
+    mov si, program_load_addr
     mov cx, bx
     call parse_system_cfg_data
 
@@ -730,7 +744,7 @@ load_logo_and_display:
     jc .error_loading
 
     pop ax
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
 
     pushf
@@ -742,7 +756,7 @@ load_logo_and_display:
 
 .no_path:
     mov ax, current_logo_file
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
     jnc .display_logo
 
@@ -755,7 +769,7 @@ load_logo_and_display:
     mov ax, 0x13
     int 0x10
     push bx
-    mov si, 32768
+    mov si, program_load_addr
     cmp byte [cfg_logo_stretch], 1
     je .display_stretched
     call display_bmp
@@ -786,7 +800,7 @@ load_first_boot_cfg:
     jc .fresh_install
 
     mov ax, first_boot_file
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
     jc .file_missing
 
@@ -798,8 +812,8 @@ load_first_boot_cfg:
     call fs_parent_directory
 
 .fresh_install:
-    mov byte [32768], '1'
-    mov byte [32769], 0
+    mov byte [program_load_addr], '1'
+    mov byte [program_load_addr + 1], 0
     popa
     ret
 
@@ -808,7 +822,7 @@ load_setup_bin:
     pusha
     mov ax, setup_bin_file
     mov bx, 0
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
     jnc .done
     mov si, error_message
@@ -834,15 +848,14 @@ load_user_cfg:
     jc .fail_load
 
     mov ax, user_cfg_file
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
+    mov [user_cfg_size], bx
 
     pushf
-    push bx
 
     call fs_parent_directory
 
-    pop bx
     popf
 
     jnc .done
@@ -854,6 +867,7 @@ load_user_cfg:
 
 .done:
     popa
+    mov bx, [user_cfg_size]
     ret
 
 ; Load PROMPT.CFG
@@ -864,14 +878,16 @@ load_prompt_cfg:
     jc .fail
 
     mov ax, prompt_cfg_file
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
+    mov [prompt_cfg_size], bx
 
     pushf
     call fs_parent_directory
     popf
     jc .fail
     popa
+    mov bx, [prompt_cfg_size]
     clc
     ret
 .fail:
@@ -889,14 +905,16 @@ load_password_cfg:
     jc .fail
 
     mov ax, password_cfg_file
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
+    mov [password_cfg_size], bx
 
     pushf
     call fs_parent_directory
     popf
     jc .fail
     popa
+    mov bx, [password_cfg_size]
     clc
     ret
 .fail:
@@ -939,3 +957,6 @@ user_cfg_missed          db 'USER.CFG not found', 0
 pass_cfg_missed          db 'PASSWORD.CFG not found', 0
 prompt_cfg_missed        db 'PROMPT.CFG not found', 0
 logo_missed              db 'LOGO.BMP not found', 0
+user_cfg_size            dw 0
+prompt_cfg_size          dw 0
+password_cfg_size        dw 0

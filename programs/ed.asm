@@ -196,8 +196,61 @@ put_help_message:
     ret
 
 
+; Convert String to Number
+; di - buffer
+; bx - to save
+convert_to_number:
+    mov si, di
+    xor ax, ax
+    xor cx, cx
+.convert_loop:
+    lodsb
+    cmp al, 0         
+    je .done_convert
+    sub al, '0'       
+    imul cx, 10       
+    add cx, ax        
+    jmp .convert_loop
+.done_convert:
+    mov [bx], cx  
+    ret
+
+
+; Number To String
+; ax - number
+; di - buffer [6 bytes]
+convert_to_string:
+    mov si, di          
+    test ax, ax         
+    jnz .non_zero       
+    mov byte [di], '0'  
+    inc di              
+    jmp .terminate      
+
+.non_zero:
+    mov bx, 10          
+    xor cx, cx          
+
+.extract_digits:
+    xor dx, dx          
+    div bx              
+    add dl, '0'         
+    push dx             
+    inc cx              
+    test ax, ax         
+    jnz .extract_digits 
+
+.reverse_digits:
+    pop dx              
+    mov [di], dl        
+    inc di              
+    loop .reverse_digits
+
+.terminate:
+    mov byte [di], 0              
+    ret
+
 ; === includes ===
     %include "programs/ed-common.inc"
     %include "programs/ed-commands.inc"
-    %include "programs/lib/utils.inc"
 ; ================

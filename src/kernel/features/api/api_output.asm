@@ -24,16 +24,19 @@ section .text
 api_output_init:
     pusha
     push es
+    push ds
     xor ax, ax
     mov es, ax
     mov word [es:0x21*4], int21_handler
     mov word [es:0x21*4+2], cs
     pop es
+    pop ds
     popa
     ret
 
 int21_handler:
     pusha
+    cld
     cmp ah, 0x00
     je .init
     cmp ah, 0x01

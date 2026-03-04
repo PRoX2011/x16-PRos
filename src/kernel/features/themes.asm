@@ -18,7 +18,7 @@ load_and_apply_theme:
 
     ; Load THEME.CFG file
     mov ax, theme_cfg_file
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
     jc .error
 
@@ -27,7 +27,7 @@ load_and_apply_theme:
     je .error
 
     ; Parse and apply theme
-    mov si, 32768
+    mov si, program_load_addr
     mov word [.line_count], 0
 
 .parse_loop:
@@ -52,6 +52,7 @@ load_and_apply_theme:
 .error:
     stc
     popa
+    call restore_current_dir
     ret
 
 .parse_color_line:
