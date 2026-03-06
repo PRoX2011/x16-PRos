@@ -83,4 +83,41 @@ fixes and kernel optimizations make this version more stable and performant.
 
 =======================================================================================
 
+9. Timezone configuration support
+1) Added TIMEZONE.CFG integration in kernel initialization
+2) Implemented timezone parsing and local datetime conversion logic
+3) date/time output now uses configured timezone offset instead of raw UTC
+4) Improved timezone config loading robustness (string termination and parsing fixes)
+
+=======================================================================================
+
+10. DOS INT 21h compatibility expansion (easy + medium calls)
+1) Added implementations for:
+   - 05h, 0Ch, 0Dh, 0Eh, 19h, 1Ah, 2Fh, 30h, 36h
+   - 39h, 3Ah, 3Bh, 41h, 4Dh, 54h
+2) Expanded COM subsystem state handling:
+   - DTA segment/offset tracking
+   - process return code/type tracking
+   - verify flag and path copy helpers for DOS-style path calls
+3) Updated DOS handler dispatch and comments in com.asm
+4) Added syscall test coverage for newly implemented calls
+
+=======================================================================================
+
+11. API output stability and correctness fixes
+1) Fixed INT 21h output handler control flow that caused program crashes
+2) Corrected call/return behavior inside the interrupt dispatcher
+3) Fixed segment register restore order during API output initialization
+4) Improved color behavior for AH=08h output mode
+
+=======================================================================================
+
+12. SETUP interface flow updates
+1) Added stage progress line at the bottom:
+   - welcome > username > password > timezone > theme > prompt > programs > end
+2) Kept setup logic unchanged while improving stage visibility during install flow
+3) Removed experimental right-side 11x11 ASCII icon frame/resources
+
+=======================================================================================
+
 Copyright (C) 2024-2026 PRoX2011

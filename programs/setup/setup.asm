@@ -1,6 +1,15 @@
 [BITS 16]
 [ORG 0x8000]
 
+%define SETUP_STAGE_WELCOME   0
+%define SETUP_STAGE_USERNAME  1
+%define SETUP_STAGE_PASSWORD  2
+%define SETUP_STAGE_TIMEZONE  3
+%define SETUP_STAGE_THEME     4
+%define SETUP_STAGE_PROMPT    5
+%define SETUP_STAGE_PROGRAMS  6
+%define SETUP_STAGE_END       7
+
 ; ========== SETUP ROUTINE ==========
 setup:
     ; Clear screen
@@ -28,6 +37,9 @@ setup:
     mov si, setup_bottom_msg
     int 0x21
 
+    mov al, SETUP_STAGE_WELCOME
+    call setup_draw_stage_ui
+
     mov dh, 3
     mov dl, 0
     call string_move_cursor
@@ -41,6 +53,9 @@ setup:
     int 16h
 
     ; ========== USERNAME SETUP ==========
+    mov al, SETUP_STAGE_USERNAME
+    call setup_draw_stage_ui
+
     mov dh, 3
     mov dl, 0
     call string_move_cursor
@@ -104,6 +119,9 @@ setup:
     int 0x22
 
     ; ========== PASSWORD SETUP ==========
+    mov al, SETUP_STAGE_PASSWORD
+    call setup_draw_stage_ui
+
     mov dh, 3
     mov dl, 0
     call string_move_cursor
@@ -160,6 +178,9 @@ setup:
     int 0x22
 
     ; ========== TIMEZONE SETUP ==========
+    mov al, SETUP_STAGE_TIMEZONE
+    call setup_draw_stage_ui
+
     mov dh, 3
     mov dl, 0
     call string_move_cursor
@@ -211,6 +232,9 @@ setup:
     int 0x22
 
     ; ========== THEME SETUP ==========
+    mov al, SETUP_STAGE_THEME
+    call setup_draw_stage_ui
+
     mov dh, 3
     mov dl, 0
     call string_move_cursor
@@ -289,6 +313,9 @@ setup:
     int 0x22
 
     ; ========== PROMPT SETUP ==========
+    mov al, SETUP_STAGE_PROMPT
+    call setup_draw_stage_ui
+
     mov dh, 3
     mov dl, 0
     call string_move_cursor
@@ -364,6 +391,9 @@ setup:
     int 0x22
 
     ; ========== PROGRAM SELECTION ==========
+    mov al, SETUP_STAGE_PROGRAMS
+    call setup_draw_stage_ui
+
     mov dh, 3
     mov dl, 0
     call string_move_cursor
@@ -501,6 +531,9 @@ setup:
     int 0x22
 
 .save_settings:
+    mov al, SETUP_STAGE_END
+    call setup_draw_stage_ui
+
     ; --- UPDATE FIRST_B.CFG in CONF.DIR ---
     ; This marks setup as complete ('0')
     mov ah, 0x09
@@ -534,6 +567,82 @@ setup:
     mov ah, 0x06
     int 0x21
 
+    ret
+
+setup_draw_stage_ui:
+    pusha
+    mov [setup_stage_current], al
+    call setup_draw_stage_bar
+    popa
+    ret
+
+setup_draw_stage_bar:
+    pusha
+
+    mov dh, 24
+    mov dl, 1
+    call string_move_cursor
+    mov ah, 0x01
+    mov si, setup_stagebar_top
+    int 0x21
+
+    mov al, [setup_stage_current]
+    cmp al, SETUP_STAGE_WELCOME
+    je .bar_welcome
+    cmp al, SETUP_STAGE_USERNAME
+    je .bar_username
+    cmp al, SETUP_STAGE_PASSWORD
+    je .bar_password
+    cmp al, SETUP_STAGE_TIMEZONE
+    je .bar_timezone
+    cmp al, SETUP_STAGE_THEME
+    je .bar_theme
+    cmp al, SETUP_STAGE_PROMPT
+    je .bar_prompt
+    cmp al, SETUP_STAGE_PROGRAMS
+    je .bar_programs
+    mov si, setup_stagebar_end
+    jmp .draw_bar_mid
+
+.bar_welcome:
+    mov si, setup_stagebar_welcome
+    jmp .draw_bar_mid
+.bar_username:
+    mov si, setup_stagebar_username
+    jmp .draw_bar_mid
+.bar_password:
+    mov si, setup_stagebar_password
+    jmp .draw_bar_mid
+.bar_timezone:
+    mov si, setup_stagebar_timezone
+    jmp .draw_bar_mid
+.bar_theme:
+    mov si, setup_stagebar_theme
+    jmp .draw_bar_mid
+.bar_prompt:
+    mov si, setup_stagebar_prompt
+    jmp .draw_bar_mid
+.bar_programs:
+    mov si, setup_stagebar_programs
+
+.draw_bar_mid:
+    mov dh, 25
+    mov dl, 1
+    call string_move_cursor
+    mov ah, 0x07
+    mov bl, 0x0F
+    int 0x21
+    mov ah, 0x08
+    int 0x21
+
+    mov dh, 26
+    mov dl, 1
+    call string_move_cursor
+    mov ah, 0x01
+    mov si, setup_stagebar_bottom
+    int 0x21
+
+    popa
     ret
 
 ; ========== INCLUDES ==========
@@ -671,3 +780,5 @@ space_file         db 'SPACE.BIN', 0
 tetris_file        db 'TETRIS.BIN', 0
 theme_file         db 'THEME.BIN', 0
 writer_file        db 'WRITER.BIN', 0
+
+setup_stage_current db 0

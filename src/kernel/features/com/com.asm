@@ -9,16 +9,16 @@
 ;  [DONE] Function 02h: Write character
 ;  [DONE] Function 03h: Read character from COM1 (auxiliary device)
 ;  [DONE] Function 04h: Write character to COM1 (auxiliary device)
-;  Function 05h: Print character to printer
+;  [DONE] Function 05h: Print character to printer
 ;  [DONE] Function 06h: Direct console input/output (unfiltered)
 ;  [DONE] Function 07h: Direct console input (no echo)
 ;  [DONE] Function 08h: Console input without echo
 ;  [DONE] Function 09h: Output string ($-terminated)
 ;  [DONE] Function 0Ah: Buffered keyboard input
 ;  [DONE] Function 0Bh: Check keyboard status / input available
-;  Function 0Ch: Clear keyboard buffer and read input
-;  Function 0Dh: Disk reset / flush buffers
-;  Function 0Eh: Select default drive
+;  [DONE] Function 0Ch: Clear keyboard buffer and read input
+;  [DONE] Function 0Dh: Disk reset / flush buffers
+;  [DONE] Function 0Eh: Select default drive
 ;  Function 0Fh: Open file using FCB
 ;  Function 10h: Close file using FCB
 ;  Function 11h: Search for first matching file using FCB
@@ -29,8 +29,8 @@
 ;  Function 16h: Create file using FCB
 ;  Function 17h: Rename file using FCB
 ;  Function 18h: [RESERVED]
-;  Function 19h: Get current default drive
-;  Function 1Ah: Set DTA (Disk Transfer Area) address
+;  [DONE] Function 19h: Get current default drive
+;  [DONE] Function 1Ah: Set DTA (Disk Transfer Area) address
 ;  Function 1Bh: Get FAT information for default drive
 ;  Function 1Ch: Get FAT information for any drive
 ;  Function 1Dh: [RESERVED]
@@ -46,30 +46,30 @@
 ;  Function 27h: Random block read using FCB
 ;  Function 28h: Random block write using FCB
 ;  Function 29h: Parse filename and build FCB
-;  Function 2Ah: Get system date
+;  [DONE] Function 2Ah: Get system date
 ;  Function 2Bh: Set system date
-;  Function 2Ch: Get system time
+;  [DONE] Function 2Ch: Get system time
 ;  Function 2Dh: Set system time
 ;  Function 2Eh: Set/Reset verify switch
-;  Function 2Fh: Get current DTA address
-;  Function 30h: Get DOS version number
+;  [DONE] Function 2Fh: Get current DTA address
+;  [DONE] Function 30h: Get DOS version number
 ;  Function 31h: Terminate and stay resident (TSR)
 ;  Function 32h: Get DOS drive information (undocumented)
 ;  Function 33h: Get/Set Ctrl+C / Ctrl+Break handling
 ;  Function 34h: Get address of InDOS flag (undocumented)
 ;  [DONE] Function 35h: Get interrupt vector
-;  Function 36:  Get free disk space
+;  [DONE] Function 36h: Get free disk space
 ;  Function 37h: Get/Set switch character (undocumented)
 ;  Function 38h: Get/Set country information
-;  Function 39h: Create subdirectory (MKDIR)
-;  Function 3Ah: Remove subdirectory (RMDIR)
-;  Function 3Bh: Change current directory (CHDIR)
+;  [DONE] Function 39h: Create subdirectory (MKDIR)
+;  [DONE] Function 3Ah: Remove subdirectory (RMDIR)
+;  [DONE] Function 3Bh: Change current directory (CHDIR)
 ;  Function 3Ch: Create file
 ;  Function 3Dh: Open file
 ;  Function 3Eh: Close file
 ;  Function 3Fh: Read from file/device
 ;  Function 40h: Write to file/device
-;  Function 41h: Delete file
+;  [DONE] Function 41h: Delete file
 ;  Function 42h: Move file pointer (seek)
 ;  Function 43h: Get/Set file attributes
 ;  Function 44h: I/O control for devices (IOCTL)
@@ -81,10 +81,10 @@
 ;  Function 4Ah: Resize memory block
 ;  Function 4Bh: Load/Execute program (EXEC)
 ;  [DONE] Function 4Ch: Terminate program with return code
-;  Function 4Dh: Get program return code
+;  [DONE] Function 4Dh: Get program return code
 ;  Function 4Eh: Find first matching file (FindFirst)
 ;  Function 4Fh: Find next matching file (FindNext)
-;  Function 54h: Get verify flag
+;  [DONE] Function 54h: Get verify flag
 ;  Function 56h: Rename/move file
 ;  Function 57h: Get/Set file date and time
 ;  Function 59h: Get extended error information
@@ -201,6 +201,8 @@ int21_dos_handler:
     je com_03h
     cmp ah, 0x04
     je com_04h
+    cmp ah, 0x05
+    je com_05h
     cmp ah, 0x06
     je com_06h
     cmp ah, 0x07
@@ -213,20 +215,99 @@ int21_dos_handler:
     je com_0Ah
     cmp ah, 0x0B
     je com_0Bh
+    cmp ah, 0x0C
+    je com_0Ch
+    cmp ah, 0x0D
+    je com_0Dh
+    cmp ah, 0x0E
+    je com_0Eh
+    cmp ah, 0x19
+    je com_19h
+    cmp ah, 0x1A
+    je com_1Ah
     cmp ah, 0x25
     je com_25h
     cmp ah, 0x2A
     je com_2Ah
     cmp ah, 0x2C
     je com_2Ch
+    cmp ah, 0x2F
+    je com_2Fh
+    cmp ah, 0x30
+    je com_30h
     cmp ah, 0x35
     je com_35h
+    cmp ah, 0x36
+    je com_36h
+    cmp ah, 0x39
+    je com_39h
+    cmp ah, 0x3A
+    je com_3Ah
+    cmp ah, 0x3B
+    je com_3Bh
+    cmp ah, 0x41
+    je com_41h
     cmp ah, 0x4C
     je com_4Ch
+    cmp ah, 0x4D
+    je com_4Dh
+    cmp ah, 0x54
+    je com_54h
     iret
 
 
 saved_interrupt_table resb 1024
+dta_offset            dw 0x0080
+dta_segment           dw program_seg
+verify_flag           db 0
+last_return_code      db 0
+last_return_type      db 0
+com_tmp_drive         db 0
+com_path_buffer       times 128 db 0
+
+; Copy ASCIIZ from caller DS:DX to kernel com_path_buffer.
+; Truncates to 127 chars and always null-terminates.
+; OUT: AX = com_path_buffer
+com_copy_path_from_caller:
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push ds
+    push es
+
+    mov bx, ds
+    mov es, bx
+    mov ax, 0x2000
+    mov ds, ax
+
+    mov si, dx
+    mov di, com_path_buffer
+    mov cx, 127
+
+.copy_loop:
+    mov al, [es:si]
+    mov [di], al
+    cmp al, 0
+    je .copy_done
+    inc si
+    inc di
+    loop .copy_loop
+
+    mov byte [di], 0
+
+.copy_done:
+    mov ax, com_path_buffer
+
+    pop es
+    pop ds
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    ret
 
 bcd_to_bin:
     push cx
@@ -251,14 +332,29 @@ bcd_to_bin:
 %include "src/kernel/features/com/02h.asm"
 %include "src/kernel/features/com/03h.asm"
 %include "src/kernel/features/com/04h.asm"
+%include "src/kernel/features/com/05h.asm"
 %include "src/kernel/features/com/06h.asm"
 %include "src/kernel/features/com/07h.asm"
 %include "src/kernel/features/com/08h.asm"
 %include "src/kernel/features/com/09h.asm"
 %include "src/kernel/features/com/0Ah.asm"
 %include "src/kernel/features/com/0Bh.asm"
+%include "src/kernel/features/com/0Ch.asm"
+%include "src/kernel/features/com/0Dh.asm"
+%include "src/kernel/features/com/0Eh.asm"
+%include "src/kernel/features/com/19h.asm"
+%include "src/kernel/features/com/1Ah.asm"
 %include "src/kernel/features/com/25h.asm"
 %include "src/kernel/features/com/2Ah.asm"
 %include "src/kernel/features/com/2Ch.asm"
+%include "src/kernel/features/com/2Fh.asm"
+%include "src/kernel/features/com/30h.asm"
 %include "src/kernel/features/com/35h.asm"
+%include "src/kernel/features/com/36h.asm"
+%include "src/kernel/features/com/39h.asm"
+%include "src/kernel/features/com/3Ah.asm"
+%include "src/kernel/features/com/3Bh.asm"
+%include "src/kernel/features/com/41h.asm"
 %include "src/kernel/features/com/4Ch.asm"
+%include "src/kernel/features/com/4Dh.asm"
+%include "src/kernel/features/com/54h.asm"

@@ -8,6 +8,12 @@
 [BITS 16]
 [ORG 0x0000]
 
+COLOR_WHITE          equ 0x0F
+COLOR_GREEN          equ 0x0A
+COLOR_CYAN           equ 0x0B
+COLOR_RED            equ 0x0C
+COLOR_YELLOW         equ 0x0E
+
 disk_buffer          equ 0x6000
 program_load_addr    equ 0x8000
 dirlist              equ 0xA800
@@ -28,6 +34,7 @@ start:
     call init_system           ; Init system (segments, timer, api, configs, display, security, start autoexec)
     call load_and_apply_theme  ; Load and aply theme from THEME.CFG file
     call fs_list_drives        ; List drives
+    call load_timezone_cfg     ; It is necessary after completion of SETUP.BIN so that the time zone is updated to the user one
     call shell                 ; Start PRos terminal
 
     jmp $
@@ -46,7 +53,7 @@ set_video_mode:
 ; IN  : SI = string location
 ; OUT : Nothing
 print_string:
-    mov bl, 0x0F
+    mov bl, COLOR_WHITE
 .print_char:
     lodsb
     cmp al, 0
@@ -61,7 +68,7 @@ print_string:
 ; IN  : Nothing
 ; OUT : Nothing
 print_newline:
-    mov bl, 0x0F
+    mov bl, COLOR_WHITE
     mov al, 0x0A
     call print_char
     ret
@@ -113,22 +120,22 @@ print_char:
 
 ; ------ Green ------
 print_string_green:
-    mov bl, 0x0A
+    mov bl, COLOR_GREEN
     jmp print_string_color
 
 ; ------ Cyan ------
 print_string_cyan:
-    mov bl, 0x0B
+    mov bl, COLOR_CYAN
     jmp print_string_color
 
 ; ------ Red ------
 print_string_red:
-    mov bl, 0x0C
+    mov bl, COLOR_RED
     jmp print_string_color
 
 ; ------ Yellow ------
 print_string_yellow:
-    mov bl, 0x0E
+    mov bl, COLOR_YELLOW
     jmp print_string_color
 
 ; -----------------------------
@@ -152,7 +159,7 @@ print_decimal:
     push dx
     inc cx
 .print_number:
-    mov bl, 0x0F
+    mov bl, COLOR_WHITE
 .print_char:
     cmp cx, 0
     je .return
@@ -166,7 +173,7 @@ print_decimal:
     ret
 
 print_drive_prefix:
-    mov bl, 0x0F
+    mov bl, COLOR_WHITE
     mov al, [current_drive_char]
     call print_char
     mov al, ':'
@@ -840,7 +847,7 @@ print_al:
     add ax, '00'
     mov dx, ax
 
-    mov bl, 0x0F
+    mov bl, COLOR_WHITE
     mov al, dl
     cmp dl, '0'
     jz skip_fn
@@ -1116,7 +1123,7 @@ list_directory:
     push si
     mov cx, 12
     mov ah, 0x0E
-    mov bl, 0x0F
+    mov bl, COLOR_WHITE
 .print_name_char:
     lodsb
     int 0x10
@@ -1154,7 +1161,7 @@ list_directory:
     jcxz .next_entry
     mov ah, 0x0E
     mov al, ' '
-    mov bl, 0x0F
+    mov bl, COLOR_WHITE
 .pad_column:
     int 0x10
     loop .pad_column
@@ -1233,13 +1240,13 @@ list_directory:
     jne .sd_pop_digits
     mov ah, 0x0E
     mov al, '0'
-    mov bl, 0x0F
+    mov bl, COLOR_WHITE
     int 0x10
     mov word [.size_digits], 1
     jmp .sd_done
 .sd_pop_digits:
     mov ah, 0x0E
-    mov bl, 0x0F
+    mov bl, COLOR_WHITE
 .sd_pop_loop:
     pop dx
     add dl, '0'
@@ -1321,7 +1328,7 @@ cat_file:
     je .handle_newline
 
     mov ah, 0x0E
-    mov bl, 0x0F
+    mov bl, COLOR_WHITE
     int 0x10
     jmp .print_loop
 
