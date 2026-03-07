@@ -14,6 +14,16 @@ COLOR_CYAN           equ 0x0B
 COLOR_RED            equ 0x0C
 COLOR_YELLOW         equ 0x0E
 
+CHAR_LF              equ 0x0A
+CHAR_CR              equ 0x0D
+
+KERNEL_DATA_SEG      equ 0x2000
+DOS_INT20_VECTOR     equ 0x20
+
+COM_EXIT_OPCODE      equ 0xCD
+COM_STACK_TOP        equ 0xFFFE
+COM_ENTRY_OFFSET     equ 0x0100
+
 disk_buffer          equ 0x6000
 program_load_addr    equ 0x8000
 dirlist              equ 0xA800
@@ -69,7 +79,7 @@ print_string:
 ; OUT : Nothing
 print_newline:
     mov bl, COLOR_WHITE
-    mov al, 0x0A
+    mov al, CHAR_LF
     call print_char
     ret
 
@@ -92,9 +102,9 @@ print_string_color:
 ;       BL = color
 ; OUT : Nothing
 print_char:
-    cmp al, 0x0A           ; LF
+    cmp al, CHAR_LF
     je .newline
-    cmp al, 0x0D           ; CR
+    cmp al, CHAR_CR
     je .carriage_return
     mov ah, 0x0E
     xor bh, bh
@@ -109,12 +119,12 @@ print_char:
     push ax
     mov ah, 0x0E
     xor bh, bh
-    mov al, 0x0D
+    mov al, CHAR_CR
     int 0x10
     pop ax
     mov ah, 0x0E
     xor bh, bh
-    mov al, 0x0A
+    mov al, CHAR_LF
     int 0x10
     ret
 
@@ -278,7 +288,7 @@ print_help:
     call DisableMouse
     call program_load_addr
 
-    mov ax, 0x2000
+    mov ax, KERNEL_DATA_SEG
     mov ds, ax
     mov es, ax
 
@@ -708,7 +718,7 @@ execute_bin:
     call DisableMouse
     call program_load_addr
 
-    mov ax, 0x2000
+    mov ax, KERNEL_DATA_SEG
     mov ds, ax
     mov es, ax
 
@@ -732,22 +742,22 @@ execute_com:
     mov ds, ax
     mov es, ax
 
-    mov byte [ds:0x0000], 0xCD
-    mov byte [ds:0x0001], 0x20
+    mov byte [ds:0x0000], COM_EXIT_OPCODE
+    mov byte [ds:0x0001], DOS_INT20_VECTOR
 
     ; Setup COM program stack
     cli
     mov ss, ax
-    mov sp, 0xFFFE
+    mov sp, COM_STACK_TOP
     sti
 
     call DisableMouse
 
     push word 0x0000
 
-    ; Jump to COM program entry point (0x0100)
+    ; Jump to COM program entry point (COM_ENTRY_OFFSET)
     push word program_seg    ; CS
-    push word 0x0100         ; IP
+    push word COM_ENTRY_OFFSET ; IP
     retf                     ; Jump
 
 .com_return:
@@ -1324,7 +1334,7 @@ cat_file:
     cmp al, 0
     je .end_cat
 
-    cmp al, 0x0A
+    cmp al, CHAR_LF
     je .handle_newline
 
     mov ah, 0x0E
@@ -1333,9 +1343,9 @@ cat_file:
     jmp .print_loop
 
 .handle_newline:
-    mov al, 0x0D
+    mov al, CHAR_CR
     int 0x10
-    mov al, 0x0A
+    mov al, CHAR_LF
     int 0x10
 
     inc word [.line_count]
@@ -1488,7 +1498,7 @@ copy_file:
     jnc .already_exists
     mov ax, dx
     mov cx, program_load_addr
-    mov dx, 0x2000
+    mov dx, KERNEL_DATA_SEG
     call fs_load_huge_file
     jc .load_fail
     mov cx, bx

@@ -112,12 +112,4 @@ fixes and kernel optimizations make this version more stable and performant.
 
 =======================================================================================
 
-12. SETUP interface flow updates
-1) Added stage progress line at the bottom:
-   - welcome > username > password > timezone > theme > prompt > programs > end
-2) Kept setup logic unchanged while improving stage visibility during install flow
-3) Removed experimental right-side 11x11 ASCII icon frame/resources
-
-=======================================================================================
-
 Copyright (C) 2024-2026 PRoX2011
