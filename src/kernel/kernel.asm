@@ -715,12 +715,22 @@ execute_bin:
     mov word si, [param_list]
     mov di, 0
 
+    ; Save kernel stack in case BIN modifies SS:SP.
+    mov [bin_stack_save], sp
+    mov [bin_ss_save], ss
+
     call DisableMouse
     call program_load_addr
+
+    cli
+    mov ax, [bin_ss_save]
+    mov ss, ax
+    mov sp, [bin_stack_save]
 
     mov ax, KERNEL_DATA_SEG
     mov ds, ax
     mov es, ax
+    sti
 
     call fs_reset_floppy
     call EnableMouse
@@ -2222,6 +2232,8 @@ timezone_offset dw 0
 
 com_stack_save  dw 0
 com_ss_save     dw 0
+bin_stack_save  dw 0
+bin_ss_save     dw 0
 
 program_seg    equ 0x3000
 

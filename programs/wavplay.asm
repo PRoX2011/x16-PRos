@@ -11,6 +11,10 @@
 [BITS 16]
 [ORG 8000h]
 
+WAV_LOAD_SEG  equ 0x3000
+WAV_LOAD_OFF  equ 0x0000
+WAV_DATA_OFF  equ 44
+
 start:
 		mov [filename_ptr], si
 
@@ -29,36 +33,39 @@ start:
 		; Load WAV file
 		mov ah, 0x10
 		mov si, [filename_ptr]
-		mov cx, 43008
-		mov dx, 0x2000
+		mov cx, WAV_LOAD_OFF
+		mov dx, WAV_LOAD_SEG
 		int 0x22
 		jc .load_error
 
+		mov ax, WAV_LOAD_SEG
+		mov es, ax
+
 		; Parse WAV header
-		mov si, 43008
+		mov si, WAV_LOAD_OFF
 
 		; Check "RIFF" signature
-		mov ax, [si]
+		mov ax, [es:si]
 		cmp ax, 'RI'
 		jne .invalid_format
-		mov ax, [si+2]
+		mov ax, [es:si+2]
 		cmp ax, 'FF'
 		jne .invalid_format
 
 		; Check "WAVE" format
-		mov ax, [si+8]
+		mov ax, [es:si+8]
 		cmp ax, 'WA'
 		jne .invalid_format
-		mov ax, [si+10]
+		mov ax, [es:si+10]
 		cmp ax, 'VE'
 		jne .invalid_format
 
-		mov ax, [si+40]
+		mov ax, [es:si+40]
 		mov [data_size], ax
-		mov ax, [si+42]
+		mov ax, [es:si+42]
 		mov [data_size+2], ax
 
-		mov ax, [si+24]
+		mov ax, [es:si+24]
 		mov [sample_rate], ax
 
 		call calculate_delay
@@ -75,10 +82,8 @@ start:
 
 		call sb_speaker_on
 
-		mov ax, 0x2000
-		mov es, ax
-		mov ax, 43008
-		add ax, 44
+		mov ax, WAV_LOAD_OFF
+		add ax, WAV_DATA_OFF
 		mov [curr_off], ax
 
 		mov word [sound_index], 0
@@ -133,15 +138,13 @@ start:
 		mov ah, 0x04
 		mov si, load_error_msg
 		int 0x21
-		mov ax, 4c01h
-		int 21h
+		ret
 
 	.invalid_format:
 		mov ah, 0x04
 		mov si, format_error_msg
 		int 0x21
-		mov ax, 4c01h
-		int 21h
+		ret
 
 ; ==================================================================
 ; Sound Blaster Functions
@@ -299,7 +302,7 @@ curr_off       dw 0
 
 warning_msg      db '+======================================================+', 10, 13
                  db '|                  !! WARNING !!                       |', 10, 13
-                 db '|      wavplay only supports files < 512kib            |', 10, 13
+                 db '|      wavplay only supports files < 448kib            |', 10, 13
 				 db '| if your file is larger, playback will not be correct |', 10, 13,
 				 db '+======================================================+', 10, 13, 10, 13, 0
 loading_msg      db '  Loading WAV file...', 10, 13, 0
