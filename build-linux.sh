@@ -255,6 +255,7 @@ programs=(
     "programs/ed.asm ED.BIN"
     "programs/fdisk.asm FDISK.BIN"
     "programs/launch.asm LAUNCH.BIN"
+    "programs/edit.asm EDIT.BIN"
 )
 
 for prog in "${programs[@]}"; do
