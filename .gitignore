@@ -6,9 +6,6 @@
 
 bin/
 
-# Compilation cash
-compcash/
-
 # CLion
 .idea/
 

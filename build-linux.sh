@@ -75,9 +75,6 @@ print_kernel_size() {
 
 mkdir -p bin
 mkdir -p disk_img
-mkdir -p compcash
-mkdir -p compcash/root
-mkdir -p compcash/com
 
 print_splitline "Starting x16-PRos build..."
 
@@ -213,19 +210,11 @@ programs_root=(
 for prog in "${programs_root[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
-    cash_file=compcash/root/$(basename $src .asm).cash
 
-    if ! cmp -s $cash_file $src; then
-        print_info "Compiling $src => bin/$bin_name..."
-        nasm -f bin $src -o bin/$bin_name
-        check_error "Compilation of $src failed"
-        print_ok "$bin_name compiled successfully"
-        
-        print_info "Cashing $bin_name..."
-        cp $src $cash_file
-        check_error "Cashing of $bin_name failed"
-        print_ok "$bin_name cashed successfully"
-    fi
+    print_info "Compiling $src => bin/$bin_name..."
+    nasm -f bin $src -o bin/$bin_name
+    check_error "Compilation of $src failed"
+    print_ok "$bin_name compiled successfully"
     
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/
@@ -271,33 +260,11 @@ programs=(
 for prog in "${programs[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
-    cash_file=compcash/$(basename $src .asm).cash
 
-    dependency_offset=3
-    need_recomp=0
-    if ! cmp -s $cash_file $src; then need_recomp=1; fi
-    while [ -n $(echo $prog | cut -d' ' -f$dependency_offset) ]; do
-        dependency_file=$(echo $prog | cut -d' ' -f$dependency_offset)
-        dependency_cash_file=compcash/$(basename $dependency_file .asm).cash
-        if ! cmp -s $dependency_cash_file $dependency_file; then
-            need_recomp=1
-            break
-        fi
-        ((dependency_offset++))
-    done
-
-
-    if ! cmp -s $cash_file $src || [ $need_recomp == 1 ]; then
-        print_info "Compiling $src => bin/$bin_name..."
-        nasm -f bin $src -o bin/$bin_name
-        check_error "Compilation of $src failed"
-        print_ok "$bin_name compiled successfully"
-        
-        print_info "Cashing $bin_name..."
-        cp $src $cash_file
-        check_error "Cashing of $bin_name failed"
-        print_ok "$bin_name cashed successfully"
-    fi
+    print_info "Compiling $src => bin/$bin_name..."
+    nasm -f bin $src -o bin/$bin_name
+    check_error "Compilation of $src failed"
+    print_ok "$bin_name compiled successfully"
 
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/BIN.DIR/
@@ -315,19 +282,11 @@ programs_com=(
 for prog in "${programs_com[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
-    cash_file=compcash/com/$(basename $src .asm).cash
 
-    if ! cmp -s $cash_file $src; then
-        print_info "Compiling $src => bin/$bin_name..."
-        nasm -f bin $src -o bin/$bin_name
-        check_error "Compilation of $src failed"
-        print_ok "$bin_name compiled successfully"
-        
-        print_info "Cashing $bin_name..."
-        cp $src $cash_file
-        check_error "Cashing of $bin_name failed"
-        print_ok "$bin_name cashed successfully"
-    fi
+    print_info "Compiling $src => bin/$bin_name..."
+    nasm -f bin $src -o bin/$bin_name
+    check_error "Compilation of $src failed"
+    print_ok "$bin_name compiled successfully"
     
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/COM.DIR/
