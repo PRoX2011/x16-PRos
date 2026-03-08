@@ -2,10 +2,11 @@
 %define EDCOMMON
 
 ; === error messages ===
-    err_text_file_name_lenght   db "ERROR: to large file name", 10, 13, 0
-    err_text_file_not_be_opened db "ERROR: input file not be opened (file not exist or disk error)", 10, 13, 0
-    err_text_unknown_command    db "ERROR: Unknown command", 10, 13, 0
-    err_text_invalid_operand    db "ERROR: Invalid operand", 10, 13, 0
+    err_text_file_name_lenght    db "ERROR: to large file name", 10, 13, 0
+    err_text_file_not_be_opened  db "ERROR: input file not be opened (file not exist or disk error)", 10, 13, 0
+    err_text_unknown_command     db "ERROR: Unknown command", 10, 13, 0
+    err_text_invalid_operand     db "ERROR: Invalid operand", 10, 13, 0
+    err_text_invalid_end_of_line db "ERROR: Invalid end of lines in the files", 10, 13, 0
 ; ======================
 
 ; === info messages ===
@@ -23,6 +24,7 @@
 ; === sub info ===
     ; control flags
     ; 0 - file_text_buffer is saved
+    ; 1 - LF/CRLF file_text_buffer
     flags db 0b00000001
     ; num of buffer lines
     lines_num dw 1
@@ -91,7 +93,7 @@ strcmp:
 
 ; in:          none
 ; out:         file_text_lines and lines_num updating
-; side effect: si, di, ax
+; side effect: si, di, ax, cx
 split_text_by_lines:
     mov word [lines_num], 1
     mov si, file_text_buffer
@@ -100,11 +102,17 @@ split_text_by_lines:
     mov [di], si
     add di, 2
 
+    xor cx, cx
+    mov cx, [flags]
+    and cx, 0b10
+    shr cx, 1
+    inc cx
+
 .splitting_loop:
-    mov ax, [si]
-    cmp al, 0x0A  ; if al = '\r'
+    mov al, [si]
+    cmp al, 0x0A  ; if al = '\n'
     je .next_line
-    cmp al, 0x0D  ; if al = '\n'
+    cmp al, 0x0D  ; if al = '\r'
     je .next_line
     cmp al, 0
     je .end
@@ -112,7 +120,7 @@ split_text_by_lines:
     jmp .splitting_loop
 
 .next_line:
-    add si, 2
+    add si, cx
     mov [di], si
     add di, 2
     inc word [lines_num]
@@ -140,6 +148,30 @@ save_buffer_for_undo:
     jmp .save_char
 
 .end:
+    ret
+
+; in:          di - buffer to write
+; out:         write NL to buffer
+;              move di to next char
+;              set cr flag if CRLF
+; side effect: di, cr flag
+put_NL:
+    test byte [flags], 0b00000010
+    jz .LF
+    jmp .CRLF
+
+.LF:
+    mov byte [di], 0x0A
+    inc di
+    clc
+    ret
+
+.CRLF:
+    mov byte [di], 0x0D
+    mov byte [di + 1], 0x0A
+    inc di
+    inc di
+    stc
     ret
 
 %endif

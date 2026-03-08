@@ -33,12 +33,12 @@ game_loop:
 
 .spawn:
     call spawn_piece
-    
+
 .piece_loop:
     call draw_ui
     call draw_board
     call draw_piece
-    
+
     ; Delay (Adjusted by Level)
     mov cx, 0x0004
     mov dx, 0x93E0
@@ -53,7 +53,7 @@ game_loop:
     int 0x15
 
     call handle_input
-    
+
     call move_down
     jc .lock_piece      ; If bottom or obstacle hit
     jmp .piece_loop
@@ -89,7 +89,7 @@ get_random_type:
     int 0x1A            ; CX:DX = clock ticks
     mov ax, dx
     xor dx, dx
-    mov cx, 7           
+    mov cx, 7
     div cx              ; DL = piece type (0-6)
     mov al, dl
     ret
@@ -99,7 +99,7 @@ spawn_piece:
     mov [current_type], al
     call get_random_type
     mov [next_type], al
-    
+
     mov byte [current_x], 4
     mov byte [current_y], 0
     mov byte [current_rotation], 0
@@ -107,22 +107,22 @@ spawn_piece:
 
 draw_ui:
     ; Draw glass boundaries (Centered)
-    mov dh, 2           
+    mov dh, 2
 .frame_loop:
-    mov dl, 30          
+    mov dl, 30
     call set_cursor
     mov si, frame_left
-    call print_string   
-    
-    add dl, 22          
+    call print_string
+
+    add dl, 22
     call set_cursor
     mov si, frame_right
-    call print_string   
-    
+    call print_string
+
     inc dh
-    cmp dh, 23          
+    cmp dh, 23
     jne .frame_loop
-    
+
     ; Bottom line
     mov dh, 22
     mov dl, 32
@@ -179,10 +179,10 @@ draw_next_piece_ui:
 
     ; Draw next piece blocks
     movzx ax, byte [next_type]
-    imul ax, 32         
+    imul ax, 32
     mov si, pieces_data
-    add si, ax          
-    
+    add si, ax
+
     mov cx, 4
 .next_loop:
     lodsb               ; rel X
@@ -208,7 +208,7 @@ handle_input:
     jz .no_key
     mov ah, 0x00
     int 0x16
-    
+
     cmp al, 'a'
     je .move_left
     cmp al, 'A'
@@ -287,25 +287,25 @@ check_total_collision:
     movzx ax, byte [current_type]
     imul ax, 32
     movzx bx, byte [current_rotation]
-    shl bx, 3           
+    shl bx, 3
     add ax, bx
     mov si, pieces_data
     add si, ax
 .c_loop:
     lodsb
     add al, [current_x]
-    mov bl, al          
+    mov bl, al
     lodsb
     add al, [current_y]
-    mov bh, al          
-    
+    mov bh, al
+
     cmp bl, 0
     jl .fail
     cmp bl, BOARD_WIDTH - 1
     jg .fail
     cmp bh, BOARD_HEIGHT - 1
     jg .fail
-    
+
     push dx
     movzx ax, bh
     mov dl, BOARD_WIDTH
@@ -327,10 +327,10 @@ check_total_collision:
 
 draw_board:
     mov dh, 2
-    xor ch, ch          
+    xor ch, ch
 .y_loop:
     mov dl, 32
-    xor cl, cl          
+    xor cl, cl
 .x_loop:
     call set_cursor
     push dx
@@ -345,10 +345,10 @@ draw_board:
     mov al, [si]
     or al, al
     jnz .draw_solid
-    mov si, empty_char  
+    mov si, empty_char
     jmp .do_print
 .draw_solid:
-    mov si, block_char  
+    mov si, block_char
 .do_print:
     call print_string
     pop cx
@@ -431,7 +431,7 @@ lock_to_board:
     ret
 
 clear_lines:
-    mov ch, BOARD_HEIGHT - 1 
+    mov ch, BOARD_HEIGHT - 1
 .row_loop:
     mov cl, 0
 .col_loop:
@@ -443,16 +443,16 @@ clear_lines:
     mov si, ax
     add si, board_data
     cmp byte [si], 0
-    je .next_row 
+    je .next_row
     inc cl
     cmp cl, BOARD_WIDTH
     jne .col_loop
     call remove_line
-    
+
     ; Update stats
     add word [lines_cleared], 1
     add word [score], 100
-    
+
     ; Check Level Up (Every 10 lines)
     mov ax, [lines_cleared]
     xor dx, dx
@@ -462,7 +462,7 @@ clear_lines:
     jnz .no_level_up
     inc word [level]
 .no_level_up:
-    jmp .row_loop 
+    jmp .row_loop
 .next_row:
     dec ch
     cmp ch, 0xFF
@@ -477,14 +477,14 @@ remove_line:
     mov cl, 0
 .shift_cols:
     movzx ax, ch
-    dec al          
+    dec al
     mov bl, BOARD_WIDTH
     mul bl
     movzx bx, cl
     add ax, bx
     mov si, ax
     add si, board_data
-    mov al, [si]    
+    mov al, [si]
     movzx dx, ch
     mov bl, BOARD_WIDTH
     imul dx, bx
@@ -492,7 +492,7 @@ remove_line:
     add dx, bx
     mov di, dx
     add di, board_data
-    mov [di], al    
+    mov [di], al
     inc cl
     cmp cl, BOARD_WIDTH
     jne .shift_cols

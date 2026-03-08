@@ -15,27 +15,27 @@ start:
     mov ah, 0x01
     mov si, welcome_msg
     int 0x21
-    
+
 main_loop:
     mov ah, 0x01
     mov si, prompt
     int 0x21
-    
+
     mov di, buffer
     call read_string
-    
+
     cmp byte [exit_flag], 1
     je exit_program
 
     cmp byte [buffer], 0
     je main_loop
-    
+
     mov si, buffer
     call parse_input
-    
+
     cmp dword [error_flag], 0
     jne .error
-    
+
     mov ah, 0x01
     mov si, result_msg
     int 0x21
@@ -56,7 +56,7 @@ main_loop:
     mov ah, 0x05
     int 0x21
     jmp main_loop
-    
+
 .error:
     mov ah, 0x04
     mov si, error_msg
@@ -80,16 +80,16 @@ read_string:
 .read_char:
     mov ah, 0
     int 0x16
-    
+
     cmp al, 0x1B
     je .exit_pressed
 
     cmp al, 0x08
     je .backspace
-    
+
     cmp al, 0x0D
     je .done
-    
+
     cmp al, '-'
     je .valid_char
     cmp al, '+'
@@ -105,19 +105,19 @@ read_string:
     cmp al, '0'
     jb .read_char
     cmp al, '9'
-    ja .read_char    
+    ja .read_char
 .valid_char:
     mov ah, 0x0E
     mov bh, 0
     mov bl, 0x0F
     int 0x10
-    
+
     stosb
     inc cx
     cmp cx, 64
     jae .done
     jmp .read_char
-    
+
 .backspace:
     test cx, cx
     jz .read_char
@@ -139,7 +139,7 @@ read_string:
     mov al, 0
     stosb
     ret
-    
+
 .done:
     mov al, 0
     stosb
@@ -152,32 +152,32 @@ parse_number:
     xor eax, eax
     mov [number], eax
     mov byte [negative_flag], 0
-    
+
     lodsb
     cmp al, '-'
     jne .not_negative
     mov byte [negative_flag], 1
     lodsb
     jmp .start_parse
-    
+
 .not_negative:
     cmp al, '+'
     jne .start_parse
     lodsb
-    
+
 .start_parse:
     dec si
-    
+
 .read_digit:
     lodsb
     cmp al, '0'
     jb .done
     cmp al, '9'
     ja .done
-    
+
     sub al, '0'
     movzx ebx, al
-    
+
     mov eax, [number]
     mov edx, 10
     mul edx
@@ -185,18 +185,18 @@ parse_number:
     add eax, ebx
     jc .overflow
     mov [number], eax
-    
+
     jmp .read_digit
-    
+
 .done:
     dec si
-    
+
     cmp byte [negative_flag], 0
     je .positive
     neg dword [number]
 .positive:
     ret
-    
+
 .overflow:
     mov dword [error_flag], 1
     ret
@@ -223,7 +223,7 @@ fold_term:
 
 parse_input:
     mov dword [error_flag], 0
-    
+
 .skip_spaces_start:
     lodsb
     cmp al, ' '
@@ -231,7 +231,7 @@ parse_input:
     cmp al, 0
     je .error
     dec si
-    
+
     call parse_number
     cmp dword [error_flag], 0
     jne .error
@@ -269,7 +269,7 @@ parse_input:
     cmp al, 0
     je .error
     dec si
-    
+
     call parse_number
     cmp dword [error_flag], 0
     jne .error
@@ -302,7 +302,7 @@ parse_input:
 .done:
     call fold_term
     ret
-    
+
 .error:
     mov dword [error_flag], 1
     ret
@@ -312,7 +312,7 @@ perform_operation:
     mov eax, [operand1]
     mov ebx, [operand2]
     mov cl, [operation]
-    
+
     cmp cl, '+'
     je .add
     cmp cl, '-'
@@ -323,29 +323,29 @@ perform_operation:
     je .div
     cmp cl, '^'
     je .power
-    
+
     mov dword [error_flag], 1
     ret
-    
+
 .add:
     add eax, ebx
     mov [operand1], eax
     ret
-    
+
 .sub:
     sub eax, ebx
     mov [operand1], eax
     ret
-    
+
 .mul:
     imul ebx
     mov [operand1], eax
     ret
-    
+
 .div:
     test ebx, ebx
     jz .div_error
-    
+
     xor edx, edx
     cmp eax, 0x80000000
     jne .normal_div
@@ -353,38 +353,38 @@ perform_operation:
     jne .normal_div
     mov dword [operand1], 0x80000000
     ret
-    
+
 .normal_div:
     cdq
     idiv ebx
     mov [operand1], eax
     ret
-    
+
 .power:
     mov ecx, ebx
     cmp ecx, 0
     jl .power_error
     mov eax, 1
     mov ebx, [operand1]
-    
+
     test ebx, ebx
     jnz .power_loop
     test ecx, ecx
     jnz .power_loop
     mov dword [operand1], 1
     ret
-    
+
 .power_loop:
     jecxz .power_done
     imul ebx
     jo .power_error
     dec ecx
     jmp .power_loop
-    
+
 .power_done:
     mov [operand1], eax
     ret
-    
+
 .power_error:
 .div_error:
     mov dword [error_flag], 1
@@ -395,20 +395,20 @@ print_number:
     pusha
     test eax, eax
     jnz .not_zero
-    
+
     mov ah, 0x0E
     mov al, '0'
     mov bh, 0
     mov bl, 0x0F
     int 0x10
     jmp .done
-    
+
 .not_zero:
     mov edi, number_buffer + 10
     mov byte [edi], 0
     dec edi
     mov ebx, 10
-    
+
 .convert_loop:
     xor edx, edx
     div ebx
@@ -417,9 +417,9 @@ print_number:
     dec edi
     test eax, eax
     jnz .convert_loop
-    
+
     inc edi
-    
+
     mov si, di
     mov ah, 0x0E
     mov bh, 0
@@ -430,7 +430,7 @@ print_number:
     je .done
     int 0x10
     jmp .print_loop
-    
+
 .done:
     popa
     ret

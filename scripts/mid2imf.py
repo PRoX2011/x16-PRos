@@ -43,37 +43,37 @@ def parse_midi(filename):
 
     # header
     fmt, tracks_count, division = struct.unpack('>HHH', data[8:14])
-    
+
     ptr = 14
     all_events = []
-    
+
     # 120 BPM
-    tempo = 500000 
-    
+    tempo = 500000
+
     for _ in range(tracks_count):
         if data[ptr:ptr+4] != b'MTrk':
             break
         track_len = struct.unpack('>I', data[ptr+4:ptr+8])[0]
         ptr += 8
         track_end = ptr + track_len
-        
+
         current_tick = 0
         last_status = 0
-        
+
         while ptr < track_end:
             delta, ptr = read_variable_length(data, ptr)
             current_tick += delta
-            
+
             if data[ptr] & 0x80:
                 status = data[ptr]
                 ptr += 1
                 last_status = status
             else:
                 status = last_status
-                
+
             cmd = status & 0xF0
             ch = status & 0x0F
-            
+
             if cmd == 0x80: # note Off
                 note = data[ptr]; vel = data[ptr+1]; ptr += 2
                 all_events.append({'tick': current_tick, 'type': 'off', 'ch': ch, 'note': note})
@@ -114,13 +114,13 @@ def parse_midi(filename):
         seconds_per_tick = (current_tempo / ticks_per_beat) / 1000000.0
         current_time += delta_ticks * seconds_per_tick
         prev_tick = ev['tick']
-        
+
         if ev['type'] == 'tempo':
             current_tempo = ev['val']
         elif ev['type'] in ('on', 'off'):
             ev['time'] = current_time
             abs_events.append(ev)
-            
+
     return abs_events
 
 # OPL2
@@ -132,13 +132,13 @@ class OPL2Allocator:
 
     def allocate(self, midi_ch, note):
         self.lru_counter += 1
-        
+
         for i in range(OPL_CHANNELS):
             if not self.channels[i]['active']:
                 self.channels[i] = {'note': note, 'midi_ch': midi_ch, 'active': True}
                 self.last_used[i] = self.lru_counter
                 return i
-        
+
         oldest_idx = self.last_used.index(min(self.last_used))
         self.channels[oldest_idx] = {'note': note, 'midi_ch': midi_ch, 'active': True}
         self.last_used[oldest_idx] = self.lru_counter
@@ -155,7 +155,7 @@ class OPL2Allocator:
 
 def calc_opl_freq(hz):
     if hz == 0: return 0, 0
-    
+
     for block in range(8):
         fnum = (hz * (1 << (20 - block))) / 49716.0
         if fnum < 1024:
@@ -170,12 +170,12 @@ class ImfWriter:
 
     def add_packet(self, reg, val, delay_ticks=0):
         total_delay = self.current_delay_buffer + delay_ticks
-        
+
         while total_delay > 65535:
             # too much
             self.buffer.extend(struct.pack('<HBB', 65535, 0, 0))
             total_delay -= 65535
-            
+
         self.buffer.extend(struct.pack('<HBB', int(total_delay), reg, val))
         self.current_delay_buffer = 0 # release delay
         self.total_ticks += total_delay
@@ -191,85 +191,85 @@ class ImfWriter:
 def setup_default_instrument(writer, ch):
     op1_off = OP_OFFSETS[ch][0] # Modulator
     op2_off = OP_OFFSETS[ch][1] # Carrier
-    
+
     # 20: Multiplier / Tremolo / Vibrato
-    writer.add_packet(0x20 + op1_off, 0x01) 
-    writer.add_packet(0x20 + op2_off, 0x01) 
-    
+    writer.add_packet(0x20 + op1_off, 0x01)
+    writer.add_packet(0x20 + op2_off, 0x01)
+
     # 40: KSL / Output Level
-    writer.add_packet(0x40 + op1_off, 0x40 | 0x15) 
-    writer.add_packet(0x40 + op2_off, 0x10) 
-    
+    writer.add_packet(0x40 + op1_off, 0x40 | 0x15)
+    writer.add_packet(0x40 + op2_off, 0x10)
+
     # 60: Attack / Decay
-    writer.add_packet(0x60 + op1_off, 0x60) 
-    writer.add_packet(0x60 + op2_off, 0x60) 
-    
+    writer.add_packet(0x60 + op1_off, 0x60)
+    writer.add_packet(0x60 + op2_off, 0x60)
+
     # 80: Sustain / Release
-    writer.add_packet(0x80 + op1_off, 0x75) 
-    writer.add_packet(0x80 + op2_off, 0x75) 
-    
+    writer.add_packet(0x80 + op1_off, 0x75)
+    writer.add_packet(0x80 + op2_off, 0x75)
+
     # E0: Waveform Select
     writer.add_packet(0xE0 + op1_off, 0x00)
-    writer.add_packet(0xE0 + op2_off, 0x00) 
-    
+    writer.add_packet(0xE0 + op2_off, 0x00)
+
     # C0: Feedback / Connection
     writer.add_packet(0xC0 + ch, 0x00) # 0 to SAVE YOUR EARS. OTHERSWISE TS WOULD MAKE WHITE NOISE
 
 def convert_mid_to_imf(input_file, output_file):
     print(f"Reading MIDI: {input_file}")
     events = parse_midi(input_file)
-    
+
     writer = ImfWriter()
     allocator = OPL2Allocator()
-    
+
     # waveform select enable
     writer.add_packet(0x01, 0x20)
     # keyboard Split
     writer.add_packet(0x08, 0x00)
-    
+
     # default instrument
     for i in range(OPL_CHANNELS):
         setup_default_instrument(writer, i)
-        
+
     current_time = 0.0
-    
+
     print(f"Processing {len(events)} events...")
-    
+
     for ev in events:
         # delta
         delta_time = ev['time'] - current_time
         if delta_time < 0: delta_time = 0
-        
+
         ticks = int(delta_time * IMF_RATE)
         if ticks > 0:
             writer.wait(ticks)
             current_time = ev['time']
         if ev.get('ch') == 9: # save YOUR ears again. YOUR TAKING TOO LONG
-            continue            
+            continue
         if ev['type'] == 'on':
             # allocate channel
             ch_idx = allocator.allocate(ev['ch'], ev['note'])
-            
+
             # calculate pitch
             freq = NOTE_FREQS[ev['note']]
             fnum, block = calc_opl_freq(freq)
-            
+
             # key OFF
             writer.add_packet(0xB0 + ch_idx, 0x00)
-            
+
             # set freq
             writer.add_packet(0xA0 + ch_idx, fnum & 0xFF)
-            
+
             # set ON + block + B0
             b0_val = 0x20 | ((block & 0x07) << 2) | ((fnum >> 8) & 0x03)
             writer.add_packet(0xB0 + ch_idx, b0_val)
-            
+
         elif ev['type'] == 'off':
             ch_idx = allocator.release(ev['ch'], ev['note'])
             if ch_idx != -1:
                 freq = NOTE_FREQS[ev['note']]
                 fnum, block = calc_opl_freq(freq)
-                
+
                 b0_val = ((block & 0x07) << 2) | ((fnum >> 8) & 0x03)
                 writer.add_packet(0xB0 + ch_idx, b0_val)
 
@@ -283,13 +283,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MIDI to IMF")
     parser.add_argument("input", help="Input .mid file")
     parser.add_argument("output", nargs="?", help="Output .imf file")
-    
+
     args = parser.parse_args()
-    
+
     out_path = args.output
     if not out_path:
         out_path = args.input.rsplit('.', 1)[0] + ".imf"
-        
+
     try:
         convert_mid_to_imf(args.input, out_path)
     except Exception as e:

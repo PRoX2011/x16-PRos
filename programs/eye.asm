@@ -30,13 +30,13 @@ start:
     call ui_enter
     call draw_wrapper
 
-    
+
     mov ax, 500
     call sleep_ms_esc
     jc exit_program
-    
+
     ; 1) Licensed
-    call clear_inside 
+    call clear_inside
     mov si, msg_license
     mov dh, TEXT_ROW_MAIN
     call draw_centered_text_row
@@ -48,11 +48,11 @@ start:
     jc exit_program
 
 main_loop:
-    
+
     mov ax, 500
     call sleep_ms_esc
     jc exit_program
-    
+
 
     ; 1) LOOK AT THE CENTER
     call clear_inside
@@ -325,7 +325,7 @@ draw_centered_text_row:
     jb .skip_char
     cmp al, 126
     ja .skip_char
-    
+
     call put_char_attr
 .skip_char:
     inc dl
@@ -344,23 +344,23 @@ strlen_preserve:
     push ax
     push si
     xor cx, cx
-    
+
     cmp si, 0
     je .out
     cmp si, 0x8000
     jb .out
-    
+
 .len:
     cmp cx, 200
     jge .out
-    
+
     mov al, [si]
     test al, al
     jz .out
 
     cmp al, 32
     jb .out
-    
+
     inc si
     inc cx
     jmp .len
@@ -476,7 +476,7 @@ compute_dot_pos:
     ret
 
 ; ============================================================
-; ESC + sleep via BIOS ticks (int 1Ah) 
+; ESC + sleep via BIOS ticks (int 1Ah)
 ; ============================================================
 
 check_esc:
@@ -620,28 +620,28 @@ pick_phrase:
     push di
     push bp
 
-    mov bp, bx     
-    mov di, cx     
+    mov bp, bx
+    mov di, cx
 
     mov ah, 00h
-    int 1Ah         
-    
+    int 1Ah
+
     mov ax, dx
-    xor dx, dx      
+    xor dx, dx
 
     cmp di, 0
     je .use_first
-    
-    div di          
-                   
+
+    div di
+
     mov si, dx
-    shl si, 1     
-    add si, bp      
-    mov si, [si]    
+    shl si, 1
+    add si, bp
+    mov si, [si]
     jmp .done
 
 .use_first:
-    mov si, [bp] 
+    mov si, [bp]
 
 .done:
     pop bp

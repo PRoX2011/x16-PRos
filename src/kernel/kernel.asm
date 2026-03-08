@@ -8,817 +8,47 @@
 [BITS 16]
 [ORG 0x0000]
 
+COLOR_WHITE          equ 0x0F
+COLOR_GREEN          equ 0x0A
+COLOR_CYAN           equ 0x0B
+COLOR_RED            equ 0x0C
+COLOR_YELLOW         equ 0x0E
 
-disk_buffer equ   24576
+CHAR_LF              equ 0x0A
+CHAR_CR              equ 0x0D
+
+KERNEL_DATA_SEG      equ 0x2000
+DOS_INT20_VECTOR     equ 0x20
+
+COM_EXIT_OPCODE      equ 0xCD
+COM_STACK_TOP        equ 0xFFFE
+COM_ENTRY_OFFSET     equ 0x0100
+
+disk_buffer          equ 0x6000
+program_load_addr    equ 0x8000
+dirlist              equ 0xA800
+command_history      equ 0xD000
 
 section .text
 
 start:
-    cli 
+    cli
+
     ; ------ Stack installation ------
     mov ax, 0
     mov ss, ax
     mov sp, 0x0FFFF
+    ; --------------------------------
 
-    xor ax, ax            
-    mov es, ax
-    mov word [es:0x80], int20_handler 
-    mov word [es:0x82], cs          
+    call set_video_mode        ; Set video mode
+    call init_system           ; Init system (segments, timer, api, configs, display, security, start autoexec)
+    call load_and_apply_theme  ; Load and aply theme from THEME.CFG file
+    call fs_list_drives        ; List drives
+    call load_timezone_cfg     ; It is necessary after completion of SETUP.BIN so that the time zone is updated to the user one
+    call shell                 ; Start PRos terminal
 
-    sti
-
-    cld
-
-    call set_video_mode  ; Setting up video mode
-
-    call InitMouse       ; Mouse initialization
-
-    mov ax, 2000h
-    mov ds, ax
-    mov es, ax
-    ;mov fs, ax
-    ;mov gs, ax
-
-    ; Set up frequency (1193180 Hz / 1193 = ~1000 Hz)
-    mov al, 0xB6
-    out 0x43, al
-    mov ax, 700
-    out 0x42, al
-    mov al, ah
-    out 0x42, al
-
-    ; PRoX kernel API initialization
-    call api_output_init    ; Output API (INT 21H)
-    call api_fs_init        ; File system API (INT 22h)
-
-    ; Load SYSTEM.CFG (Logo and Sound settings)
-    call load_system_cfg
-
-    ; Display PRoX OS logo if available (using configured filename)
-    call load_logo_and_display
-
-    call set_video_mode
-
-    ; Load and check FIRST_B.CFG
-    call load_first_boot_cfg
-    mov al, [32768]
-    cmp al, '1'
-    je .first_boot
-    jmp .normal_boot
-
-.first_boot:
-    ; Load and execute SETUP.BIN
-    call load_setup_bin
-    jc .setup_failed            ; Jump if file loading fails
-    ; Prepare to execute SETUP.BIN
-    mov ax, 0
-    mov bx, 0
-    mov cx, 0
-    mov dx, 0
-    mov word si, [param_list]   ; Parameter list
-    mov di, 0
-    call 32768                  ; Execute SETUP.BIN
-
-    ; Load USER.CFG into "user" if exists
-    call load_user_cfg
-    jnc .load_user_after_setup
-    jmp .load_prompt
-.load_user_after_setup:
-    mov si, 32768
-    mov di, user
-    mov cx, bx
-    cmp cx, 31
-    jbe .copy_user_after_setup
-    mov cx, 31
-.copy_user_after_setup:
-    rep movsb
-    mov byte [di], 0
-    jmp .load_prompt
-
-.setup_failed:
-    ; Handle failure to load SETUP.BIN (already handled in load_setup_bin)
-    jmp .load_prompt
-
-.normal_boot:
-    ; Load USER.CFG into "user" if exists
-    call load_user_cfg
-    jnc .load_user_success
-    jmp .load_prompt
-.load_user_success:
-    mov si, 32768
-    mov di, user
-    mov cx, bx
-    cmp cx, 31
-    jbe .copy_user
-    mov cx, 31
-.copy_user:
-    rep movsb
-    mov byte [di], 0
-
-.load_prompt:
-    ; Load PROMPT.CFG if exists
-    call load_prompt_cfg
-    jnc .load_prompt_success
-    jmp .set_default_prompt
-
-.load_prompt_success:
-    cmp bx, 63
-    jbe .copy_prompt
-    mov bx, 63
-.copy_prompt:
-    mov si, 32768
-    mov di, temp_prompt
-    mov cx, bx
-    rep movsb
-    mov byte [di], 0
-
-    mov si, temp_prompt
-    mov di, final_prompt
-    call parse_prompt
-    jmp .prompt_done
-
-.set_default_prompt:
-    mov di, final_prompt
-    mov al, '['
-    stosb
-    mov si, user
-.default_user_copy:
-    lodsb
-    cmp al, 0
-    je .default_user_done
-    stosb
-    jmp .default_user_copy
-.default_user_done:
-    mov si, .default_suffix
-.default_suffix_copy:
-    lodsb
-    stosb
-    cmp al, 0
-    jne .default_suffix_copy
-    jmp .prompt_done
-
-.prompt_done:
-    ; Password check
-    call load_password_cfg
-    jnc .password_check
-    jmp .password_ok 
-
-.password_check:
-    ; Decrypt the loaded password
-    mov si, 32768              ; Encrypted password from file
-    mov di, decrypted_pass     ; Buffer for decrypted password
-    mov cx, bx                 ; Length from file load
-    call decrypt_string
-
-    ; Check if password is empty (first byte is 0 after decrypt)
-    cmp byte [decrypted_pass], 0
-    je .password_ok
-    cmp bx, 0
-    je .password_ok
-
-.password_prompt:
-    mov dh, 12
-    mov dl, 0
-    call string_move_cursor
-
-    mov si, login_password_prompt
-    call print_string
-
-    mov dh, 14
-    mov dl, 24
-    call string_move_cursor
-
-    mov di, .password_input
-    mov al, 0
-    mov cx, 32
-    rep stosb
-
-    mov ax, .password_input
-    call string_input_string
-
-    ; Compare input (plaintext) with decrypted password
-    mov si, .password_input
-    mov di, decrypted_pass
-    call string_string_compare
-    jc .password_ok
-
-    ; Wrong password
-    mov dh, 28
-    mov dl, 27
-    call string_move_cursor
-
-    mov si, .wrong_password_msg
-    call print_string_red
-
-    ; Wait for key press
-    mov ah, 0
-    int 16h
-
-    mov dh, 28
-    mov dl, 27
-    call string_move_cursor
-
-    mov si, .clear_row
-    call print_string_red
-
-    jmp .password_prompt
-
-.password_ok:
-    call EnableMouse        ; Turn on mouse
-    call string_clear_screen
-
-    call print_interface    ; Help menu and header
-    
-    ; Check configuration for start sound
-    cmp byte [cfg_sound_enabled], 1
-    jne .skip_melody
-    
-    mov si, start_melody
-    call play_melody        ; Startup melody
-
-.skip_melody:
-    ; Check for AUTOEXEC.BIN
-    mov ax, autoexec_file
-    call fs_file_exists
-    jnc .execute_autoexec   ; File exists, execute it
-    jmp .skip_autoexec      ; File doesn't exist, skip to normal boot
-
-.execute_autoexec:
-    mov ax, autoexec_file
-    mov bx, 0
-    mov cx, 32768
-    call fs_load_file
-    jc .skip_autoexec       ; If loading fails, skip to normal boot
-
-    ; Execute AUTOEXEC.BIN
-    mov ax, 0
-    mov bx, 0
-    mov cx, 0
-    mov dx, 0
-    mov word si, [param_list]
-    mov di, 0
-
-    call DisableMouse
-    call 32768              ; Execute the loaded binary
-    call EnableMouse
-
-.skip_autoexec:
-    ; Load and aply theme from THEME.CFG file
-    call load_and_apply_theme
-
-    call shell              ; PRos terminal
     jmp $
 
-.wrong_password_msg db 'Wrong password! Try again.', 13, 10, 0
-.clear_row          db 80 dup(' '), 0
-.password_input     times 32 db 0
-.default_suffix     db '@PRos] > ', 0
-
-; ===================== SYSTEM CONFIGURATION =====================
-
-; Load SYSTEM.CFG
-load_system_cfg:
-    pusha
-    
-    mov byte [cfg_sound_enabled], 1    
-    mov byte [cfg_logo_stretch], 0   
-    
-    mov si, default_logo_file     
-    mov di, current_logo_file
-    call string_string_copy
-    
-    mov ax, system_cfg_file
-    mov cx, 32768                   
-    call fs_load_file
-    jc .done                          
-    
-    mov si, 32768                 
-    mov cx, bx                         
-    call parse_system_cfg_data
-    
-.done:
-    popa
-    ret
-
-parse_system_cfg_data:
-    pusha
-    
-.scan_loop:
-    cmp cx, 0
-    jle .finish_parse
-
-    lodsb
-    dec cx
-    cmp al, ' '
-    je .scan_loop
-    cmp al, 9      
-    je .scan_loop
-    cmp al, 13        
-    je .scan_loop
-    cmp al, 10      
-    je .scan_loop
-
-    cmp al, '#'
-    je .skip_comment_line
-
-    dec si
-    inc cx
-
-    push si
-    mov di, cfg_key_logo
-    call .check_keyword
-    jnc .found_logo
-    pop si
-
-    push si
-    mov di, cfg_key_logo_stretch
-    call .check_keyword
-    jnc .found_logo_stretch
-    pop si
-
-    push si
-    mov di, cfg_key_sound
-    call .check_keyword
-    jnc .found_sound
-    pop si
-
-    inc si
-    dec cx
-    jmp .scan_loop
-
-.skip_comment_line:
-    cmp cx, 0
-    jle .finish_parse
-    lodsb
-    dec cx
-    cmp al, 10     
-    je .scan_loop
-    cmp al, 13     
-    je .scan_loop
-    jmp .skip_comment_line
-
-.found_logo:
-    pop si          
-    add si, 5        
-    sub cx, 5
-    
-.skip_logo_spaces:
-    cmp cx, 0
-    jle .finish_parse
-    lodsb
-    dec cx
-    cmp al, ' '
-    je .skip_logo_spaces
-    cmp al, 9    
-    je .skip_logo_spaces
-    
-    dec si
-    inc cx
-    
-    push si
-    push cx
-    mov di, .false_str
-    call .check_keyword
-    pop cx
-    pop si
-    jnc .set_logo_false
-    
-    mov di, current_logo_file
-.copy_logo_val:
-    cmp cx, 0
-    jle .logo_val_done
-    lodsb
-    dec cx
-    cmp al, 13          ; CR
-    je .logo_val_done
-    cmp al, 10          ; LF
-    je .logo_val_done
-    cmp al, 0
-    je .logo_val_done
-    cmp al, '#'         ; Comment
-    je .logo_val_done
-    cmp al, ' '         ; Space 
-    je .check_logo_end
-    cmp al, 9           ; Tab
-    je .check_logo_end
-    stosb
-    jmp .copy_logo_val
-
-.check_logo_end:
-    cmp cx, 0
-    jle .logo_val_done
-    push si
-    lodsb
-    dec cx
-    cmp al, '#'
-    je .logo_val_done_pop
-    cmp al, 13
-    je .logo_val_done_pop
-    cmp al, 10
-    je .logo_val_done_pop
-    pop si
-    mov al, ' '
-    stosb
-    jmp .copy_logo_val
-
-.logo_val_done_pop:
-    pop si
-.logo_val_done:
-    mov byte [di], 0  
-    mov byte [cfg_logo_enabled], 1
-    jmp .scan_loop    
-
-.set_logo_false:
-    add si, 5       
-    sub cx, 5
-    mov byte [cfg_logo_enabled], 0
-.skip_logo_line:
-    cmp cx, 0
-    jle .finish_parse
-    lodsb
-    dec cx
-    cmp al, 10
-    je .scan_loop
-    cmp al, 13
-    je .scan_loop
-    jmp .skip_logo_line
-
-.found_logo_stretch:
-    pop si  
-    add si, 13        
-    sub cx, 13
-    
-.skip_stretch_spaces:
-    cmp cx, 0
-    jle .finish_parse
-    lodsb
-    dec cx
-    cmp al, ' '
-    je .skip_stretch_spaces
-    cmp al, 9       
-    je .skip_stretch_spaces
-    
-    dec si
-    inc cx
-
-    lodsb
-    dec cx
-    cmp al, 'F'
-    je .set_stretch_false
-    cmp al, 'f'
-    je .set_stretch_false
-    cmp al, 'T'
-    je .set_stretch_true
-    cmp al, 't'
-    je .set_stretch_true
-
-    mov byte [cfg_logo_stretch], 0
-    jmp .skip_stretch_line
-
-.set_stretch_false:
-    mov byte [cfg_logo_stretch], 0
-    jmp .skip_stretch_line
-
-.set_stretch_true:
-    mov byte [cfg_logo_stretch], 1
-    
-.skip_stretch_line:
-    cmp cx, 0
-    jle .finish_parse
-    lodsb
-    dec cx
-    cmp al, 10
-    je .scan_loop
-    cmp al, 13
-    je .scan_loop
-    jmp .skip_stretch_line
-
-.found_sound:
-    pop si      
-    add si, 12        
-    sub cx, 12
-    
-.skip_sound_spaces:
-    cmp cx, 0
-    jle .finish_parse
-    lodsb
-    dec cx
-    cmp al, ' '
-    je .skip_sound_spaces
-    cmp al, 9        
-    je .skip_sound_spaces
-    
-    dec si
-    inc cx
-    lodsb
-    dec cx
-    cmp al, 'F'
-    je .set_sound_false
-    cmp al, 'f'
-    je .set_sound_false
-    cmp al, 'T'
-    je .set_sound_true
-    cmp al, 't'
-    je .set_sound_true
-    
-    mov byte [cfg_sound_enabled], 1
-    jmp .skip_sound_line
-
-.set_sound_false:
-    mov byte [cfg_sound_enabled], 0
-    jmp .skip_sound_line
-
-.set_sound_true:
-    mov byte [cfg_sound_enabled], 1
-    
-.skip_sound_line:
-    cmp cx, 0
-    jle .finish_parse
-    lodsb
-    dec cx
-    cmp al, 10
-    je .scan_loop
-    cmp al, 13
-    je .scan_loop
-    jmp .skip_sound_line
-
-.finish_parse:
-    popa
-    ret
-
-.check_keyword:
-    push si
-    push di
-.kw_loop:
-    mov al, [di]
-    cmp al, 0
-    je .kw_match
-    mov ah, [si]
-    cmp ah, al
-    jne .kw_fail
-    inc si
-    inc di
-    jmp .kw_loop
-.kw_match:
-    pop di
-    pop si
-    clc
-    ret
-.kw_fail:
-    pop di
-    pop si
-    stc
-    ret
-
-.false_str db 'FALSE', 0
-
-; =================================================================
-
-; Load and display Logo
-load_logo_and_display:
-    pusha
-
-    cmp byte [cfg_logo_enabled], 0
-    je .done                  
-    
-    mov si, current_logo_file
-    mov di, si
-    xor cx, cx          
-    
-.find_slash:
-    lodsb
-    inc cx
-    cmp al, 0
-    je .no_path           
-    cmp al, '/'
-    je .path_found
-    jmp .find_slash
-
-.path_found:
-    mov si, current_logo_file
-    mov di, .temp_dir_path
-    dec cx   
-    
-.copy_dir_loop:
-    lodsb
-    stosb
-    dec cx
-    jnz .copy_dir_loop
-
-    mov al, '.'
-    stosb
-    mov al, 'D'
-    stosb
-    mov al, 'I'
-    stosb
-    mov al, 'R'
-    stosb
-    mov byte [di], 0
-
-    inc si
-
-    push si
-    mov di, .temp_file_name
-.copy_file_loop:
-    lodsb
-    stosb
-    cmp al, 0
-    jne .copy_file_loop
-
-    mov ax, .temp_dir_path
-    call fs_change_directory
-    jc .error_loading
-
-    pop ax          
-    mov cx, 32768
-    call fs_load_file
-    
-    pushf             
-    call fs_parent_directory  
-    popf
-    
-    jnc .display_logo
-    jmp .error_loading
-
-.no_path:
-    mov ax, current_logo_file   
-    mov cx, 32768
-    call fs_load_file
-    jnc .display_logo
-
-.error_loading:
-    mov si, error_message
-    call print_string_red
-    mov si, logo_missed
-    call print_string
-    call print_newline
-    mov ah, 0
-    int 16h
-    jmp .done
-
-.display_logo:
-    mov ax, 0x13
-    int 0x10
-    push bx
-    mov si, 32768
-    cmp byte [cfg_logo_stretch], 1
-    je .display_stretched
-    call display_bmp
-    jmp .wait_key
-
-.display_stretched:
-    call display_bmp_stretched
-
-.wait_key:
-    mov ah, 0
-    int 16h
-    mov byte [_palSet], 0
-    pop bx  
-
-.done:
-    popa
-    ret
-
-.temp_dir_path  times 20 db 0
-.temp_file_name times 13 db 0
-
-; Load FIRST_B.CFG from CONF.DIR
-; If CONF.DIR or file missing -> Return '1' (First Boot)
-load_first_boot_cfg:
-    pusha
-    
-    ; 1. Try Enter CONF.DIR
-    mov ax, conf_dir_name
-    call fs_change_directory
-    jc .fresh_install
-    
-    ; 2. Try Load File
-    mov ax, first_boot_file
-    mov cx, 32768
-    call fs_load_file
-    jc .file_missing
-    
-    ; 3. Success: Go back
-    call fs_parent_directory
-    popa
-    ret
-
-.file_missing:
-    ; Go back even if file missing
-    call fs_parent_directory
-
-.fresh_install:
-    ; If folder or file missing, simulate "First Boot"
-    ; by writing '1' into the buffer
-    mov byte [32768], '1'
-    mov byte [32769], 0
-    popa
-    ret
-
-; Load SETUP.BIN
-load_setup_bin:
-    pusha
-    mov ax, setup_bin_file
-    mov bx, 0
-    mov cx, 32768
-    call fs_load_file
-    jnc .done
-    mov si, error_message
-    call print_string_red
-    mov si, setup_failed_msg
-    call print_string
-    call print_newline
-    ; Wait for key press
-    mov ah, 0
-    int 16h
-    stc 
-
-.done:
-    popa
-    ret
-
-; Load USER.CFG
-load_user_cfg:
-    pusha
-    
-    mov ax, conf_dir_name
-    call fs_change_directory
-    jc .fail_load
-
-    mov ax, user_cfg_file
-    mov cx, 32768
-    call fs_load_file
-    
-    pushf
-    push bx
-    
-    call fs_parent_directory
-    
-    pop bx
-    popf
-    
-    jnc .done
-    
-.fail_load:
-    mov si, error_message
-    call print_string_red
-    mov si, user_cfg_missed
-    call print_string
-    call print_newline
-    ; Wait for key press
-    mov ah, 0
-    int 16h
-    stc  
-
-.done:
-    popa
-    ret
-
-; Load PROMPT.CFG 
-load_prompt_cfg:
-    pusha
-    mov ax, conf_dir_name
-    call fs_change_directory
-    jc .fail
-    
-    mov ax, prompt_cfg_file
-    mov cx, 32768
-    call fs_load_file
-    
-    pushf
-    call fs_parent_directory
-    popf
-    jc .fail
-    popa
-    clc
-    ret
-.fail:
-    popa
-    stc
-    ret
-
-; Load PASSWORD.CFG 
-load_password_cfg:
-    pusha
-    mov ax, conf_dir_name
-    call fs_change_directory
-    jc .fail
-    
-    mov ax, password_cfg_file
-    mov cx, 32768
-    call fs_load_file
-    
-    pushf
-    call fs_parent_directory
-    popf
-    jc .fail
-    popa
-    clc
-    ret
-.fail:
-    popa
-    stc
-    ret
 
 set_video_mode:
     ; VGA 640*480, 16 colors
@@ -833,21 +63,12 @@ set_video_mode:
 ; IN  : SI = string location
 ; OUT : Nothing
 print_string:
-    mov ah, 0x0E
-    mov bl, 0x0F
+    mov bl, COLOR_WHITE
 .print_char:
     lodsb
     cmp al, 0
     je .done
-    cmp al, 0x0A          ; Check for newline (LF)
-    je .handle_newline
-    int 0x10              ; Print character
-    jmp .print_char
-.handle_newline:
-    mov al, 0x0D          ; Output carriage return (CR)
-    int 0x10
-    mov al, 0x0A          ; Output line feed (LF)
-    int 0x10
+    call print_char
     jmp .print_char
 .done:
     ret
@@ -857,66 +78,75 @@ print_string:
 ; IN  : Nothing
 ; OUT : Nothing
 print_newline:
-    mov ah, 0x0E
-    mov al, 0x0D
-    int 0x10
-    mov al, 0x0A
-    int 0x10
+    mov bl, COLOR_WHITE
+    mov al, CHAR_LF
+    call print_char
     ret
 
 ; ===================== Colored print functions =====================
 
-; ------ Green ------
-print_string_green:
-    mov ah, 0x0E
-    mov bl, 0x0A
+; ------ Shared color printer ------
+print_string_color:
 .print_char:
     lodsb
     cmp al, 0
     je .done
-    int 0x10
+    call print_char
     jmp .print_char
 .done:
     ret
+
+; -----------------------------
+; Output a single character with color
+; IN  : AL = character code
+;       BL = color
+; OUT : Nothing
+print_char:
+    cmp al, CHAR_LF
+    je .newline
+    cmp al, CHAR_CR
+    je .carriage_return
+    mov ah, 0x0E
+    xor bh, bh
+    int 0x10
+    ret
+.carriage_return:
+    mov ah, 0x0E
+    xor bh, bh
+    int 0x10
+    ret
+.newline:
+    push ax
+    mov ah, 0x0E
+    xor bh, bh
+    mov al, CHAR_CR
+    int 0x10
+    pop ax
+    mov ah, 0x0E
+    xor bh, bh
+    mov al, CHAR_LF
+    int 0x10
+    ret
+
+; ------ Green ------
+print_string_green:
+    mov bl, COLOR_GREEN
+    jmp print_string_color
 
 ; ------ Cyan ------
 print_string_cyan:
-    mov ah, 0x0E
-    mov bl, 0x0B
-.print_char:
-    lodsb
-    cmp al, 0
-    je .done
-    int 0x10
-    jmp .print_char
-.done:
-    ret
+    mov bl, COLOR_CYAN
+    jmp print_string_color
 
 ; ------ Red ------
 print_string_red:
-    mov ah, 0x0E
-    mov bl, 0x0C
-.print_char:
-    lodsb
-    cmp al, 0
-    je .done
-    int 0x10
-    jmp .print_char
-.done:
-    ret
+    mov bl, COLOR_RED
+    jmp print_string_color
 
 ; ------ Yellow ------
 print_string_yellow:
-    mov ah, 0x0E
-    mov bl, 0x0E
-.print_char:
-    lodsb
-    cmp al, 0
-    je .done
-    int 0x10
-    jmp .print_char
-.done:
-    ret
+    mov bl, COLOR_YELLOW
+    jmp print_string_color
 
 ; -----------------------------
 ; Print decimal number
@@ -925,13 +155,13 @@ print_decimal:
     mov cx, 0
     mov dx, 0
 .setup:
-    cmp ax, 0  
+    cmp ax, 0
     je .check_0
-    mov bx, 10          
-    div bx             
-    push dx   
-    inc cx                 
-    xor dx, dx            
+    mov bx, 10
+    div bx
+    push dx
+    inc cx
+    xor dx, dx
     jmp .setup
 .check_0:
     cmp cx, 0
@@ -939,17 +169,27 @@ print_decimal:
     push dx
     inc cx
 .print_number:
-    mov ah, 0x0E              
+    mov bl, COLOR_WHITE
 .print_char:
-    cmp cx, 0                
+    cmp cx, 0
     je .return
-    pop dx                    
-    add dx, 48            
+    pop dx
+    add dx, 48
     mov al, dl
-    int 0x10
+    call print_char
     dec cx
     jmp .print_char
 .return:
+    ret
+
+print_drive_prefix:
+    mov bl, COLOR_WHITE
+    mov al, [current_drive_char]
+    call print_char
+    mov al, ':'
+    call print_char
+    mov al, '/'
+    call print_char
     ret
 
 print_interface:
@@ -969,7 +209,7 @@ print_interface:
 
     mov si, .shell
     call print_string
-    
+
     mov si, version_msg
     call print_string
 
@@ -979,25 +219,25 @@ print_interface:
     call print_string_cyan
 
     call print_newline
-    
-    mov cx, 15         
-    mov bl, 0           
+
+    mov cx, 15
+    mov bl, 0
 .color_blocks:
-    push cx            
-    
-    mov ah, 0x0E          
-    mov al, 0xDB            
-    int 0x10      
-    
-    inc bl             
-    cmp bl, 15        
+    push cx
+
+    mov ah, 0x0E
+    mov al, 0xDB
+    int 0x10
+
+    inc bl
+    cmp bl, 15
     jbe .next_block
-    mov bl, 0          
-    
+    mov bl, 0
+
 .next_block:
-    pop cx          
+    pop cx
     loop .color_blocks
-    
+
     call print_newline
     call print_newline
 
@@ -1032,7 +272,7 @@ print_help:
 
     mov ax, .help_bin_file
     mov bx, 0
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
     jc .restore_and_builtin
 
@@ -1044,17 +284,18 @@ print_help:
     mov dx, 0
     mov word si, [param_list]
     mov di, 0
-    
+
     call DisableMouse
-    call 32768
-    
-    mov ax, 0x2000
+    call program_load_addr
+
+    mov ax, KERNEL_DATA_SEG
     mov ds, ax
     mov es, ax
-    
+
+    call fs_reset_floppy
     call EnableMouse
     call load_and_apply_theme
-    
+
     popa
     jmp get_cmd
 
@@ -1066,12 +307,12 @@ print_help:
 .use_builtin_help:
     popa
     call print_newline
-    
+
     mov si, kshell_comands
     call print_string
-    
+
     call print_newline
-    
+
     jmp get_cmd
 
 .help_bin_file db 'HELP.BIN', 0
@@ -1086,6 +327,7 @@ print_info:
 
 shell:
 get_cmd:
+    call refresh_prompt
     mov si, final_prompt
     call print_string
 
@@ -1102,7 +344,61 @@ get_cmd:
     mov ax, input
     call string_input_string
     call print_newline
+    cmp byte [input], 0
+    je .save_input_to_history_skip
 
+    ; append input to command history (16 entries x 256 bytes)
+    pusha
+    cmp byte [command_history_top], 16
+    jbe .history_top_ok
+    mov byte [command_history_top], 16
+.history_top_ok:
+    xor cx, cx
+    mov cl, [command_history_top]
+    cmp cx, 0
+    je .save_input_to_history_store_new
+    cmp cx, 16
+    jb .history_shift_start_ok
+    mov cx, 15
+.history_shift_start_ok:
+    dec cx
+.shift_history_element_loop:
+    mov bx, cx
+    shl bx, 8
+    lea si, [command_history + bx]
+    add bx, 256
+    lea di, [command_history + bx]
+.shift_history_shift_char:
+    mov al, [si]
+    mov [di], al
+    inc si
+    inc di
+    cmp al, 0
+    jne .shift_history_shift_char
+    cmp cx, 0
+    je .save_input_to_history_store_new
+    dec cx
+    jmp .shift_history_element_loop
+
+.save_input_to_history_store_new:
+    mov di, command_history
+    mov si, input
+.save_input_loop:
+    mov al, [si]
+    mov [di], al
+    cmp al, 0
+    je .save_input_to_history_end
+    inc si
+    inc di
+    jmp .save_input_loop
+.save_input_to_history_end:
+    cmp byte [command_history_top], 16
+    jae .save_input_to_history_done
+    inc byte [command_history_top]
+.save_input_to_history_done:
+    popa
+
+.save_input_to_history_skip:
     mov ax, input
     call string_string_chomp
 
@@ -1122,10 +418,34 @@ get_cmd:
     mov ax, command
     call string_string_uppercase
 
+    ; ============ Drive Change Check (A:, B:, C:) ============
+    mov si, command
+    
+    call string_string_length
+    cmp ax, 2
+    jne .not_drive_change
+
+    cmp byte [si+1], ':'
+    jne .not_drive_change
+
+    mov al, [si]
+    call fs_change_drive_letter
+    call print_newline
+    mov si, .success_disk_change_msg
+    call print_string_green
+    call print_newline
+    call print_newline
+    jnc get_cmd
+
+    mov si, bad_drive_msg
+    call print_string_red
+    call print_newline
+    jmp get_cmd
+
+.not_drive_change:
+    ; ============ kernel shell comands ============
     mov si, command
 
-    ; ============ kernel shell comands ============
-    
     mov di, exit_string
     call string_string_compare
     jc near exit
@@ -1202,14 +522,6 @@ get_cmd:
     call string_string_compare
     jc near view_bmp
 
-    mov di, head_string
-    call string_string_compare
-    jc near head_file
-
-    mov di, tail_string
-    call string_string_compare
-    jc near tail_file
-
     mov di, mkdir_string
     call string_string_compare
     jc near mkdir_command
@@ -1221,20 +533,20 @@ get_cmd:
     mov di, cd_string
     call string_string_compare
     jc near cd_command
-    
+
     mov si, command
     mov di, kernel_file
     call string_string_compare
     jc no_kernel_allowed
 
     ; ============ Check File Extension ============
-    
+
     ; Check if command ends with .COM
     mov ax, command
     call string_string_length
     cmp ax, 4
     jl .check_bin_extension
-    
+
     mov si, command
     add si, ax
     sub si, 4
@@ -1254,7 +566,7 @@ get_cmd:
     jc .load_bin_program
 
     ; ============ Auto-append Extensions ============
-    
+
     ; No extension found, try .COM first
     mov ax, command
     call string_string_length
@@ -1292,36 +604,53 @@ get_cmd:
     ; Try to load from current directory
     mov ax, command
     mov bx, 0
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
-    jnc execute_bin 
+    jnc execute_bin
 
-    ; If not found, try /BIN directory 
+    ; If not found, try /BIN.DIR on current drive first
     call save_current_dir
-
-    mov di, temp_saved_dir
-    mov si, current_directory
-    call string_string_copy
     mov byte [current_directory], 0
 
     mov ax, bin_dir_name
     call fs_change_directory
-    jc .restore_and_fail
+    jc .restore_and_try_a_bin
 
     mov ax, command
     mov bx, 0
-    mov cx, 32768
+    mov cx, program_load_addr
     call fs_load_file
-    jc .restore_and_fail
+    jc .restore_and_try_a_bin
 
-    ; Restore original directory 
     call restore_current_dir
     jmp execute_bin
 
-.restore_and_fail:
-    mov di, current_directory
-    mov si, temp_saved_dir
-    call string_string_copy
+.restore_and_try_a_bin:
+    call restore_current_dir
+    cmp byte [current_drive_char], 'A'
+    je total_fail
+
+    ; Then try A:/BIN.DIR (legacy fallback)
+    call save_current_dir
+    mov al, 'A'
+    call fs_change_drive_letter
+    jc .restore_and_fail_a_bin
+
+    mov ax, bin_dir_name
+    call fs_change_directory
+    jc .restore_and_fail_a_bin
+
+    mov ax, command
+    mov bx, 0
+    mov cx, program_load_addr
+    call fs_load_file
+    jc .restore_and_fail_a_bin
+
+    call restore_current_dir
+    jmp execute_bin
+
+.restore_and_fail_a_bin:
+    call restore_current_dir
     jmp total_fail
 
 .load_com_program:
@@ -1334,29 +663,47 @@ get_cmd:
 
 .try_bin_dir_com:
     call save_current_dir
-    
-    mov di, temp_saved_dir
-    mov si, current_directory
-    call string_string_copy
     mov byte [current_directory], 0
 
     mov ax, bin_dir_name
     call fs_change_directory
-    jc .restore_and_fail_com
+    jc .restore_and_try_a_com
 
     mov ax, command
     mov dx, program_seg
     call fs_load_com
-    jc .restore_and_fail_com
+    jc .restore_and_try_a_com
 
     call restore_current_dir
     jmp execute_com
 
-.restore_and_fail_com:
-    mov di, current_directory
-    mov si, temp_saved_dir
-    call string_string_copy
+.restore_and_try_a_com:
+    call restore_current_dir
+    cmp byte [current_drive_char], 'A'
+    je total_fail
+
+    call save_current_dir
+    mov al, 'A'
+    call fs_change_drive_letter
+    jc .restore_and_fail_a_com
+
+    mov ax, bin_dir_name
+    call fs_change_directory
+    jc .restore_and_fail_a_com
+
+    mov ax, command
+    mov dx, program_seg
+    call fs_load_com
+    jc .restore_and_fail_a_com
+
+    call restore_current_dir
+    jmp execute_com
+
+.restore_and_fail_a_com:
+    call restore_current_dir
     jmp total_fail
+
+.success_disk_change_msg db 'Disk changed', 0
 
 ; ============ Execute BIN Program ============
 
@@ -1368,13 +715,24 @@ execute_bin:
     mov word si, [param_list]
     mov di, 0
 
+    ; Save kernel stack in case BIN modifies SS:SP.
+    mov [bin_stack_save], sp
+    mov [bin_ss_save], ss
+
     call DisableMouse
-    call 32768
+    call program_load_addr
 
-    mov ax, 0x2000   
-    mov ds, ax        
-    mov es, ax           
+    cli
+    mov ax, [bin_ss_save]
+    mov ss, ax
+    mov sp, [bin_stack_save]
 
+    mov ax, KERNEL_DATA_SEG
+    mov ds, ax
+    mov es, ax
+    sti
+
+    call fs_reset_floppy
     call EnableMouse
     call load_and_apply_theme
 
@@ -1390,26 +748,26 @@ execute_com:
     call api_dos_init
 
     ; Setup COM program environment
-    mov ax, program_seg     
+    mov ax, program_seg
     mov ds, ax
     mov es, ax
 
-    mov byte [ds:0x0000], 0xCD
-    mov byte [ds:0x0001], 0x20
+    mov byte [ds:0x0000], COM_EXIT_OPCODE
+    mov byte [ds:0x0001], DOS_INT20_VECTOR
 
     ; Setup COM program stack
     cli
-    mov ss, ax           
-    mov sp, 0xFFFE   
+    mov ss, ax
+    mov sp, COM_STACK_TOP
     sti
 
     call DisableMouse
 
     push word 0x0000
 
-    ; Jump to COM program entry point (0x0100)
+    ; Jump to COM program entry point (COM_ENTRY_OFFSET)
     push word program_seg    ; CS
-    push word 0x0100         ; IP
+    push word COM_ENTRY_OFFSET ; IP
     retf                     ; Jump
 
 .com_return:
@@ -1443,8 +801,7 @@ print_ver:
     jmp get_cmd
 
 exit:
-    int 0x19
-    ret
+    jmp reboot_system
 
 ; ===================== CPU Info Functions =====================
 
@@ -1510,16 +867,14 @@ print_al:
     add ax, '00'
     mov dx, ax
 
-    mov ah, 0eh
+    mov bl, COLOR_WHITE
     mov al, dl
     cmp dl, '0'
     jz skip_fn
-    mov bl, 0x0F
-    int 10h
+    call print_char
 skip_fn:
     mov al, dh
-    mov bl, 0x0F
-    int 10h
+    call print_char
     ret
 
 ; -----------------------------
@@ -1606,25 +961,25 @@ do_CPUinfo:
     call print_string
     mov eax, 1
     cpuid
-    mov ebx, eax     
-    shr eax, 8          
-    and eax, 0x0F       
-    mov ecx, ebx     
-    shr ecx, 20          
-    and ecx, 0xFF        
-    add eax, ecx        
+    mov ebx, eax
+    shr eax, 8
+    and eax, 0x0F
+    mov ecx, ebx
+    shr ecx, 20
+    and ecx, 0xFF
+    add eax, ecx
 
     mov si, family_table
 .lookup_loop:
-    cmp word [si], 0      
+    cmp word [si], 0
     je .unknown_family
-    cmp ax, word [si]     
+    cmp ax, word [si]
     je .found_family
-    add si, 4   
+    add si, 4
     jmp .lookup_loop
 
 .found_family:
-    mov si, word [si + 2]  
+    mov si, word [si + 2]
     call print_string_cyan
     jmp .family_done
 
@@ -1711,9 +1066,9 @@ do_shutdown:
 
     pusha
 
-    mov ax, 5300h 
-    xor bx, bx 
-    int 15h 
+    mov ax, 5300h
+    xor bx, bx
+    int 15h
     jc APM_error
 
     mov ax, 5301h
@@ -1732,19 +1087,26 @@ do_shutdown:
 
     hlt
 
-APM_error: 
+APM_error:
     mov si, APM_error_msg
     call print_string_red
 
     call print_newline
 
-    popa 
+    popa
 
     jmp get_cmd
 
 do_reboot:
-    int 0x19
-    ret
+    jmp reboot_system
+
+reboot_system:
+    cli
+    mov ax, 0x0040
+    mov ds, ax
+    ; Force cold boot path so BIOS reinitializes hardware state.
+    mov word [0x0072], 0x0000
+    jmp 0FFFFh:0000h
 
 ; ===================== File Operation Functions =====================
 
@@ -1753,46 +1115,91 @@ list_directory:
 
     cmp byte [current_directory], 0
     je .show_root
-    
+
     mov si, .subdir_prefix
     call print_string
     mov si, current_directory
     call print_string
     jmp .show_path_done
-    
+
 .show_root:
-    mov si, root
-    call print_string
+    call print_drive_prefix
 
 .show_path_done:
     call print_newline
     call print_newline
 
-    mov cx, 0
     mov ax, dirlist
     call fs_get_file_list
     mov word [file_count], dx
 
     mov si, dirlist
-    mov ah, 0Eh
+    mov word [.files_in_row], 0
 
-.repeat:
+.print_entry:
+    cmp byte [si], 0
+    je .done_entries
+
+    push si
+    mov cx, 12
+    mov ah, 0x0E
+    mov bl, COLOR_WHITE
+.print_name_char:
     lodsb
-    cmp al, 0
-    je .done
-    cmp al, ','
-    jne .nonewline
-    pusha
-    call print_newline
-    popa
-    jmp .repeat
+    int 0x10
+    loop .print_name_char
+    pop si
 
-.nonewline:
+    mov ah, 0x0E
+    mov al, ' '
     mov bl, 0x0F
-    int 10h
-    jmp .repeat
+    int 0x10
+    int 0x10
 
-.done:
+    test byte [si+16], 0x10
+    jnz .print_dir_marker
+
+    mov ax, [si+12]
+    call .print_size_decimal
+    jmp .after_size
+
+.print_dir_marker:
+    push si
+    mov si, .dir_marker_str
+    call print_string
+    pop si
+    mov word [.size_digits], 5
+
+.after_size:
+    inc word [.files_in_row]
+    cmp word [.files_in_row], 3
+    je .add_newline
+
+    mov ax, 12
+    sub ax, [.size_digits]
+    mov cx, ax
+    jcxz .next_entry
+    mov ah, 0x0E
+    mov al, ' '
+    mov bl, COLOR_WHITE
+.pad_column:
+    int 0x10
+    loop .pad_column
+    jmp .next_entry
+
+.add_newline:
+    mov word [.files_in_row], 0
+    call print_newline
+
+.next_entry:
+    add si, 18
+    jmp .print_entry
+
+.done_entries:
+    cmp word [.files_in_row], 0
+    je .no_final_newline
+    call print_newline
+.no_final_newline:
     call print_newline
 
     mov ax, [file_count]
@@ -1806,14 +1213,14 @@ list_directory:
     call print_string
 
     call fs_free_space
-    shr ax, 1           
-    mov [.freespace], ax 
-    mov bx, 1440 
-    sub bx, ax 
+    shr ax, 1
+    mov [.freespace], ax
+    mov bx, 1440
+    sub bx, ax
     mov ax, bx
     call string_int_to_string
     mov si, ax
-    call print_string_green 
+    call print_string_green
     mov si, .kb_msg
     call print_string
 
@@ -1832,11 +1239,55 @@ list_directory:
 
     jmp get_cmd
 
-.free_msg      db ' KB free', 0
-.kb_msg        db ' KB', 0
-.sep           db '   ', 0
-.subdir_prefix db 'A:/', 0
-.freespace     dw 0
+.print_size_decimal:
+    mov word [.size_digits], 0
+    push bx
+    push cx
+    push dx
+    mov cx, 0
+.sd_push_digits:
+    cmp ax, 0
+    je .sd_check_zero
+    xor dx, dx
+    mov bx, 10
+    div bx
+    push dx
+    inc cx
+    inc word [.size_digits]
+    jmp .sd_push_digits
+.sd_check_zero:
+    cmp cx, 0
+    jne .sd_pop_digits
+    mov ah, 0x0E
+    mov al, '0'
+    mov bl, COLOR_WHITE
+    int 0x10
+    mov word [.size_digits], 1
+    jmp .sd_done
+.sd_pop_digits:
+    mov ah, 0x0E
+    mov bl, COLOR_WHITE
+.sd_pop_loop:
+    pop dx
+    add dl, '0'
+    mov al, dl
+    int 0x10
+    dec cx
+    jnz .sd_pop_loop
+.sd_done:
+    pop dx
+    pop cx
+    pop bx
+    ret
+
+.files_in_row    dw 0
+.size_digits     dw 0
+.dir_marker_str  db '<DIR>', 0
+.free_msg        db ' KB free', 0
+.kb_msg          db ' KB', 0
+.sep             db '   ', 0
+.subdir_prefix   db 'A:/', 0
+.freespace       dw 0
 
 cat_file:
     call print_newline
@@ -1846,84 +1297,84 @@ cat_file:
     call string_string_parse
     cmp ax, 0
     jne .filename_provided
-    
+
     mov si, nofilename_msg
     call print_string
     call print_newline
     jmp .exit_cat
 
 .filename_provided:
-    push ax          
+    push ax
     call fs_file_exists
-    pop ax               
+    pop ax
     jc .not_found
 
-    mov cx, 32768     
-    mov dx, ds           
-    
-    call fs_load_huge_file  
+    mov cx, program_load_addr
+    mov dx, ds
+
+    call fs_load_huge_file
     jc .load_fail
-    
-    mov word [.rem_size], ax   
-    mov word [.rem_size+2], dx  
-    
+
+    mov word [.rem_size], ax
+    mov word [.rem_size+2], dx
+
     mov cx, ax
-    or cx, dx          
+    or cx, dx
     jz .empty_file
 
-    mov word [.curr_seg], ds 
-    mov word [.curr_off], 32768 
+    mov word [.curr_seg], ds
+    mov word [.curr_off], program_load_addr
     mov word [.line_count], 0
 
 .print_loop:
     cmp dword [.rem_size], 0
     je .end_cat
 
-    mov es, [.curr_seg]   
-    mov si, [.curr_off] 
-    mov al, [es:si]      
+    mov es, [.curr_seg]
+    mov si, [.curr_off]
+    mov al, [es:si]
 
-    inc word [.curr_off]   
-    jnz .no_wrap        
-    
-    add word [.curr_seg], 0x1000 
+    inc word [.curr_off]
+    jnz .no_wrap
+
+    add word [.curr_seg], 0x1000
 .no_wrap:
     sub dword [.rem_size], 1
 
     cmp al, 0
-    je .end_cat       
-    
-    cmp al, 0x0A       
+    je .end_cat
+
+    cmp al, CHAR_LF
     je .handle_newline
-    
+
     mov ah, 0x0E
-    mov bl, 0x0F
+    mov bl, COLOR_WHITE
     int 0x10
     jmp .print_loop
 
 .handle_newline:
-    mov al, 0x0D
+    mov al, CHAR_CR
     int 0x10
-    mov al, 0x0A
+    mov al, CHAR_LF
     int 0x10
-    
+
     inc word [.line_count]
-    cmp word [.line_count], 23 
+    cmp word [.line_count], 23
     jne .print_loop
-    
+
     push si
-    push es            
+    push es
     mov si, .continue_msg
     call print_string_cyan
-    
+
     mov ah, 0
-    int 16h       
-    
+    int 16h
+
     mov si, .clear_msg
     call print_string
-    
+
     mov word [.line_count], 0
-    pop es              
+    pop es
     pop si
     jmp .print_loop
 
@@ -1955,9 +1406,9 @@ cat_file:
     jmp get_cmd
 
 .line_count   dw 0
-.curr_seg     dw 0       
-.curr_off     dw 0         
-.rem_size     dd 0      
+.curr_seg     dw 0
+.curr_off     dw 0
+.rem_size     dd 0
 
 .continue_msg db 13, ' -- Press key -- ', 0
 .clear_msg    db 13, '                 ', 13, 0
@@ -2056,12 +1507,12 @@ copy_file:
     call fs_file_exists
     jnc .already_exists
     mov ax, dx
-    mov cx, 32768     
-    mov dx, 0x2000    
+    mov cx, program_load_addr
+    mov dx, KERNEL_DATA_SEG
     call fs_load_huge_file
     jc .load_fail
     mov cx, bx
-    mov bx, 32768
+    mov bx, program_load_addr
     mov word ax, [.tmp]
     call fs_write_file
     jc .write_fail
@@ -2184,14 +1635,10 @@ write_file:
 
 .text_provided:
     mov word [.filename], ax
-    mov si, bx
-    mov di, file_buffer
-    call string_string_copy
-    mov ax, file_buffer
+    mov ax, bx
     call string_string_length
     mov cx, ax
     mov word ax, [.filename]
-    mov bx, file_buffer
     call fs_write_file
     jc .failure
     mov si, .success_msg
@@ -2286,17 +1733,17 @@ string_string_parse:
 set_background_color:
     pusha
     mov ah, 0x0B
-    mov bh, 0  
-    mov bl, al     
+    mov bh, 0
+    mov bl, al
     int 0x10
-    
+
     popa
     ret
 
 wait_for_key:
     pusha
     mov ax, 0
-    mov ah, 10h    
+    mov ah, 10h
     int 16h
     mov [.tmp_buf], ax
     popa
@@ -2306,267 +1753,32 @@ wait_for_key:
 .tmp_buf    dw 0
 
 
-; ===================== HEAD Command =====================
-
-head_file:
-    call print_newline
-    pusha
-    
-    mov word si, [param_list]
-    call string_string_parse
-    cmp ax, 0
-    je .show_help
-    
-    mov [.filename], ax
-    
-    mov ax, [.filename]
-    call fs_file_exists
-    jc .file_not_found
-    
-    mov ax, [.filename]
-    mov cx, 32768
-    call fs_load_file
-    jc .load_error
-
-    cmp bx, 0
-    je .empty_file
-
-    mov word [.file_ptr], 32768
-    mov word [.file_size], bx
-    mov word [.lines_printed], 0
-
-.print_loop:
-    cmp word [.lines_printed], 10
-    jge .done
-    cmp word [.file_size], 0
-    je .done
-    
-    mov si, [.file_ptr]
-    mov al, [si]
-    
-    cmp al, 10      
-    je .print_newline
-    cmp al, 13       
-    je .skip_char
-    cmp al, 32       
-    jb .skip_char
-    cmp al, 126      
-    ja .skip_char
-    
-    mov ah, 0x0E
-    mov bl, 0x07
-    int 0x10
-    jmp .next_char
-
-.print_newline:
-    inc word [.lines_printed]
-    call print_newline
-    jmp .next_char
-
-.skip_char:
-    jmp .next_char
-
-.next_char:
-    inc word [.file_ptr]
-    dec word [.file_size]
-    jmp .print_loop
-
-.done:
-    call print_newline
-    popa
-    jmp get_cmd
-
-.show_help:
-    mov si, .help_msg
-    call print_string
-    call print_newline
-    jmp .done
-
-.file_not_found:
-    mov si, notfound_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.load_error:
-    mov si, .load_error_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.empty_file:
-    mov si, .empty_file_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.filename        dw 0
-.file_ptr        dw 0
-.file_size       dw 0
-.lines_printed   dw 0
-
-.help_msg          db 'Usage: head <filename>', 10, 13
-.load_error_msg    db 'Error loading file', 0
-.empty_file_msg    db 'File is empty', 0
-
-
-; ===================== TAIL Command Implementation =====================
-
-tail_file:
-    call print_newline
-    pusha
-    
-    mov word si, [param_list]
-    call string_string_parse
-    cmp ax, 0
-    je .show_help
-    
-    mov [.filename], ax
-    
-    mov ax, [.filename]
-    call fs_file_exists
-    jc .file_not_found
-    
-    mov ax, [.filename]
-    mov cx, 32768
-    call fs_load_file
-    jc .load_error
-    
-    cmp bx, 0
-    je .empty_file
-    
-    mov word [.file_start], 32768
-    mov word [.file_size], bx
-    mov word [.file_end], 32768
-    add [.file_end], bx
-    mov word [.lines_to_show], 10
-    mov word [.lines_found], 0
-    
-    mov si, [.file_end]
-    dec si
-    
-.find_lines:
-    mov ax, [.lines_found]
-    cmp ax, [.lines_to_show]
-    jge .found_all_lines
-    cmp si, [.file_start]
-    jb .found_all_lines
-    
-    mov al, [si]
-    cmp al, 10
-    jne .continue_search
-
-    inc word [.lines_found]
-    
-.continue_search:
-    dec si
-    jmp .find_lines
-
-.found_all_lines:
-    inc si
-    mov [.print_start], si
-
-    mov si, [.print_start]
-    
-.print_loop:
-    cmp si, [.file_end]
-    jge .done
-
-    mov al, [si]
-
-    cmp al, 10     
-    je .print_newline
-    cmp al, 13    
-    je .skip_char
-    cmp al, 32        
-    jb .skip_char
-    cmp al, 126       
-    ja .skip_char
-
-    mov ah, 0x0E
-    mov bl, 0x07 
-    int 0x10
-    jmp .next_char
-
-.print_newline:
-    call print_newline
-    jmp .next_char
-
-.skip_char:
-    jmp .next_char
-
-.next_char:
-    inc si
-    jmp .print_loop
-
-.done:
-    call print_newline
-    popa
-    jmp get_cmd
-
-.show_help:
-    mov si, .help_msg
-    call print_string
-    call print_newline
-    jmp .done
-
-.file_not_found:
-    mov si, notfound_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.load_error:
-    mov si, .load_error_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.empty_file:
-    mov si, .empty_file_msg
-    call print_string_red
-    call print_newline
-    jmp .done
-
-.filename        dw 0
-.file_start      dw 0
-.file_end        dw 0
-.file_size       dw 0
-.print_start     dw 0
-.lines_to_show   dw 10
-.lines_found     dw 0
-
-.help_msg          db 'Usage: tail <filename>', 10, 13
-.load_error_msg    db 'Error loading file', 0
-.empty_file_msg    db 'File is empty', 0
-  
-
 mkdir_command:
     call print_newline
     pusha
-    
+
     mov word si, [param_list]
     call string_string_parse
     cmp ax, 0
     je .no_dirname
-    
+
     mov si, ax
     push ax
     call string_string_length
     cmp ax, 8
     jg .name_too_long
     pop ax
-    
+
     mov [.dirname], ax
-    
+
     mov ax, [.dirname]
     call fs_file_exists
     jnc .already_exists
-    
+
     mov ax, [.dirname]
     call fs_create_directory
     jc .failure
-    
+
     mov si, .success_msg
     call print_string_green
     call print_newline
@@ -2617,21 +1829,21 @@ mkdir_command:
 deldir_command:
     call print_newline
     pusha
-    
+
     mov word si, [param_list]
     call string_string_parse
     cmp ax, 0
     je .no_dirname
-    
+
     mov si, ax
     mov di, .dirname_buffer
     call string_string_copy
-    
+
     mov ax, .dirname_buffer
     call string_string_length
     cmp ax, 8
     jg .name_too_long
-    
+
     mov si, .dirname_buffer
     mov cx, 0
 .check_dot:
@@ -2642,7 +1854,7 @@ deldir_command:
     je .has_extension
     inc cx
     jmp .check_dot
-    
+
 .no_extension:
     mov si, .dirname_buffer
     add si, cx
@@ -2655,23 +1867,23 @@ deldir_command:
     mov byte [si], 'R'
     inc si
     mov byte [si], 0
-    
+
 .has_extension:
     mov ax, .dirname_buffer
     mov [.dirname], ax
-    
+
     mov ax, [.dirname]
     call fs_file_exists
     jc .not_found
-    
+
     mov ax, [.dirname]
     call fs_is_directory
     jc .not_directory
-    
+
     mov ax, [.dirname]
     call fs_remove_directory
     jc .failure
-    
+
     mov si, .success_msg
     call print_string_green
     call print_newline
@@ -2730,28 +1942,28 @@ deldir_command:
 cd_command:
     call print_newline
     pusha
-    
+
     mov word si, [param_list]
     call string_string_parse
-    
+
     cmp ax, 0
     je .show_current
-    
+
     mov si, ax
     mov di, .dotdot_str
     call string_string_compare
     jc .go_parent
-    
+
     mov si, ax
     cmp byte [si], '/'
     je .go_root
     cmp byte [si], '\'
     je .go_root
-    
+
     mov si, ax
     mov di, .dirname_buffer
     call string_string_copy
-    
+
     mov si, .dirname_buffer
     mov cx, 0
 .check_dot:
@@ -2762,7 +1974,7 @@ cd_command:
     je .has_extension
     inc cx
     jmp .check_dot
-    
+
 .no_extension:
     mov si, .dirname_buffer
     add si, cx
@@ -2775,12 +1987,12 @@ cd_command:
     mov byte [si], 'R'
     inc si
     mov byte [si], 0
-    
+
 .has_extension:
     mov ax, .dirname_buffer
     call fs_change_directory
     jc .failure
-    
+
     mov si, .success_msg
     call print_string_green
     call print_newline
@@ -2791,18 +2003,17 @@ cd_command:
 .show_current:
     mov si, .current_msg
     call print_string
-    
+
     cmp byte [current_directory], 0
     jne .show_path
-    
-    mov si, root
-    call print_string_cyan
+
+    call print_drive_prefix
     jmp .show_done
-    
+
 .show_path:
     mov si, current_directory
     call print_string_cyan
-    
+
 .show_done:
     call print_newline
     popa
@@ -2812,7 +2023,7 @@ cd_command:
 .go_parent:
     call fs_parent_directory
     jc .already_root
-    
+
     mov si, .success_msg
     call print_string_green
     call print_newline
@@ -2831,7 +2042,7 @@ cd_command:
 .go_root:
     mov di, current_directory
     mov byte [di], 0
-    
+
     mov si, .success_msg
     call print_string_green
     call print_newline
@@ -2854,13 +2065,16 @@ cd_command:
 .already_root_msg   db 'Already in root directory', 0
 .failure_msg        db 'Directory not found or invalid', 0
 
+%INCLUDE "src/kernel/init.asm"                      ; x16-PRos initialisation
+%INCLUDE "src/kernel/log.asm"                       ; Log functions
 %INCLUDE "src/kernel/features/fs.asm"               ; FAT12 filesystem functions
 %INCLUDE "src/kernel/features/string.asm"           ; String functions
+%INCLUDE "src/kernel/features/timezone.asm"         ; Timezone config/time helpers
 %INCLUDE "src/kernel/features/speaker.asm"          ; PC speaker functions
 %INCLUDE "src/kernel/features/bmp_rendering.asm"    ; BMP rendering functions
-%INCLUDE "src/kernel/features/themes.asm"           ; Themes 
-%INCLUDE "src/kernel/features/encrypt.asm"          ; Encryption     
-%INCLUDE "src/kernel/features/com.asm"              ; COM     
+%INCLUDE "src/kernel/features/themes.asm"           ; Themes
+%INCLUDE "src/kernel/features/encrypt.asm"          ; Encryption
+%INCLUDE "src/kernel/features/com/com.asm"          ; COM
 
 ; ====== DRIVERS ======
 %INCLUDE "src/drivers/ps2_mouse.asm"                ; Mouse driver
@@ -2872,9 +2086,9 @@ cd_command:
 ; =================
 
 ; ===================== Data Section =====================
-
+section .data
 ; ------ Header ------
-header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v0.6', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
+header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v0.7', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
 
 ; ------ Help ------
 kshell_comands db 'HELP               - get list of commands', 10, 13
@@ -2895,8 +2109,6 @@ kshell_comands db 'HELP               - get list of commands', 10, 13
                db 'TOUCH  <f>         - create empty file', 10, 13
                db 'WRITE  <f> <text>  - write to file', 10, 13
                db 'VIEW   <f> <flags> - view BMP image', 10, 13
-               db 'HEAD   <f>         - first 10 lines of TXT', 10, 13
-               db 'TAIL   <f>         - last 10 lines of TXT', 10, 13
                db 'CD     <dir>       - change directory', 10, 13
                db 'MKDIR  <dir>       - create directory', 10, 13
                db 'DELDIR <dir>       - delete directory', 10, 13
@@ -2913,7 +2125,7 @@ info db 10, 13
      db '  Video mode: 0x12 (640x480; 16 colors)', 10, 13
      db '  File system: FAT12', 10, 13
      db '  License: MIT', 10, 13
-     db '  OS version: 0.6.5', 10, 13
+     db '  OS version: 0.7.0', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.2', 10, 13, 0
@@ -2938,8 +2150,6 @@ cpu_string     db 'CPU', 0
 touch_string   db 'TOUCH', 0
 write_string   db 'WRITE', 0
 view_string    db 'VIEW', 0
-head_string    db 'HEAD', 0
-tail_string    db 'TAIL', 0
 mkdir_string   db 'MKDIR', 0
 deldir_string  db 'DELDIR', 0
 cd_string      db 'CD', 0
@@ -2954,17 +2164,7 @@ kern_warn_msg     db 'Cannot execute kernel file!', 0
 kern_warn2_msg    db 'Cannot delete kernel file!', 0
 notext_msg        db 'No text provided for writing', 0
 APM_error_msg     db "APM error or APM not available",0
-setup_failed_msg  db 'Failed to load SETUP.BIN. Press any key to continue...', 0
-boot_cfg_missed   db 'FIRST_B.CFG file not found. Press any key to continue...', 0
-user_cfg_missed   db 'USER.CFG file not found. Press any key to continue...', 0
-pass_cfg_missed   db 'PASSWORD.CFG file not found. Press any key to continue...', 0
-prompt_cfg_missed db 'PROMPT.CFG file not found. Press any key to continue...', 0
-logo_missed       db 'LOGO.BMP file not found. Press any key to continue...', 0
-
-; ------ Log messages ------
-error_message    db '[ ERROR ] ', 0
-okay_message     db '[ OKAY ]  ', 0
-warn_message     db '[ WARN ]  ', 0
+bad_drive_msg     db 'Drive not ready or does not exist!', 0
 
 ; ------ CPU info ------
 flags_str          db '  FLAGS: ', 0
@@ -2999,23 +2199,22 @@ time_msg  db 'Current time: ', 0
 date_msg  db 'Current date: ', 0
 
 files_msg db ' files', 0
-root      db 'A:/', 0
 
 ; ------ Sounds ------
 start_melody:
-    dw 4186, 150 
-    dw 3136, 150  
-    dw 2637, 150  
-    dw 2093, 300  
-    dw 0, 0         
+    dw 4186, 150
+    dw 3136, 150
+    dw 2637, 150
+    dw 2093, 300
+    dw 0, 0
 
 
 shut_melody:
-    dw 2093, 150  
-    dw 2637, 150  
-    dw 3136, 150    
-    dw 4186, 300    
-    dw 0, 0         
+    dw 2093, 150
+    dw 2637, 150
+    dw 3136, 150
+    dw 4186, 300
+    dw 0, 0
 
 file_size       dw 0
 param_list      dw 0
@@ -3033,6 +2232,8 @@ timezone_offset dw 0
 
 com_stack_save  dw 0
 com_ss_save     dw 0
+bin_stack_save  dw 0
+bin_ss_save     dw 0
 
 program_seg    equ 0x3000
 
@@ -3054,37 +2255,43 @@ cfg_key_logo_stretch db 'LOGO_STRETCH=', 0
 cfg_key_sound        db 'START_SOUND=', 0
 default_logo_file    db 'LOGO.BMP', 0
 cfg_sound_enabled    db 1  ; 1 = True, 0 = False
-cfg_logo_enabled     db 1  ; 1 = True, 0 = False 
-cfg_logo_stretch     db 0  ; 1 = Stretch, 0 = Centered 
+cfg_logo_enabled     db 1  ; 1 = True, 0 = False
+cfg_logo_stretch     db 0  ; 1 = Stretch, 0 = Centered
 
 bin_dir_name         db 'BIN.DIR', 0
 conf_dir_name        db 'CONF.DIR', 0
 
+current_drive_char db 'A'
 
 login_password_prompt  db 19 dup(' '), 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                        db 19 dup(' '), 0xBA, '        Enter your password:           ', 0xBA, 10, 13
                        db 19 dup(' '), 0xBA, '    _______________________________    ', 0xBA, 10, 13
                        db 19 dup(' '), 0xC0, 39 dup(0xCD), 0xBC, 10, 13, 0
 
-mt           db '', 10, 13, 0
-Sides        dw 2
-SecsPerTrack dw 18
-bootdev      db 0
-fmt_date     dw 1
- 
+mt                  db '', 10, 13, 0
+Sides               dw 2
+SecsPerTrack        dw 18
+bootdev             db 0
+current_disk        db 0 
+fmt_date            dw 1
+command_history_top db 0
+
+saved_disk          db 0
+saved_drive_char    db 0
+
+section .bss
 ; ------ Buffers ------
-current_logo_file resb 13 
-tmp_string        resb 15    
-command           resb 32    
-user              resb 32    
-password          resb 32    
-decrypted_pass    resb 32    
-timezone          resb 32   
-saved_directory   resb 32  
-final_prompt      resb 64    
-temp_prompt       resb 64      
-input             resb 256   
-current_directory resb 256   
+current_logo_file resb 13
+tmp_string        resb 15
+command           resb 32
+user              resb 32
+password          resb 32
+decrypted_pass    resb 32
+timezone          resb 32
+saved_directory   resb 32
+final_prompt      resb 64
+temp_prompt       resb 64
+save_dir_buffer   resb 128 
+input             resb 256
+current_directory resb 256
 temp_saved_dir    resb 256
-dirlist           resb 1024  
-file_buffer       resb 32768

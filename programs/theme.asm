@@ -21,7 +21,7 @@ start:
 
     mov si, [param_list]
     call string_string_parse
-    
+
     cmp ax, 0
     je print_usage
 
@@ -84,27 +84,27 @@ save_theme:
     mov ah, 0x0E
     int 0x22
 
-    ; Go to root 
-    mov ah, 0x0A    
+    ; Go to root
+    mov ah, 0x0A
     int 0x22
-    
+
     ; Switch to /CONF.DIR
     mov ah, 0x09
     mov si, conf_dir_name
     int 0x22
-    
+
     ; Write THEME.CFG
     mov ah, 0x03
     mov si, theme_cfg_file
     mov bx, 43008
     int 0x22
-    
+
     ; Restore current directory
     mov ah, 0x0F
     int 0x22
 
     ; Success message
-    mov ah, 0x02    
+    mov ah, 0x02
     mov si, msg_success
     int 0x21
     mov ah, 0x05

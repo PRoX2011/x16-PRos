@@ -1,6 +1,6 @@
 ----------------------- Key changes x16-PRos v0.5.9 ----------------------
 
-Release 0.5 had a couple of bugs. The creation of an ISO image has been 
+Release 0.5 had a couple of bugs. The creation of an ISO image has been
 removed due to the need for its complete reworking. This update fixed them, and also updated some programs.
                                         -- PRoX
 =======================================================================================

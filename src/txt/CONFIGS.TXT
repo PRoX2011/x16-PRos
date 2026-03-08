@@ -8,14 +8,14 @@ They use .CFG extension and are loaded at system startup.
 [SYSTEM.CFG]
   Purpose: System boot settings
   Format: Key=Value pairs
-  
+
   Settings:
     LOGO=<path>         - Path to boot logo BMP file
                           Example: LOGO=BMP/LOGO.BMP
-    
+
     LOGO_STRETCH=<bool> - Stretch logo to fullscreen
                           Values: TRUE or FALSE
-    
+
     START_SOUND=<bool>  - Play startup melody
                           Values: TRUE or FALSE
 
@@ -23,13 +23,13 @@ They use .CFG extension and are loaded at system startup.
   Purpose: Stores username
   Format: Plain text (encrypted)
   Max length: 31 characters
-  
+
   Edit: Run SETUP.BIN to change username
 
 [PASSWORD.CFG]
   Purpose: Stores login password
   Format: XOR-encrypted data
-  
+
   Edit: Run SETUP.BIN to change password
   WARNING: Manual editing will corrupt password!
 
@@ -37,17 +37,17 @@ They use .CFG extension and are loaded at system startup.
   Purpose: Define command prompt appearance
   Format: Plain text template
   Max length: 63 characters
-  
+
   Variables:
     $user     - Replaced with username from USER.CFG
     %XX       - ASCII character in hex (e.g., %3E = ">")
-  
+
   Default: [$user@PRos] >
 
 [THEME.CFG]
   Purpose: Terminal color scheme
   Format: 16 lines of RGB values
-  
+
   Colors (in order):
     Line 1:  Black
     Line 2:  Blue
@@ -65,10 +65,10 @@ They use .CFG extension and are loaded at system startup.
     Line 14: Light Magenta
     Line 15: Yellow
     Line 16: White
-  
+
   Format per line: R G B (decimal values 0-63)
   Example: 63 0 0 (bright red)
-  
+
   Edit: Use THEME.BIN program or manually edit file
 
 [FIRST_B.CFG]
@@ -77,14 +77,14 @@ They use .CFG extension and are loaded at system startup.
   Values:
     1 - First boot (triggers SETUP.BIN)
     0 - Normal boot
-  
+
   WARNING: Do not delete this file!
 
 CREATING CONFIG FILES:
   - Use TOUCH command to create empty file
   - Use WRITE command for simple content
   - Use WRITER.BIN for complex editing
-  
+
   Example:
     touch CONF/PROMPT.CFG
     write CONF/PROMPT.CFG [$user] >

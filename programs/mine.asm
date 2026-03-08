@@ -101,7 +101,7 @@ PopulateTextBuf:
   mov byte [di], '*'
 .LoopDir:
   push di
-  movsx ax, byte [cs:bp + Dirs - 1] 
+  movsx ax, byte [cs:bp + Dirs - 1]
   add di, ax
   mov al, [di]
   cmp al, '*'
@@ -120,7 +120,7 @@ mov dl, Color.Veiled
 GameLoop:
   xor ax, ax
   int 0x16
-  
+
   cmp al, Key.Ascii.Esc
   je ExitGame
 
@@ -305,7 +305,7 @@ WaitRestart:
   jmp WaitRestart
 
 ExitGame:
-  mov ax, 0x12 
+  mov ax, 0x12
   int 0x10
   ret
 

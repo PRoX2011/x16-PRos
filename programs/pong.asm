@@ -54,8 +54,8 @@ start:
     call check_goal
 
     mov ah, 0x86
-    mov cx, 0x0000 
-    mov dx, 0x9870 
+    mov cx, 0x0000
+    mov dx, 0x9870
     int 0x15
 
     jmp .loop
@@ -78,7 +78,7 @@ draw_ball:
     mov dh, [BALL_Y]
     mov dl, [BALL_X]
     call move_cursor
-    mov al, 0xDB 
+    mov al, 0xDB
     call write_char
     ret
 
@@ -87,22 +87,22 @@ draw_scores:
     mov ax, 0xB800
     mov es, ax
     mov bl, [LEFT_SCORE]
-    mov di, 36  
+    mov di, 36
     call paint_digit
     mov bl, [RIGHT_SCORE]
-    mov di, 108  
+    mov di, 108
     call paint_digit
     pop es
     ret
 
 draw_center_line:
-    mov dh, 0 
-    mov dl, 40   
+    mov dh, 0
+    mov dl, 40
 .loop:
     call move_cursor
-    mov al, 0xB3  
+    mov al, 0xB3
     call write_char
-    add dh, 2   
+    add dh, 2
     cmp dh, SCREEN_HEIGHT
     jb .loop
     ret
@@ -122,7 +122,7 @@ handle_input:
     je .set_s
     cmp al, 27
     je exit
-    jmp .loop 
+    jmp .loop
 .set_w:
     or byte [KEYS_PRESSED], (1 << 0)
     jmp .loop
@@ -161,7 +161,7 @@ update_right_paddle_ai:
     cmp al, ah
     je .end
     jl .move_up
-    jg .move_down  
+    jg .move_down
 .move_up:
     cmp byte [RIGHT_PLAYER_POS], 0
     je .end
@@ -239,41 +239,41 @@ paint_digit:
     xor ax, ax
     bt dx, 6
     jnc .b5
-    call bar_horiz         
+    call bar_horiz
 .b5:
     bt dx, 5
     jnc .b4
-    call bar_vert             
+    call bar_vert
 .b4:
     bt dx, 4
     jnc .b3
     push di
-    add di, 12              
+    add di, 12
     call bar_vert
     pop di
 .b3:
     bt dx, 3
     jnc .b2
-    mov al, 4               
-    call bar_horiz           
+    mov al, 4
+    call bar_horiz
 .b2:
     bt dx, 2
     jnc .b1
     mov al, 4
-    call bar_vert             
+    call bar_vert
 .b1:
     bt dx, 1
     jnc .b0
     mov al, 4
     push di
-    add di, 12       
+    add di, 12
     call bar_vert
     pop di
 .b0:
     bt dx, 0
     jnc .digdone
-    mov ax, 8               
-    call bar_horiz            
+    mov ax, 8
+    call bar_horiz
 .digdone:
     popa
     ret
@@ -281,14 +281,14 @@ paint_digit:
 bar_horiz:
     pusha
     mov bx, 160
-    mul bx                 
-    add di, ax               
-    mov bx, 2            
+    mul bx
+    add di, ax
+    mov bx, 2
 .barh:
-    mov cx, 8             
-    mov ax, [fullchr]       
+    mov cx, 8
+    mov ax, [fullchr]
     rep stosw
-    add di, 144             
+    add di, 144
     dec bx
     jnz .barh
     popa
@@ -297,14 +297,14 @@ bar_horiz:
 bar_vert:
     pusha
     mov bx, 160
-    mul bx                  
-    add di, ax               
-    mov bx, 6         
+    mul bx
+    add di, ax
+    mov bx, 6
 .barv:
-    mov cx, 2    
+    mov cx, 2
     mov ax, [fullchr]
     rep stosw
-    add di, 156        
+    add di, 156
     dec bx
     jnz .barv
     popa
@@ -325,8 +325,8 @@ KEYS_PRESSED:     db 0
 pattern           db 01110111b, 00010010b, 01011101b, 01011011b, 0111010b
                   db 01101011b, 01101111b, 01010010b, 01111111b, 01111011b
 fullchr:
-    chr           db 0xDB             
-    col           db 0x0F               
+    chr           db 0xDB
+    col           db 0x0F
 
 move_cursor:
     mov ah, 0x02

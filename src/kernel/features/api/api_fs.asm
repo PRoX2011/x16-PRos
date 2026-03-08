@@ -3,8 +3,8 @@
 ; Copyright (C) 2025 PRoX2011
 ;
 ; Function codes in AH:
-;   0x00: Re-Initialize file system 
-;   0x01: Get file list (SI = buffer, returns BX = size low, CX = size high, DX = file count)
+;   0x00: Re-Initialize file system
+;   0x01: Get file list (SI = buffer for 18-byte entries, returns BX = size low, CX = size high, DX = file count)
 ;   0x02: Load file (SI = filename, CX = load position, returns BX = file size)
 ;   0x03: Write file (SI = filename, BX = buffer, CX = size)
 ;   0x04: Check if file exists (SI = filename)
@@ -14,12 +14,14 @@
 ;   0x08: Get file size (SI = filename, returns BX = size)
 ;   0x09: Change current directory (SI = dirname, returns CF flag)
 ;   0x0A: Go to parent directory (returns CF flag)
-;   0x0B: Create directory (SI = dirname, returns CF flag) 
-;   0x0C: Remove directory (SI = dirname, returns CF flag) 
-;   0x0D: Check if directory (SI = name, returns CF flag)  
-;   0x0E: Save current directory 
+;   0x0B: Create directory (SI = dirname, returns CF flag)
+;   0x0C: Remove directory (SI = dirname, returns CF flag)
+;   0x0D: Check if directory (SI = name, returns CF flag)
+;   0x0E: Save current directory
 ;   0x0F: Restore current directory
 ;   0x10: Load huge file (SI = filename, CX = load offset (position), DX = load segment address)
+;   0x11: List drives
+;   0x12: Change drive (SI = Drive letter pointer)
 ; ==================================================================
 
 [BITS 16]
@@ -43,21 +45,22 @@ int22_handler:
     pusha
     push ds
     push es
-    
+
     mov bp, cs
     mov ds, bp
     mov es, bp
-    
+    cld
+
     mov al, ah
-    
+
     cmp al, 0x00
     je .init
-    cmp al, 0x01  
+    cmp al, 0x01
     je .get_file_list
     cmp al, 0x02
     je .load_file
     cmp al, 0x03
-    je .write_file  
+    je .write_file
     cmp al, 0x04
     je .file_exists
     cmp al, 0x05
@@ -84,12 +87,16 @@ int22_handler:
     je .restore_directory
     cmp al, 0x10
     je .load_huge_file
+    cmp al, 0x11
+    je .list_drives
+    cmp al, 0x12
+    je .change_drive
     stc
     jmp .done
 
 .init:
     mov ax, 0
-    call fs_reset_floppy  
+    call fs_reset_floppy
     jmp .done
 
 .get_file_list:
@@ -97,16 +104,16 @@ int22_handler:
     call fs_get_file_list
     jc .done
     mov [.saved_bx], bx
-    mov [.saved_cx], cx  
+    mov [.saved_cx], cx
     mov [.saved_dx], dx
 
     mov bp, sp
     mov bx, [.saved_bx]
-    mov [bp+14], bx
-    mov cx, [.saved_cx] 
-    mov [bp+12], cx
+    mov [bp+12], bx
+    mov cx, [.saved_cx]
+    mov [bp+16], cx
     mov dx, [.saved_dx]
-    mov [bp+10], dx
+    mov [bp+14], dx
     jmp .done
 
 .load_file:
@@ -115,7 +122,7 @@ int22_handler:
     jc .done
 
     mov bp, sp
-    mov [bp+14], bx
+    mov [bp+12], bx
     jmp .done
 
 .write_file:
@@ -130,7 +137,7 @@ int22_handler:
 
 .create_file:
     mov ax, si
-    call fs_create_file  
+    call fs_create_file
     jmp .done
 
 .remove_file:
@@ -148,13 +155,13 @@ int22_handler:
     mov ax, si
     call fs_get_file_size
     mov bp, sp
-    mov [bp+14], bx
+    mov [bp+12], bx
     jmp .done
 
 .change_directory:
     mov ax, si
     call fs_change_directory
-    jmp .done 
+    jmp .done
 
 .parent_directory:
     call fs_parent_directory
@@ -182,18 +189,39 @@ int22_handler:
 .restore_directory:
     call restore_current_dir
     jmp .done
-    
+
 .load_huge_file:
     mov ax, si
     call fs_load_huge_file
     jmp .done
+
+.list_drives:
+    call fs_list_drives
+    jmp .done
+
+.change_drive:
+    mov al, [si]               
+    call fs_change_drive_letter
+    jmp .done
     
 .done:
+    jc .set_cf
+    push bp
+    mov bp, sp
+    and word [bp+26], 0xFFFE
+    pop bp
+    jmp .do_iret
+.set_cf:
+    push bp
+    mov bp, sp
+    or word [bp+26], 0x0001
+    pop bp
+.do_iret:
     pop es
     pop ds
     popa
     iret
 
 .saved_bx dw 0
-.saved_cx dw 0  
+.saved_cx dw 0
 .saved_dx dw 0

@@ -14,7 +14,7 @@ start:
     mov si, help_msg
     call print_string
     call print_newline
-    
+
     ; Initialize recording buffer
     mov word [record_count], 0
     mov byte [recording], 0
@@ -24,24 +24,24 @@ start:
 key_loop:
     ; Update status
     call update_status
-    
+
     mov ah, 0x01        ; Check if key available
     int 0x16
     jz .no_key          ; No key pressed
-    
+
     ; Key is available, get it
     mov ah, 0x00
     int 0x16
-    
+
     ; Record time since last note if recording
     cmp byte [recording], 1
     jne .skip_pause_record
     call record_pause
-    
+
 .skip_pause_record:
     cmp al, 0x1B    ; ESC
     je exit_program
-    
+
     ; Recording controls
     cmp al, '['
     je toggle_recording
@@ -49,11 +49,11 @@ key_loop:
     je play_recording
     cmp al, '\'
     je clear_recording
-    
+
     ; Check if playing back
     cmp byte [playing], 1
     je key_loop
-    
+
     ; Low octave (zxcvbnm)
     cmp al, 'z'
     je play_C2
@@ -69,7 +69,7 @@ key_loop:
     je play_A2
     cmp al, 'm'
     je play_B2
-    
+
     ; Mid octave (asdfghjk)
     cmp al, 'a'
     je play_C3
@@ -87,7 +87,7 @@ key_loop:
     je play_B3
     cmp al, 'k'
     je play_C4
-    
+
     ; High octave (qwertyui)
     cmp al, 'q'
     je play_C4
@@ -105,7 +105,7 @@ key_loop:
     je play_B4
     cmp al, 'i'
     je play_C5
-    
+
     ; Black keys (sharps/flats) - row 2
     cmp al, 'S'
     je play_Cs2
@@ -117,8 +117,8 @@ key_loop:
     je play_Gs2
     cmp al, 'J'
     je play_As2
-    
-    ; Black keys - row 3  
+
+    ; Black keys - row 3
     cmp al, 'W'
     je play_Cs3
     cmp al, 'E'
@@ -129,7 +129,7 @@ key_loop:
     je play_Gs3
     cmp al, 'U'
     je play_As3
-    
+
     ; Black keys - row 1
     cmp al, '2'
     je play_Cs4
@@ -141,7 +141,7 @@ key_loop:
     je play_Gs4
     cmp al, '7'
     je play_As4
-    
+
     jmp key_loop
 
 .no_key:
@@ -149,7 +149,7 @@ key_loop:
     cmp byte [recording], 1
     jne key_loop
     inc word [last_note_time]
-    
+
     ; Small delay to not overflow counter too fast (~18ms per tick)
     mov dx, 18
     call delay_ms
@@ -158,47 +158,47 @@ key_loop:
 ; ========== Recording Functions ==========
 record_pause:
     pusha
-    
+
     ; Check if this is first note
     cmp word [record_count], 0
     je .first_note
-    
+
     ; Check if buffer has space
     cmp word [record_count], 500
     jge .done
-    
+
     ; Get pause duration
     mov ax, [last_note_time]
     cmp ax, 0
     je .done            ; No pause to record
-    
+
     ; Record pause (frequency 0 = pause)
     mov di, record_buffer
     mov cx, [record_count]
     shl cx, 2
     add di, cx
-    
+
     xor ax, ax          ; Frequency 0 = pause
     stosw
     mov ax, [last_note_time]
-    
+
     ; Convert to milliseconds (multiply by 18)
     mov bx, 18
     mul bx
-    
+
     ; Limit max pause to 2000ms
     cmp ax, 2000
     jbe .store_pause
     mov ax, 2000
-    
+
 .store_pause:
     stosw               ; Store pause duration
     inc word [record_count]
-    
+
 .first_note:
     ; Reset time counter
     mov word [last_note_time], 0
-    
+
 .done:
     popa
     ret
@@ -220,49 +220,49 @@ toggle_recording:
 play_recording:
     cmp word [record_count], 0
     je key_loop
-    
+
     mov byte [playing], 1
     mov si, record_buffer
     mov cx, [record_count]
-    
+
 .play_loop:
     push cx
     push si
-    
+
     ; Get frequency
     lodsw
     mov bx, ax
-    
+
     ; Get duration
     lodsw
     mov dx, ax
-    
+
     ; Check if this is a pause (frequency = 0)
     cmp bx, 0
     je .play_pause
-    
+
     ; Play note
     mov ax, bx
     call set_frequency
     call on_pc_speaker
     call delay_ms
     call off_pc_speaker
-    
+
     ; Small pause between notes
     mov dx, 30
     call delay_ms
     jmp .next_item
-    
+
 .play_pause:
     ; Just delay for pause duration
     call delay_ms
-    
+
 .next_item:
     pop si
     add si, 4
     pop cx
     loop .play_loop
-    
+
     mov byte [playing], 0
     jmp key_loop
 
@@ -486,37 +486,37 @@ play_note:
 play_note_common:
     push ax
     push dx
-    
+
     ; Record note if recording
     cmp byte [recording], 1
     jne .skip_record
-    
+
     cmp word [record_count], 500
     jge .skip_record
-    
+
     mov di, record_buffer
     mov cx, [record_count]
     shl cx, 2
     add di, cx
-    
+
     stosw           ; Store frequency
     mov ax, dx
     stosw           ; Store duration
-    
+
     inc word [record_count]
-    
+
     ; Reset pause timer after recording note
     mov word [last_note_time], 0
 
 .skip_record:
     pop dx
     pop ax
-    
+
     call set_frequency
     call on_pc_speaker
     call delay_ms
     call off_pc_speaker
-    
+
     jmp key_loop
 
 ; ========== Visual Functions ==========
@@ -536,29 +536,29 @@ update_status:
     mov dh, 20
     mov dl, 0
     call move_cursor
-    
+
     cmp byte [recording], 1
     je .show_recording
     cmp word [record_count], 0
     je .show_ready
     jmp .show_recorded
-    
+
 .show_recording:
     mov si, .rec_msg
     call print_string_red
     jmp .show_count
-    
+
 .show_recorded:
     mov si, .saved_msg
     call print_string_green
     jmp .show_count
-    
+
 .show_ready:
     mov si, .ready_msg
     call print_string
     popa
     ret
-    
+
 .show_count:
     mov si, .notes_msg
     call print_string
@@ -566,7 +566,7 @@ update_status:
     call print_decimal
     mov si, .notes_suffix
     call print_string
-    
+
     popa
     ret
 
@@ -586,7 +586,7 @@ print_string:
     mov ah, 0x0E
     mov bl, 0x0F
 .loop:
-    lodsb 
+    lodsb
     cmp al, 0
     je .done
     cmp al, 10
@@ -625,12 +625,12 @@ print_string_green:
     jmp .loop
 .done:
     ret
-    
+
 print_newline:
     mov ah, 0x0E
     mov al, 0x0D
     int 0x10
-    mov al, 0x0A 
+    mov al, 0x0A
     int 0x10
     ret
 
@@ -647,7 +647,7 @@ print_decimal:
     push bx
     push cx
     push dx
-    
+
     mov cx, 0
     mov bx, 10
 .divide:
@@ -657,7 +657,7 @@ print_decimal:
     inc cx
     cmp ax, 0
     jne .divide
-    
+
 .print:
     pop dx
     add dl, '0'
@@ -666,7 +666,7 @@ print_decimal:
     mov bl, 0x0F
     int 0x10
     loop .print
-    
+
     pop dx
     pop cx
     pop bx

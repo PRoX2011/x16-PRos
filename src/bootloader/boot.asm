@@ -1,8 +1,8 @@
 ; ==================================================================
 ; x16-PRos -- The x16-PRos bootloader
 ; Copyright (C) 2025 PRoX2011
-; 
-; Loads the kernel (KERNEL.BIN) for execution. 
+;
+; Loads the kernel (KERNEL.BIN) for execution.
 ; Uses FAT12 file system.
 ; ==================================================================
 

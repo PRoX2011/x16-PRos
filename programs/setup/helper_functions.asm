@@ -4,10 +4,10 @@
 set_background_color:
     pusha
     mov ah, 0x0B
-    mov bh, 0  
-    mov bl, al     
+    mov bh, 0
+    mov bl, al
     int 0x10
-    
+
     popa
     ret
 
@@ -40,7 +40,7 @@ string_input_string:
     mov cx, 0
 
     call string_get_cursor_pos
-    mov word [.cursor_col], dx 
+    mov word [.cursor_col], dx
 
 .read_loop:
     mov ah, 0x00
@@ -126,11 +126,11 @@ string_to_int:
     push cx
     push dx
     push si
-    
+
     xor ax, ax
     xor bx, bx
     xor cx, cx
-    
+
 .convert_loop:
     lodsb
     cmp al, 0
@@ -139,7 +139,7 @@ string_to_int:
     jb .invalid
     cmp al, '9'
     ja .invalid
-    
+
     sub al, '0'
     mov cl, al
     mov ax, bx
@@ -148,10 +148,10 @@ string_to_int:
     add ax, cx
     mov bx, ax
     jmp .convert_loop
-    
+
 .invalid:
     mov bx, -1
-    
+
 .done:
     mov ax, bx
     pop si

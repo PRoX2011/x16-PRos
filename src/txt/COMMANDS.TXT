@@ -117,11 +117,11 @@ MEDIA & VIEWING:
     Display BMP image
     Maximum resolution: 320x240
     256 colors
-    
+
     Options:
       -upscale  Scale image 2x
       -stretch  Stretch to fullscreen
-    
+
     Examples:
       view IMAGE.BMP
       view LOGO.BMP -upscale

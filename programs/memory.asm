@@ -2,7 +2,7 @@
 ; x16-PRos -- MEMORY. Memory viewer.
 ; Copyright (C) 2025 PRoX2011
 ;
-; Made by ??? and PRoX-dev 
+; Made by ??? and PRoX-dev
 ; =================================================================
 
 [BITS 16]
@@ -42,55 +42,55 @@ display_memory:
     mov ax, [current_address]
     shr ax, 4
     mov es, ax
-    
+
     ; Display address
     mov si, current_address_display
     mov ax, [current_address]
     call word_to_hex
     mov si, current_address_display
     call print_string
-    
+
     ; Display 16 lines of 16 bytes each
     mov cx, 16
     mov di, 0
     mov bx, 0
-    
+
 .display_line:
     ; Display 16 bytes as hex with colors
     mov cx, 16
     push di
-    
+
 .hex_loop:
     mov al, [es:di]
     push cx
     call byte_to_hex_temp  ; Convert to hex in temp buffer
-    
+
     ; Calculate and set color
     mov al, [es:di]
     call calculate_color
     mov bl, al
-    
+
     ; Print first hex digit
     mov ah, 0x0E
     mov bh, 0x00
     mov al, [hex_byte_temp]
     int 0x10
-    
+
     ; Print second hex digit
     mov ah, 0x0E
     mov al, [hex_byte_temp+1]
     int 0x10
-    
+
     ; Print space (in default color)
     mov bl, 0x0F
     mov ah, 0x0E
     mov al, ' '
     int 0x10
-    
+
     pop cx
     inc di
     loop .hex_loop
-    
+
     ; Display ASCII representation
     mov bl, 0x0F
     mov ah, 0x0E
@@ -98,11 +98,11 @@ display_memory:
     int 0x10
     mov al, ' '
     int 0x10
-    
+
     pop di
     push di
     mov cx, 16
-    
+
 .ascii_loop:
     mov al, [es:di]
     cmp al, 32
@@ -110,22 +110,22 @@ display_memory:
     cmp al, 126
     ja .non_printable
     jmp .print_ascii
-    
+
 .non_printable:
     mov al, '.'    ; Replace non-printable with dot
-    
+
 .print_ascii:
     int 0x10
     inc di
     loop .ascii_loop
-    
+
     call print_newline
     pop di
     add di, 16
     inc bx
     cmp bx, 16
     jb .display_line
-    
+
     pop es
     ret
 
@@ -144,18 +144,18 @@ byte_to_hex_temp:
 calculate_color:
     push bx
     mov bl, al
-    
+
     mov bh, bl
     and bh, 0xC0        ; Bits 7-6
     shr bh, 6
     mov al, bh
     add al, 1            ; Background (1-4)
-    
+
     mov bh, bl
     and bh, 0x38        ; Bits 5-3
     shr bh, 3
     add bh, 4            ; Foreground (4-11)
-    
+
     ; Combine
     shl al, 4
     or al, bh
@@ -165,7 +165,7 @@ calculate_color:
 get_user_input:
     mov ah, 0x00
     int 0x16
-    
+
     cmp al, 0x1B        ; ESC
     je exit_program
     cmp al, 'f'

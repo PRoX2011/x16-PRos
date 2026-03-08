@@ -1,0 +1,115 @@
+----------------------- Key changes x16-PRos v0.7 ----------------------
+
+This release brings significant improvements to multi-disk support, shell 
+terminal enhancements, and build system optimization. Several important bug 
+fixes and kernel optimizations make this version more stable and performant.
+                                        -- PRoX
+
+=======================================================================================
+
+1. Multi-Disk Support (Complete Redesign)
+1) Full kernel support for multiple disk drives
+   - Kernel now properly handles operations with multiple disks
+   - File system operations adapted for multi-disk environments
+2) New system calls for disk management
+   - INT 0x22; AH = 0x11: List available disk drives
+   - INT 0x22; AH = 0x12: Change current drive (SI = Drive letter pointer)
+3) New dlist program
+   - Displays list of currently available disks in the system
+4) Test files removed from secondary disk images
+   - Improved disk image cleanliness and reduced size
+
+=======================================================================================
+
+2. Kernel Optimization & Core Programs Refactoring
+1) head and tail commands moved to separate programs
+   - head.asm: Display first lines of a file
+   - tail.asm: Display last lines of a file  
+   - This refactoring significantly reduced kernel size (~300 lines removed)
+2) Enhanced string library (string.inc)
+   - Improved utilities for text processing in standalone programs
+
+=======================================================================================
+
+3. Terminal Shell Improvements
+1) Command history feature
+   - Users can now navigate through previously executed commands using arrow keys
+   - Improves productivity when working with the command line
+   - 136 new lines of history tracking code
+2) Ctrl+Backspace keyboard shortcut
+   - New key combination for deleting the previous word
+   - Useful for quick command line editing
+3) Bugfixes for keyboard input
+   - Fixed issues with Ctrl+Backspace functionality
+   - Improved overall keyboard input stability
+
+=======================================================================================
+
+4. Build System Enhancements
+1) New compilation flags (check out build-linux.sh)
+2) Caching system
+3) Build script refactoringy
+
+=======================================================================================
+
+5. New text-based user interface (TUI) system and kernel optimization
+1) New shared TUI library for programs (programs/lib/tui.inc)
+2) Interface and rendering updates for hexedit and writer
+3) Kernel optimization
+   - The kernel now weighs 40kib less
+
+=======================================================================================
+
+6. Program bugfixes and behavior improvements
+1) ED editor now correctly works with LF line endings
+2) Fixed file loading in HEXEDIT
+3) Additional bugfixes in kernel FS/init and launch program
+4) Command history stability improvements
+
+=======================================================================================
+
+7. BARCHART program updates
+1) Added support for loading and saving chart data files
+2) Added chart name support
+3) Added navigation through columns and value editing
+4) Minor barchart bugfixes and polishing
+
+=======================================================================================
+
+8. Project documentation and metadata updates
+1) Updated screenshots in docs
+2) README and CONFIGURATION docs updated
+3) Credits list updated
+
+=======================================================================================
+
+9. Timezone configuration support
+1) Added TIMEZONE.CFG integration in kernel initialization
+2) Implemented timezone parsing and local datetime conversion logic
+3) date/time output now uses configured timezone offset instead of raw UTC
+4) Improved timezone config loading robustness (string termination and parsing fixes)
+
+=======================================================================================
+
+10. DOS INT 21h compatibility expansion (easy + medium calls)
+1) Added implementations for:
+   - 05h, 0Ch, 0Dh, 0Eh, 19h, 1Ah, 2Fh, 30h, 36h
+   - 39h, 3Ah, 3Bh, 41h, 4Dh, 54h
+2) Expanded COM subsystem state handling:
+   - DTA segment/offset tracking
+   - process return code/type tracking
+   - verify flag and path copy helpers for DOS-style path calls
+3) Updated DOS handler dispatch and comments in com.asm
+4) Added syscall test coverage for newly implemented calls
+
+=======================================================================================
+
+11. API output stability and correctness fixes
+1) Fixed INT 21h output handler control flow that caused program crashes
+2) Corrected call/return behavior inside the interrupt dispatcher
+3) Fixed segment register restore order during API output initialization
+4) Improved color behavior for AH=08h output mode
+
+=======================================================================================
+
+Copyright (C) 2024-2026 PRoX2011

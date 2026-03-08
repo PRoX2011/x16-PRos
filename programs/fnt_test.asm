@@ -49,7 +49,7 @@ start:
 
     mov byte [cursor_x], 5
     mov byte [cursor_y], 9
-    mov byte [color_fg], 0x04 
+    mov byte [color_fg], 0x04
     mov byte [color_bg], 0x00
     mov si, text_msg3
     call print_string_custom
@@ -69,7 +69,7 @@ print_string_custom:
     je .next_char
 
     call draw_char_vga12
-    
+
     inc byte [cursor_x]
     cmp byte [cursor_x], 80
     jae .newline
@@ -97,7 +97,7 @@ draw_char_vga12:
     mov cx, SCREEN_WIDTH_B * FONT_HEIGHT
     mul cx
     mov di, ax
-    
+
     xor ax, ax
     mov al, [cursor_x]
     add di, ax
@@ -116,7 +116,7 @@ draw_char_vga12:
 
     push ax
     not ah
-    
+
     mov dx, VGA_GC_INDEX
     mov al, 0x08
     out dx, al
@@ -135,7 +135,7 @@ draw_char_vga12:
     mov byte [es:di], 0xFF
 
     pop ax
-    
+
     mov dx, VGA_GC_INDEX
     mov al, 0x08
     out dx, al
@@ -173,7 +173,7 @@ clear_screen:
     mov al, 0x02
     out dx, al
     inc dx
-    mov al, 0x0F 
+    mov al, 0x0F
     out dx, al
 
     mov dx, VGA_GC_INDEX

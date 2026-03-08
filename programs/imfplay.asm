@@ -12,8 +12,8 @@
 		cpu 8086
 [BITS 16]
 [ORG 8000h]
-		
-		
+
+
 
 start:
 		mov [filename_ptr], si
@@ -24,8 +24,8 @@ start:
 
 		mov ah, 0x10
         mov si, [filename_ptr]
-        mov cx, 43008    
-        mov dx, 0x2000    
+        mov cx, 43008
+        mov dx, 0x2000
         int 22h
 
 		mov ah, 0x01
@@ -38,7 +38,7 @@ start:
 
 		call reset_all_registers
 		call start_fast_clock
-		
+
 		; imf type-1: first word is the data length
 		mov ax, 0x2000
 		mov es, ax
@@ -52,17 +52,17 @@ start:
 		mov [curr_off], ax
 		mov ax, 0x2000
 		mov [curr_seg], ax
-		
+
 		mov word [bytes_read], 0
 
 	.next_note:
 		; select opl2 register through port 388h
 		call get_byte
 		mov bl, al ; opl2 register
-		
+
 		call get_byte
 		mov bh, al ; data
-		
+
 		call write_adlib
 
 		call get_byte
@@ -72,25 +72,25 @@ start:
 		mov bx, cx
 
 		add word [bytes_read], 4
-		
+
 	.repeat_delay:
 		call delay
 		; if keypress then exit
 		mov ah, 1
 		int 16h
 		jnz .exit
-	
+
 		dec bx
 		jg .repeat_delay
-		
+
 		mov ax, [bytes_read]
 		cmp ax, [music_length]
 		jb .next_note
-		
+
 	.exit:
 		call stop_fast_clock
 		call reset_all_registers
-		
+
 		mov ax, 4c00h
 		int 21h
 
@@ -128,7 +128,7 @@ write_adlib:
 		push bx
 		push cx
 		push dx
-		
+
 		mov dx, 388h
 		mov al, bl
 		out dx, al
@@ -147,25 +147,25 @@ write_adlib:
 	.delay_2:
 		in al, dx
 		loop .delay_2
-		
+
 		pop dx
 		pop cx
 		pop bx
 		pop ax
 		ret
-			
+
 ; count = 1193180 / sampling_rate
 ; sampling_rate = n cycles per second
-; count = 1193180 / 140  = 214a (in hex) 
-; count = 1193180 / 560  =  852 (in hex) 
-; count = 1193180 / 700  =  6a8 (in hex) 
-; count = 1193180 / 2000 =  254 (in hex) 
-; count = 1193180 / 8000 =   95 (in hex) 
+; count = 1193180 / 140  = 214a (in hex)
+; count = 1193180 / 560  =  852 (in hex)
+; count = 1193180 / 700  =  6a8 (in hex)
+; count = 1193180 / 2000 =  254 (in hex)
+; count = 1193180 / 8000 =   95 (in hex)
 start_fast_clock:
 		cli
 		mov al, 36h
 		out 43h, al
-		mov al, 0a8h ; low 
+		mov al, 0a8h ; low
 		out 40h, al
 		mov al, 06h ; high
 		out 40h, al
@@ -176,13 +176,13 @@ stop_fast_clock:
 		cli
 		mov al, 36h
 		out 43h, al
-		mov al, 0h ; low 
+		mov al, 0h ; low
 		out 40h, al
 		mov al, 0h ; high
 		out 40h, al
 		sti
 		ret
-		
+
 ; delay 1/sampling_rate seconds
 delay:
 		push es
@@ -195,9 +195,9 @@ delay:
 		mov [last_time], ax
 		pop es
 		ret
-		
-last_time    dw 0	
-music_length dw 0	
+
+last_time    dw 0
+music_length dw 0
 filename_ptr dw 0
 curr_seg     dw 0
 curr_off     dw 0

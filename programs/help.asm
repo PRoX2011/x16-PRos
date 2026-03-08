@@ -15,13 +15,13 @@ start:
     call string_get_cursor_pos
     mov [.saved_row], dh
     mov [.saved_col], dl
-    
+
     mov word [current_category], 0
     call .show_current_category
 
 .key_loop:
-    mov ah, 0    
-    int 16h    
+    mov ah, 0
+    int 16h
     ; Check for navigation keys
     cmp ah, 0x48    ; Up arrow
     je .prev_category
@@ -33,7 +33,7 @@ start:
     je .next_category
     cmp al, 27      ; ESC key
     je .exit_help
-    
+
     jmp .key_loop   ; Ignore other keys
 
 .prev_category:
@@ -46,11 +46,11 @@ start:
 .next_category:
     mov si, help_categories
     mov bx, [current_category]
-    shl bx, 1      
+    shl bx, 1
     add si, bx
-    add si, 2      
+    add si, 2
     cmp word [si], 0
-    je .key_loop  
+    je .key_loop
     inc word [current_category]
 
 .update_category:
@@ -65,22 +65,22 @@ start:
     mov dh, [.saved_row]
     mov dl, [.saved_col]
     call string_move_cursor
-    
+
     mov ah, 0x02
     mov si, help_categories
     mov bx, [current_category]
-    shl bx, 1   
+    shl bx, 1
     add si, bx
-    mov si, [si]   
+    mov si, [si]
     int 0x21
     ret
 
 .exit_help:
     mov dh, [.saved_row]
-    add dh, 22     
+    add dh, 22
     mov dl, 0
     call string_move_cursor
-    ret 
+    ret
 
 .saved_row db 0
 .saved_col db 0
@@ -109,8 +109,8 @@ string_move_cursor:
     ret
 
 help_categories:
-    dw  help_menu_1, help_menu_2, help_menu_3, help_menu_4, help_menu_5                                         
-    dw 0 
+    dw  help_menu_1, help_menu_2, help_menu_3, help_menu_4, help_menu_5
+    dw 0
 
 current_category dw 0
 
