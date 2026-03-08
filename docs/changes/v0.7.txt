@@ -47,8 +47,6 @@ fixes and kernel optimizations make this version more stable and performant.
 
 4. Build System Enhancements
 1) New compilation flags (check out build-linux.sh)
-2) Caching system
-3) Build script refactoringy
 
 =======================================================================================
 
