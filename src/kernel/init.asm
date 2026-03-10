@@ -685,8 +685,8 @@ parse_system_cfg_data:
 
 ; Load and display Logo
 load_logo_and_display:
+%ifndef NO_LOGO_DISPLAY
     pusha
-
     cmp byte [cfg_logo_enabled], 0
     je .done
 
@@ -781,6 +781,7 @@ load_logo_and_display:
 
 .done:
     popa
+%endif
     ret
 
 .temp_dir_path  times 20 db 0
