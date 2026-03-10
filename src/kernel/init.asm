@@ -143,6 +143,11 @@ run_setup_wizard:
     mov word si, [param_list]
     mov di, 0
     call program_load_addr
+
+    ; BIN programs may leave data segments changed.
+    mov ax, 0x2000
+    mov ds, ax
+    mov es, ax
     ret
 
 .setup_failed:
@@ -378,6 +383,12 @@ execute_autoexec_if_exists:
 
     call DisableMouse
     call program_load_addr
+
+    ; Restore kernel data segments after BIN return.
+    mov ax, 0x2000
+    mov ds, ax
+    mov es, ax
+
     call EnableMouse
     ret
 
