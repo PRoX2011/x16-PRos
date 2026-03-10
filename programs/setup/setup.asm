@@ -12,6 +12,7 @@
 
 ; ========== SETUP ROUTINE ==========
 setup:
+%ifndef NO_SETUP
     ; Clear screen
     mov ah, 0x06
     int 0x21
@@ -643,6 +644,7 @@ setup_draw_stage_bar:
     int 0x21
 
     popa
+%endif
     ret
 
 ; ========== INCLUDES ==========

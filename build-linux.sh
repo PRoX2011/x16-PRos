@@ -10,6 +10,10 @@ FLAG_NO_MUSIC=0
 FLAG_NO_TXT=0
 FLAG_NO_BOOT_RECOMP=0
 FLAG_NO_KERNEL_RECOMP=0
+FLAG_NO_PROGRAMS_RECOMP=0
+FLAG_NO_LOGO_DISPLAY=0
+FLAG_NO_SETUP=0
+FLAG_DTM=0  # DTM - Dev Tesing Mode
 
 for arg in $@; do
     if [ $arg == "-quiet" ]; then FLAG_QUIET_MODE=1; continue; fi
@@ -17,6 +21,10 @@ for arg in $@; do
     if [ $arg == "-no-txt" ]; then FLAG_NO_TXT=1; continue; fi
     if [ $arg == "-no-boot-recomp" ]; then FLAG_NO_BOOT_RECOMP=1; continue; fi
     if [ $arg == "-no-kernel-recomp" ]; then FLAG_NO_KERNEL_RECOMP=1; continue; fi
+    if [ $arg == "-no-programs-recomp" ]; then FLAG_NO_PROGRAMS_RECOMP=1; continue; fi
+    if [ $arg == "-no-logo-display" ]; then FLAG_NO_LOGO_DISPLAY=1; continue; fi
+    if [ $arg == "-no-setup" ]; then FLAG_NO_SETUP=1; continue; fi
+    if [ $arg == "-dtm" ]; then FLAG_NO_SETUP=1; FLAG_NO_LOGO_DISPLAY=1; FLAG_NO_BOOT_RECOMP=1; continue; fi
 done
 
 RED='\033[31m'
@@ -90,9 +98,13 @@ fi
 
 # Compile kernel
 if [ $FLAG_NO_KERNEL_RECOMP == 0 ]; then
+    addition_flags=""
+    if [ $FLAG_NO_LOGO_DISPLAY == 1 ]; then
+        addition_flags="-d NO_LOGO_DISPLAY"
+    fi
     baseline_kernel_size=$(stat -c%s bin/KERNEL.BIN 2>/dev/null || echo 0)
     print_info "Compiling kernel (kernel.asm => bin/KERNEL.BIN)..."
-    nasm -f bin src/kernel/kernel.asm -o bin/KERNEL.BIN
+    nasm -f bin src/kernel/kernel.asm -o bin/KERNEL.BIN $addition_flags
     check_error "Kernel compilation failed"
     print_ok "Kernel compiled successfully"
     current_kernel_size=$(stat -c%s bin/KERNEL.BIN 2>/dev/null || echo 0)
@@ -211,10 +223,17 @@ for prog in "${programs_root[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
 
-    print_info "Compiling $src => bin/$bin_name..."
-    nasm -f bin $src -o bin/$bin_name
-    check_error "Compilation of $src failed"
-    print_ok "$bin_name compiled successfully"
+    addition_flags=""
+    if [ $FLAG_NO_SETUP == 1 ]; then
+        addition_flags="-d NO_SETUP"
+    fi
+
+    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+        print_info "Compiling $src => bin/$bin_name..."
+        nasm -f bin $src -o bin/$bin_name $addition_flags
+        check_error "Compilation of $src failed"
+        print_ok "$bin_name compiled successfully"
+    fi
     
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/
@@ -261,10 +280,12 @@ for prog in "${programs[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
 
-    print_info "Compiling $src => bin/$bin_name..."
-    nasm -f bin $src -o bin/$bin_name
-    check_error "Compilation of $src failed"
-    print_ok "$bin_name compiled successfully"
+    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+        print_info "Compiling $src => bin/$bin_name..."
+        nasm -f bin $src -o bin/$bin_name
+        check_error "Compilation of $src failed"
+        print_ok "$bin_name compiled successfully"
+    fi
 
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/BIN.DIR/
@@ -283,10 +304,12 @@ for prog in "${programs_com[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
 
-    print_info "Compiling $src => bin/$bin_name..."
-    nasm -f bin $src -o bin/$bin_name
-    check_error "Compilation of $src failed"
-    print_ok "$bin_name compiled successfully"
+    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+        print_info "Compiling $src => bin/$bin_name..."
+        nasm -f bin $src -o bin/$bin_name
+        check_error "Compilation of $src failed"
+        print_ok "$bin_name compiled successfully"
+    fi
     
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/COM.DIR/
@@ -294,6 +317,7 @@ for prog in "${programs_com[@]}"; do
     print_ok "$bin_name copied successfully"
 done
 
+mcopy -i disk_img/x16pros.img bin/prasm.bin ::/BIN.DIR/
 
 # Copy text files
 if [ $FLAG_NO_TXT == 0 ]; then
