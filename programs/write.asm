@@ -23,8 +23,8 @@
 TEXT_BUFFER      equ 0xE000
 TEXT_BUFFER_SIZE equ 16384
 
-SAVE_BUFFER      equ 0xD000
-SAVE_BUFFER_SIZE equ 8192
+SAVE_BUFFER      equ 0xA800
+SAVE_BUFFER_SIZE equ 0x3800
 
 KEY_CTRL_X  equ 0x18
 KEY_CTRL_O  equ 0x0F
@@ -1007,6 +1007,7 @@ save_handler:
     int 0x22
     jc .sh_fail
 
+    call restore_text_buffer
     mov byte [modified], 0
 
     mov si, .saved_str
@@ -1017,6 +1018,8 @@ save_handler:
     jmp main_loop
 
 .sh_fail:
+    call restore_text_buffer
+
     mov si, .fail_str
     mov di, status_msg
     call .copy_msg
@@ -1103,13 +1106,15 @@ exit_editor:
 
 prepare_save_buffer:
     pusha
-    cmp byte [had_crlf], 1
-    jne .psb_direct
 
     mov si, TEXT_BUFFER
     mov di, SAVE_BUFFER
     mov cx, [text_size]
     xor dx, dx
+
+    cmp byte [had_crlf], 1
+    jne .psb_plain
+
 .psb_loop:
     cmp cx, 0
     je .psb_done
@@ -1128,21 +1133,48 @@ prepare_save_buffer:
     stosb
     inc dx
     jmp .psb_loop
+
+.psb_plain:
+    cmp cx, SAVE_BUFFER_SIZE
+    jbe .psb_size_ok
+    mov cx, SAVE_BUFFER_SIZE
+.psb_size_ok:
+    mov dx, cx
+    rep movsb
+
 .psb_done:
     mov word [save_ptr], SAVE_BUFFER
     mov [save_size], dx
     popa
     ret
 
-.psb_direct:
-    mov word [save_ptr], TEXT_BUFFER
-    mov ax, [text_size]
-    mov [save_size], ax
-    popa
-    ret
-
 save_ptr  dw 0
 save_size dw 0
+
+restore_text_buffer:
+    pusha
+    mov si, SAVE_BUFFER
+    mov di, TEXT_BUFFER
+    cmp byte [had_crlf], 1
+    jne .rtb_plain
+    mov cx, [save_size]
+    xor dx, dx
+.rtb_strip:
+    cmp cx, 0
+    je .rtb_done
+    lodsb
+    dec cx
+    cmp al, 0x0D
+    je .rtb_strip
+    stosb
+    jmp .rtb_strip
+.rtb_plain:
+    mov cx, [text_size]
+    cld
+    rep movsb
+.rtb_done:
+    popa
+    ret
 
 ; ==================================================================
 ; Data section

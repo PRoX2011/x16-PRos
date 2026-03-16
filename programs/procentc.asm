@@ -21,8 +21,8 @@ section .text
 start:
     pusha
 
-    mov ax, 0x12
-    int 0x10
+    mov ah, 0x06
+    int 0x21
 
     mov ah, 0x01
     mov si, welcome_msg

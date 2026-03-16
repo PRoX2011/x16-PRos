@@ -2,6 +2,10 @@
 ; x16-PRos - Compatibility layer with MS DOS programs.
 ;            Emulates MS DOS system calls through PRos kernel functions
 ;
+; https://wiki.osdev.org/COM
+; https://en.wikipedia.org/wiki/COM_file
+; https://en.wikipedia.org/wiki/DOS_API
+; https://biosprog.narod.ru/real/dos/ints.htm 
 ;
 ; ------------ DOS system calls ------------
 ;  [DONE] Function 00h: Terminate program
@@ -258,7 +262,7 @@ int21_dos_handler:
 
 saved_interrupt_table resb 1024
 dta_offset            dw 0x0080
-dta_segment           dw program_seg
+dta_segment           dw 0
 verify_flag           db 0
 last_return_code      db 0
 last_return_type      db 0

@@ -87,6 +87,7 @@ init_display:
 
     call load_logo_and_display
     call set_video_mode
+    call font_load_from_cfg
     ret
 
 init_security:
@@ -750,8 +751,9 @@ load_logo_and_display:
     jc .error_loading
 
     pop ax
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, 0
+    mov dx, BMP_LOAD_SEG
+    call fs_load_huge_file
 
     pushf
     call fs_parent_directory
@@ -762,8 +764,9 @@ load_logo_and_display:
 
 .no_path:
     mov ax, current_logo_file
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, 0
+    mov dx, BMP_LOAD_SEG
+    call fs_load_huge_file
     jnc .display_logo
 
 .error_loading:
@@ -772,10 +775,13 @@ load_logo_and_display:
     jmp .done
 
 .display_logo:
+    mov word [bmp_src_seg], BMP_LOAD_SEG
+    mov word [bmp_src_off], 0
+
+    ; Switch to VGA 0x13 (320x200, 256 colors)
     mov ax, 0x13
     int 0x10
     push bx
-    mov si, program_load_addr
     cmp byte [cfg_logo_stretch], 1
     je .display_stretched
     call display_bmp
@@ -789,6 +795,10 @@ load_logo_and_display:
     int 16h
     mov byte [_palSet], 0
     pop bx
+
+    mov ax, KERNEL_DATA_SEG
+    mov ds, ax
+    mov es, ax
 
 .done:
     popa

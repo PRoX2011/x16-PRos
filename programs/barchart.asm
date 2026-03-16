@@ -48,8 +48,8 @@ start:
     jmp exit
 
 clear_screen:
-    mov ax, 0x0012
-    int 0x10
+    mov ah, 0x06
+    int 0x21
     ret
 
 draw_interface:

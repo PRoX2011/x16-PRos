@@ -24,7 +24,7 @@
 %assign Key.ScanCode.Right 0x4d
 %assign Key.ScanCode.Enter 0x1c
 %assign Key.Ascii.RestartGame 'r'
-%assign Key.Ascii.Esc 0x1b      ; Добавлен код ESC
+%assign Key.Ascii.Esc 0x1b
 
 %define VgaChar(color, ascii) (((color) << 8) | (ascii))
 

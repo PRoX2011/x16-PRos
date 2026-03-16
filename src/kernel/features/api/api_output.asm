@@ -13,6 +13,9 @@
 ;   0x06: Clear screen
 ;   0x07: Set color (BL = color code)
 ;   0x08: Print string with current color (SI = string pointer)
+;   0x09: CP866 control (AL=0x01 enable, AL=0x00 disable)
+;   0x0A: Get system time (OUT: CH=hour, CL=min, DH=sec)
+;   0x0B: Get system date (OUT: CH=century, CL=year, DH=month, DL=day)
 ; Preserves all registers unless specified
 ; ==================================================================
 
@@ -55,11 +58,16 @@ int21_handler:
     je .set_color
     cmp ah, 0x08
     je .print_current_color
+    cmp ah, 0x09
+    je .cp866_control
+    cmp ah, 0x0A
+    je .get_time
+    cmp ah, 0x0B
+    je .get_date
     jmp .done
 
 .init:
-    mov ax, 0x12
-    int 0x10
+    call set_video_mode
     jmp .done
 
 .print_white:
@@ -93,6 +101,46 @@ int21_handler:
 .print_current_color:
     mov bl, [current_color]
     call print_string_color
+    jmp .done
+
+.cp866_control:
+    cmp al, 0x00
+    je .font_disable
+    cmp al, 0x01
+    je .font_load_def
+    cmp al, 0x02
+    je .font_load_name
+    jmp .done
+.font_disable:
+    call font_restore
+    jmp .done
+.font_load_def:
+    call font_load_default
+    jmp .done
+.font_load_name:
+    call font_load_file
+    jmp .done
+
+.get_time:
+    call timezone_get_local_datetime
+    mov bp, sp
+    mov ch, [timezone_local_hour]
+    mov cl, [timezone_local_minute]
+    mov [bp+12], cx
+    mov dh, [timezone_local_second]
+    xor dl, dl
+    mov [bp+10], dx
+    jmp .done
+
+.get_date:
+    call timezone_get_local_datetime
+    mov bp, sp
+    mov ch, [timezone_local_century]
+    mov cl, [timezone_local_year]
+    mov [bp+12], cx
+    mov dh, [timezone_local_month]
+    mov dl, [timezone_local_day]
+    mov [bp+10], dx
     jmp .done
 
 .done:

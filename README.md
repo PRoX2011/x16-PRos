@@ -5,7 +5,7 @@
 <h1>x16-PRos Operating System</h1>
 
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE.TXT)
-[![Version](https://img.shields.io/badge/version-0.7-blue?style=for-the-badge)](docs/changes/v0.7.txt)
+[![Version](https://img.shields.io/badge/version-0.7-blue?style=for-the-badge)](docs/changes/v0.8.txt)
 [![Assembler](https://img.shields.io/badge/assembler-NASM-1f425f?style=for-the-badge)](https://nasm.us/)
 [![Boot Mode](https://img.shields.io/badge/boot-BIOS%20Legacy-orange?style=for-the-badge)](#running-x16-pros)
 
@@ -82,6 +82,7 @@ Thanks to everyone who supported me financially. All your nicknames will appear 
 - **API Access**: Comprehensive kernel API for file, string, and output operations
 - **Debugging Tools**: CPU info display, memory viewer, register inspection
 - **Multiple disk support**: detect/list available drives and switch drives in the terminal
+- **cp866 fonts support**: change system font using config or TUI application
 
 ---
 

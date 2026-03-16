@@ -1,0 +1,127 @@
+[RU]
+
+ФИЛОСОФИЯ ПРОЕКТА
+
+Есть системы огромные, мощные и универсальные. Я с уважением
+отношусь к Linux и Windows: они решают свои задачи на высоком уровне.
+Но мой проект родился из другой идеи. Я не стремлюсь обогнать их в масштабе,
+экосистеме или корпоративной зрелости. Я иду по другой дороге.
+
+Моя цель - создать систему, которая по духу близка к MS-DOS и FreeDOS,
+но ощущается более живой, удобной и современной в повседневном опыте.
+Я не говорю о "современности" как о перегруженности и сложных абстракциях.
+Я говорю о внимании к человеку: чтобы интерфейс был понятным, поведение
+предсказуемым, а система не требовала лишнего.
+
+Меня вдохновляют старые ОС, в которых было легко понять, что происходит.
+И одновременно мне важны удачные идеи новых систем: ясный UX, удобные фичи,
+возможность самому во всем разобраться. В этом проекте нет конфликта между 
+старым и новым. Здесь есть некий союз: сохранить простоту, убрать 
+шероховатость, оставить прозрачность и добавить удобство.
+
+Одна из главных причин, почему этот проект для меня важен - ретро-гейминг.
+Старые игры для меня часть культуры. Я хочу,чтобы к этой культуре можно было
+прикоснуться сегодня так же тепло, как и раньше. 
+Это эмоциональная часть проекта.
+
+Вторая миссия - дать вторую жизнь очень старым машинам. Есть очень 
+старые компьютеры, которые не тянут тяжелые системы, но все еще могут служить.
+Я хочу, чтобы на таком железе снова было ощущение, что компьютер жив:
+для простых задач, экспериментов, обучения и ретро-игр. Хорошая система
+должна продлевать жизнь технике, а не отправлять ее на помойку раньше времени.
+
+Основа проекта - свобода и контроль пользователя. Мне важно, чтобы человек
+понимал, где он находится, что делает система и почему она так работает.
+Я не люблю модель "черного ящика", где все зависит от скрытых 
+подсистем и модулей. Я люблю ясность: понятные команды, простые правила, 
+предсказуемая логика.
+
+Проект также определяет, чем он НЕ является. Я не стремлюсь превращать его
+в платформу со сложным пакетным менеджером и цепочками зависимостей, где
+поломка одного элемента ломает другой. Ограничения реального режима для меня
+не слабость, а философская рамка. Проект не пытается быть всем сразу. 
+Он про легкость, ясность и устойчивую простоту.
+
+Важная часть философии - образовательная. Я хочу, чтобы человек мог открыть
+систему и понять ее не как магию, а как инженерный объект. Как устроены
+команды, файловые операции, интерфейс, взаимодействие компонентов. Такой
+опыт развивает мышление и возвращает интерес к устройству компьютера.
+Если проект помогает хотя бы кому-то глубже понять ОС, значит он уже делает
+ценное дело.
+
+Отдельно - о сообществе. Мне важны те, кто разделяет этот дух: 
+уважение к простоте, любовь к технике, интерес к ретро и желание делать 
+понятные вещи. Вклад сообщества для меня не "дополнение", а продолжение
+философии проекта.
+
+Если вам близка эта идея, попробуйте систему в деле. Запустите ее,
+поэкспериментируйте, почувствуйте ее ритм. А если захотите - присоединяйтесь
+к развитию: предлагайте идеи, делитесь опытом, улучшайте код и документацию, 
+создавайте новые, полезные фичи. Этот проект открыт для тех, кто верит, что простые 
+и теплые технологии по-прежнему нужны.
+
+[EN]
+
+PROJECT PHILOSOPHY
+
+There are systems that are vast, powerful, and universal. I have great respect
+for Linux and Windows: they do their jobs at a high level. But my project
+was born from a different idea. I am not trying to compete with them in
+scale, ecosystem, or corporate maturity. I am walking a different road.
+
+My goal is to create a system that is close in spirit to MS-DOS and FreeDOS,
+but feels more alive, comfortable, and modern in everyday use. I am not
+talking about "modern" as in bloated and full of complex abstractions.
+I am talking about putting the person first: an interface that is easy to
+understand, behavior that is predictable, and a system that does not ask
+more of you than it needs to.
+
+I am inspired by old operating systems where it was easy to understand what
+was happening. At the same time, I value the good ideas from newer systems:
+clear UX, convenient features, and the ability to figure everything out on
+your own. In this project there is no conflict between old and new. There
+is a kind of alliance: preserve simplicity, smooth out the rough edges,
+keep transparency, and add convenience.
+
+One of the main reasons this project matters to me is retro gaming. Old
+games are part of culture for me. I want that culture to be something you
+can reach out and touch today with the same warmth as before. This is the
+emotional core of the project.
+
+The second mission is to give a second life to very old machines. There are
+computers that cannot run heavy modern systems, but can still serve a
+purpose. I want such hardware to feel alive again: for simple tasks,
+experiments, learning, and retro games. A good system should extend the
+life of hardware, not send it to the landfill ahead of its time.
+
+The foundation of the project is user freedom and control. It matters to me
+that a person understands where they are, what the system is doing, and why
+it works the way it does. I do not like the "black box" model, where
+everything depends on hidden subsystems and modules. I value clarity:
+understandable commands, simple rules, predictable logic.
+
+The project also defines what it is NOT. I am not trying to turn it into a
+platform with a complex package manager and chains of dependencies, where
+breaking one thing breaks another. The constraints of real mode are not a
+weakness for me, but a philosophical boundary. The project does not try to
+be everything at once. It is about lightness, clarity, and durable
+simplicity.
+
+An important part of the philosophy is educational. I want a person to be
+able to open the system and understand it not as magic, but as an
+engineering artifact. How commands work, file operations, the interface,
+how components interact. That kind of experience develops thinking and
+rekindles interest in how computers work. If the project helps even one
+person understand an OS more deeply, it is already doing something
+worthwhile.
+
+A word about community. I care about those who share this spirit: respect
+for simplicity, love of technology, interest in retro, and a desire to
+build things that make sense. Community contributions are not an "add-on"
+for me, but a continuation of the project's philosophy.
+
+If this idea speaks to you, try the system out. Run it, experiment with it,
+feel its rhythm. And if you want to get involved, join the development:
+propose ideas, share your experience, improve the code and documentation,
+create new and useful features. This project is open to those who believe
+that simple, warm technology still has a place in the world.

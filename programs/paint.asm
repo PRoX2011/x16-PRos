@@ -9,8 +9,8 @@
 [ORG 0x8000]
 
 start:
-    mov ax, 0x12
-    int 0x10
+    mov ah, 0x06
+    int 0x21
 
     mov byte [CurrentColor], 0x0F
     mov byte [BrushSize], 1

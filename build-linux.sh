@@ -15,6 +15,9 @@ FLAG_NO_LOGO_DISPLAY=0
 FLAG_NO_SETUP=0
 FLAG_DTM=0  # DTM - Dev Tesing Mode
 
+MAX_KERNEL_LOADER_BYTES=32768
+KERNEL_SIZE_WARN_BYTES=30720
+
 for arg in $@; do
     if [ $arg == "-quiet" ]; then FLAG_QUIET_MODE=1; continue; fi
     if [ $arg == "-no-music" ]; then FLAG_NO_MUSIC=1; continue; fi
@@ -81,6 +84,25 @@ print_kernel_size() {
     fi
 }
 
+check_kernel_size_guard() {
+    local size_bytes
+    size_bytes=$(stat -c%s bin/KERNEL.BIN 2>/dev/null || echo 0)
+
+    if [ "$size_bytes" -le 0 ]; then
+        print_failed "Kernel image missing: bin/KERNEL.BIN"
+    fi
+
+    print_info "Loader window limit: ${MAX_KERNEL_LOADER_BYTES} bytes"
+
+    if [ "$size_bytes" -gt "$KERNEL_SIZE_WARN_BYTES" ]; then
+        print_info "Kernel size warning: ${size_bytes} bytes is close to loader limit"
+    fi
+
+    if [ "$size_bytes" -gt "$MAX_KERNEL_LOADER_BYTES" ]; then
+        print_failed "Kernel too large for bootloader window (${size_bytes} > ${MAX_KERNEL_LOADER_BYTES})"
+    fi
+}
+
 mkdir -p bin
 mkdir -p disk_img
 
@@ -118,6 +140,8 @@ if [ $FLAG_NO_KERNEL_RECOMP == 0 ]; then
     fi
     print_kernel_size "Current"
 fi
+
+check_kernel_size_guard
 
 # Create and format disk image
 print_info "Creating disk image (disk_img/x16pros.img)..."
@@ -184,6 +208,34 @@ mmd -i disk_img/x16pros.img ::/MUSIC.DIR
 check_error "Failed to create MUSIC directory"
 print_ok "MUSIC directory created successfully"
 
+# Create FONTS directory
+print_splitline "Creating FONTS directory..."
+print_info "Creating FONTS directory..."
+mmd -i disk_img/x16pros.img ::/FONTS.DIR
+check_error "Failed to create FONTS directory"
+print_ok "FONTS directory created successfully"
+
+# Copy fonts
+print_info "Copying DEFAULT.FNT to disk..."
+mcopy -i disk_img/x16pros.img assets/fonts/DEFAULT.FNT ::/FONTS.DIR/
+check_error "DEFAULT.FNT copy failed"
+print_ok "DEFAULT.FNT copied successfully"
+
+print_info "Copying BOLD.FNT to disk..."
+mcopy -i disk_img/x16pros.img assets/fonts/BOLD.FNT ::/FONTS.DIR/
+check_error "BOLD.FNT copy failed"
+print_ok "BOLD.FNT copied successfully"
+
+print_info "Copying THIN.FNT to disk..."
+mcopy -i disk_img/x16pros.img assets/fonts/THIN.FNT ::/FONTS.DIR/
+check_error "THIN.FNT copy failed"
+print_ok "THIN.FNT copied successfully"
+
+print_info "Copying ITALIC.FNT to disk..."
+mcopy -i disk_img/x16pros.img assets/fonts/ITALIC.FNT ::/FONTS.DIR/
+check_error "ITALIC.FNT copy failed"
+print_ok "ITALIC.FNT copied successfully"
+
 echo -e "$NC"
 
 # Copy config files
@@ -206,6 +258,9 @@ print_ok "PROMPT.CFG copied successfully"
 mcopy -i disk_img/x16pros.img src/kernel/configs/THEME.CFG ::/CONF.DIR/
 check_error "THEME.CFG copy failed"
 print_ok "THEME.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/FONT.CFG ::/CONF.DIR/
+check_error "FONT.CFG copy failed"
+print_ok "FONT.CFG copied successfully"
 mcopy -i disk_img/x16pros.img src/kernel/configs/SYSTEM.CFG ::/
 check_error "SYSTEM.CFG copy failed"
 print_ok "SYSTEM.CFG copied successfully"
@@ -274,6 +329,8 @@ programs=(
     "programs/ed.asm ED.BIN"
     "programs/fdisk.asm FDISK.BIN"
     "programs/launch.asm LAUNCH.BIN"
+    "programs/font.asm FONT.BIN"
+    "programs/tree.asm TREE.BIN"
 )
 
 for prog in "${programs[@]}"; do
@@ -332,6 +389,11 @@ if [ $FLAG_NO_TXT == 0 ]; then
         check_error "Copy of $file failed"
         print_ok "$file copied successfully"
     done
+
+    print_info "Copying project_philosophy.txt as PROJECT.TXT..."
+    mcopy -o -i disk_img/x16pros.img project_philosophy.txt ::/PROJECT.TXT
+    check_error "Copy of PROJECT.TXT failed"
+    print_ok "PROJECT.TXT copied successfully"
 
     text_files_doc=(
         "src/txt/README.TXT"

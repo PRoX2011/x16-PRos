@@ -48,6 +48,11 @@ start:
     call string_string_compare
     jc set_ocean
 
+    mov si, [arg_ptr]
+    mov di, str_mono
+    call string_string_compare
+    jc set_mono
+
     jmp print_usage
 
 ; ------------------------------------------------
@@ -72,6 +77,11 @@ set_ubuntu:
 set_ocean:
     mov si, theme_ocean_data
     mov cx, theme_ocean_size
+    jmp save_theme
+
+set_mono:
+    mov si, theme_mono_data
+    mov cx, theme_mono_size
     jmp save_theme
 
 save_theme:
@@ -192,8 +202,9 @@ str_default     db 'DEFAULT', 0
 str_vga         db 'VGA', 0
 str_ubuntu      db 'UBUNTU', 0
 str_ocean       db 'OCEAN', 0
+str_mono        db 'MONO', 0
 
-msg_usage       db 'Usage: THEME <DEFAULT | VGA | UBUNTU | OCEAN>', 0
+msg_usage       db 'Usage: THEME <DEFAULT | VGA | UBUNTU | OCEAN | MONO', 0
 msg_success     db 'Theme applied successfully.', 0
 
 ; --- THEME DATA ---
@@ -201,20 +212,20 @@ msg_success     db 'Theme applied successfully.', 0
 theme_default_data:
     db '0,2,3,5', 10
     db '1,25,24,52', 10
-    db '2,41,52,31', 10
-    db '3,12,32,32', 10
-    db '4,52,13,32', 10
+    db '2,21,37,10', 10
+    db '3,18,26,40', 10
+    db '4,46,9,12', 10
     db '5,27,28,48', 10
     db '6,10,40,38', 10
-    db '7,63,57,45', 10
+    db '7,63,56,50', 10
     db '8,3,14,17', 10
     db '9,50,19,5', 10
-    db '10,22,27,29', 10
-    db '11,45,34,0', 10
-    db '12,25,30,32', 10
+    db '10,33,53,22', 10
+    db '11,16,53,56', 10
+    db '12,53,17,20', 10
     db '13,32,37,37', 10
-    db '14,36,40,40', 10
-    db '15,63,58,44', 0
+    db '14,56,55,27', 10
+    db '15,63,63,63', 0
 theme_default_size equ $ - theme_default_data
 
 theme_ubuntu_data:
@@ -273,3 +284,22 @@ theme_ocean_data:
     db '14,55,58,45', 10
     db '15,58,60,63', 0
 theme_ocean_size equ $ - theme_ocean_data
+
+theme_mono_data:
+    db '0,2,3,5', 10
+    db '1,25,24,52', 10
+    db '2,41,52,31', 10
+    db '3,12,32,32', 10
+    db '4,52,13,32', 10
+    db '5,27,28,48', 10
+    db '6,10,40,38', 10
+    db '7,63,57,45', 10
+    db '8,3,14,17', 10
+    db '9,50,19,5', 10
+    db '10,22,27,29', 10
+    db '11,45,34,0', 10
+    db '12,25,30,32', 10
+    db '13,32,37,37', 10
+    db '14,36,40,40', 10
+    db '15,63,58,44', 0
+theme_mono_size equ $ - theme_mono_data

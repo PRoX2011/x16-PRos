@@ -17,17 +17,27 @@ COLOR_YELLOW         equ 0x0E
 CHAR_LF              equ 0x0A
 CHAR_CR              equ 0x0D
 
-KERNEL_DATA_SEG      equ 0x2000
 DOS_INT20_VECTOR     equ 0x20
 
 COM_EXIT_OPCODE      equ 0xCD
 COM_STACK_TOP        equ 0xFFFE
 COM_ENTRY_OFFSET     equ 0x0100
 
-disk_buffer          equ 0x6000
-program_load_addr    equ 0x8000
-dirlist              equ 0xA800
-command_history      equ 0xD000
+KERNEL_DATA_SEG      equ 0x2000
+
+PROGRAM_LOAD_OFF     equ 0x8000
+DIRLIST_OFF          equ 0xA800
+COMMAND_HISTORY_OFF  equ 0xD000
+DISK_BUFFER_OFF      equ 0xE000
+DISK_BUFFER_SIZE     equ 0x1C00
+KERNEL_WORK_END_OFF  equ DISK_BUFFER_OFF + DISK_BUFFER_SIZE  ; 0xFC00
+
+disk_buffer          equ DISK_BUFFER_OFF
+program_load_addr    equ PROGRAM_LOAD_OFF
+dirlist              equ DIRLIST_OFF
+command_history      equ COMMAND_HISTORY_OFF
+program_seg          equ 0x2FC0
+
 
 section .text
 
@@ -42,18 +52,18 @@ start:
 
     call set_video_mode        ; Set video mode
     call init_system           ; Init system (segments, timer, api, configs, display, security, start autoexec)
-    call load_and_apply_theme  ; Load and aply theme from THEME.CFG file
     call fs_list_drives        ; List drives
     call load_timezone_cfg     ; It is necessary after completion of SETUP.BIN so that the time zone is updated to the user one
+    call load_and_apply_theme  ; Load and aply theme from THEME.CFG file
     call shell                 ; Start PRos terminal
 
     jmp $
 
 
 set_video_mode:
-    ; VGA 640*480, 16 colors
     mov ax, 0x12
     int 0x10
+    call font_reinstall
     ret
 
 ; ===================== String Output Functions =====================
@@ -260,7 +270,10 @@ print_help:
     mov di, temp_saved_dir
     mov si, current_directory
     call string_string_copy
+    mov ax, [current_dir_cluster]
+    mov [temp_saved_cluster], ax
     mov byte [current_directory], 0
+    mov word [current_dir_cluster], 0
 
     mov ax, bin_dir_name
     call fs_change_directory
@@ -294,6 +307,7 @@ print_help:
 
     call fs_reset_floppy
     call EnableMouse
+    call font_reinstall
     call load_and_apply_theme
 
     popa
@@ -303,6 +317,8 @@ print_help:
     mov di, current_directory
     mov si, temp_saved_dir
     call string_string_copy
+    mov ax, [temp_saved_cluster]
+    mov [current_dir_cluster], ax
 
 .use_builtin_help:
     popa
@@ -341,8 +357,14 @@ get_cmd:
     mov cx, 32
     rep stosb
 
+    mov ax, dirlist
+    call fs_get_file_list
+    mov byte [autocomplete_enabled], 1
+
     mov ax, input
     call string_input_string
+
+    mov byte [autocomplete_enabled], 0
     call print_newline
     cmp byte [input], 0
     je .save_input_to_history_skip
@@ -611,6 +633,7 @@ get_cmd:
     ; If not found, try /BIN.DIR on current drive first
     call save_current_dir
     mov byte [current_directory], 0
+    mov word [current_dir_cluster], 0
 
     mov ax, bin_dir_name
     call fs_change_directory
@@ -655,8 +678,9 @@ get_cmd:
 
 .load_com_program:
     mov ax, command
-    mov dx, program_seg
-    call fs_load_com
+    mov cx, 0x0100
+    mov dx, [program_seg_runtime]
+    call fs_load_huge_file
     jc .try_bin_dir_com
 
     jmp execute_com
@@ -664,14 +688,16 @@ get_cmd:
 .try_bin_dir_com:
     call save_current_dir
     mov byte [current_directory], 0
+    mov word [current_dir_cluster], 0
 
     mov ax, bin_dir_name
     call fs_change_directory
     jc .restore_and_try_a_com
 
     mov ax, command
-    mov dx, program_seg
-    call fs_load_com
+    mov cx, 0x0100
+    mov dx, [program_seg_runtime]
+    call fs_load_huge_file
     jc .restore_and_try_a_com
 
     call restore_current_dir
@@ -692,8 +718,9 @@ get_cmd:
     jc .restore_and_fail_a_com
 
     mov ax, command
-    mov dx, program_seg
-    call fs_load_com
+    mov cx, 0x0100
+    mov dx, [program_seg_runtime]
+    call fs_load_huge_file
     jc .restore_and_fail_a_com
 
     call restore_current_dir
@@ -712,7 +739,17 @@ execute_bin:
     mov bx, 0
     mov cx, 0
     mov dx, 0
-    mov word si, [param_list]
+
+    mov ax, [param_list]
+    cmp ax, 0
+    je .no_params
+    mov si, ax
+    jmp .continue
+
+.no_params:
+    xor si, si
+
+.continue:
     mov di, 0
 
     ; Save kernel stack in case BIN modifies SS:SP.
@@ -734,6 +771,7 @@ execute_bin:
 
     call fs_reset_floppy
     call EnableMouse
+    call font_reinstall
     call load_and_apply_theme
 
     jmp get_cmd
@@ -748,7 +786,7 @@ execute_com:
     call api_dos_init
 
     ; Setup COM program environment
-    mov ax, program_seg
+    mov ax, [program_seg_runtime]
     mov ds, ax
     mov es, ax
 
@@ -765,10 +803,11 @@ execute_com:
 
     push word 0x0000
 
-    ; Jump to COM program entry point (COM_ENTRY_OFFSET)
-    push word program_seg    ; CS
+    ; Jump to COM program entry point (COM_ENTRY_OFFSET).
+    ; DS already points to COM segment, so use DS directly as CS.
+    push ds                    ; CS
     push word COM_ENTRY_OFFSET ; IP
-    retf                     ; Jump
+    retf                       ; Jump
 
 .com_return:
     jmp int20_handler
@@ -1949,56 +1988,133 @@ cd_command:
     cmp ax, 0
     je .show_current
 
+    ; Check for ".."
     mov si, ax
     mov di, .dotdot_str
     call string_string_compare
     jc .go_parent
 
+    ; Check for "/" or "\" (go to root)
     mov si, ax
     cmp byte [si], '/'
     je .go_root
     cmp byte [si], '\'
     je .go_root
 
+    ; Copy full path to work buffer
     mov si, ax
-    mov di, .dirname_buffer
+    mov di, .path_buffer
     call string_string_copy
 
-    mov si, .dirname_buffer
-    mov cx, 0
-.check_dot:
+    ; Save state for rollback on failure
+    mov ax, [current_dir_cluster]
+    mov [.saved_cluster], ax
+    mov si, current_directory
+    mov di, .saved_dir
+    call string_string_copy
+
+    ; Process path components separated by '/'
+    mov si, .path_buffer
+
+.next_path_component:
+    cmp byte [si], 0
+    je .cd_path_done
+
+    ; Extract next component up to '/' or end
+    mov di, .comp_buffer
+    xor cx, cx
+
+.copy_comp:
+    lodsb
+    cmp al, '/'
+    je .comp_sep
+    cmp al, '\'
+    je .comp_sep
+    cmp al, 0
+    je .comp_end
+    stosb
+    inc cx
+    jmp .copy_comp
+
+.comp_sep:
+    mov byte [di], 0
+    jmp .process_comp
+
+.comp_end:
+    mov byte [di], 0
+    dec si                  ; point back at null for loop exit
+
+.process_comp:
+    push si                 ; save remaining path position
+
+    ; Skip empty components (e.g., "//")
+    cmp cx, 0
+    je .skip_empty_comp
+
+    ; Check for ".." component
+    cmp word [.comp_buffer], '..'
+    jne .not_dotdot_comp
+    cmp byte [.comp_buffer + 2], 0
+    jne .not_dotdot_comp
+    call fs_parent_directory
+    jc .cd_rollback
+    jmp .skip_empty_comp
+
+.not_dotdot_comp:
+    ; Auto-append .DIR if no extension
+    mov si, .comp_buffer
+    xor bx, bx
+.check_comp_dot:
     lodsb
     cmp al, 0
-    je .no_extension
+    je .comp_check_dot_done
     cmp al, '.'
-    je .has_extension
-    inc cx
-    jmp .check_dot
+    je .comp_has_dot
+    jmp .check_comp_dot
+.comp_has_dot:
+    mov bx, 1
+.comp_check_dot_done:
+    cmp bx, 0
+    jne .comp_has_ext
 
-.no_extension:
-    mov si, .dirname_buffer
-    add si, cx
+    ; Append .DIR
+    mov si, .comp_buffer
+    mov ax, si
+    call string_string_length
+    mov si, .comp_buffer
+    add si, ax
     mov byte [si], '.'
-    inc si
-    mov byte [si], 'D'
-    inc si
-    mov byte [si], 'I'
-    inc si
-    mov byte [si], 'R'
-    inc si
-    mov byte [si], 0
+    mov byte [si+1], 'D'
+    mov byte [si+2], 'I'
+    mov byte [si+3], 'R'
+    mov byte [si+4], 0
 
-.has_extension:
-    mov ax, .dirname_buffer
+.comp_has_ext:
+    mov ax, .comp_buffer
     call fs_change_directory
-    jc .failure
+    jc .cd_rollback
 
+.skip_empty_comp:
+    pop si
+    jmp .next_path_component
+
+.cd_path_done:
     mov si, .success_msg
     call print_string_green
     call print_newline
     popa
     call print_newline
     jmp get_cmd
+
+.cd_rollback:
+    pop si                  ; clean remaining path from stack
+    ; Restore original state
+    mov ax, [.saved_cluster]
+    mov [current_dir_cluster], ax
+    mov si, .saved_dir
+    mov di, current_directory
+    call string_string_copy
+    jmp .failure
 
 .show_current:
     mov si, .current_msg
@@ -2011,6 +2127,7 @@ cd_command:
     jmp .show_done
 
 .show_path:
+    call print_drive_prefix
     mov si, current_directory
     call print_string_cyan
 
@@ -2040,8 +2157,8 @@ cd_command:
     jmp get_cmd
 
 .go_root:
-    mov di, current_directory
-    mov byte [di], 0
+    mov byte [current_directory], 0
+    mov word [current_dir_cluster], 0
 
     mov si, .success_msg
     call print_string_green
@@ -2059,7 +2176,10 @@ cd_command:
     jmp get_cmd
 
 .dotdot_str         db '..', 0
-.dirname_buffer     times 16 db 0
+.comp_buffer        times 16 db 0
+.path_buffer        times 256 db 0
+.saved_dir          times 256 db 0
+.saved_cluster      dw 0
 .current_msg        db 'Current directory: ', 0
 .success_msg        db 'Directory changed', 0
 .already_root_msg   db 'Already in root directory', 0
@@ -2075,6 +2195,7 @@ cd_command:
 %INCLUDE "src/kernel/features/themes.asm"           ; Themes
 %INCLUDE "src/kernel/features/encrypt.asm"          ; Encryption
 %INCLUDE "src/kernel/features/com/com.asm"          ; COM
+%INCLUDE "src/kernel/features/cp866.asm"            ; .FNT font loading
 
 ; ====== DRIVERS ======
 %INCLUDE "src/drivers/ps2_mouse.asm"                ; Mouse driver
@@ -2088,7 +2209,7 @@ cd_command:
 ; ===================== Data Section =====================
 section .data
 ; ------ Header ------
-header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v0.7', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
+header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v0.8', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
 
 ; ------ Help ------
 kshell_comands db 'HELP               - get list of commands', 10, 13
@@ -2120,15 +2241,14 @@ info db 10, 13
      db '  x16 PRos is the simple 16 bit operating', 10, 13
      db '  system written in NASM for x86 PC`s ', 10, 13
      db 47 dup(0xC4), 10, 13
-     db '  Author: PRoX (https://github.com/PRoX2011)', 10, 13
-     db '  Disk size: 1.44 MB', 10, 13
-     db '  Video mode: 0x12 (640x480; 16 colors)', 10, 13
-     db '  File system: FAT12', 10, 13
-     db '  License: MIT', 10, 13
-     db '  OS version: 0.7.0', 10, 13
+     db '  Author:           PRoX   (https://github.com/PRoX2011)', 10, 13
+     db '  Support project:  DALink (https://dalink.to/PRoXdev)', 10, 13
+     db '  Source code:      GitHub (https://github.com/PRoX2011/x16-PRos)', 10, 13
+     db '  License:          MIT', 10, 13
+     db '  OS version:       0.8', 10, 13
      db 0
 
-version_msg db 'PRos Terminal v0.2', 10, 13, 0
+version_msg db 'PRos Terminal v0.3', 10, 13, 0
 
 ; ------ Commands ------
 exit_string    db 'EXIT', 0
@@ -2153,6 +2273,15 @@ view_string    db 'VIEW', 0
 mkdir_string   db 'MKDIR', 0
 deldir_string  db 'DELDIR', 0
 cd_string      db 'CD', 0
+
+autocomplete_cmd_table:
+    dw exit_string, help_string, info_string, cls_string
+    dw dir_string, cd_string, ver_string, time_string, date_string
+    dw cat_string, del_string, copy_string, ren_string
+    dw size_string, shut_string, reboot_string, cpu_string
+    dw touch_string, write_string, view_string, mkdir_string
+    dw deldir_string
+    dw 0
 
 ; ------ Errors ------
 invalid_msg       db 'No such command or program', 0
@@ -2216,28 +2345,27 @@ shut_melody:
     dw 4186, 300
     dw 0, 0
 
-file_size       dw 0
-param_list      dw 0
+file_size            dw 0
+param_list           dw 0
 
-x_offset dw 0
-y_offset dw 0
+x_offset             dw 0
+y_offset             dw 0
 
-bin_extension   db '.BIN', 0
-com_extension   db '.COM', 0
+bin_extension        db '.BIN', 0
+com_extension        db '.COM', 0
 
-total_file_size dd 0
-file_count      dw 0
+total_file_size      dd 0
+file_count           dw 0
 
-timezone_offset dw 0
+timezone_offset      dw 0
 
-com_stack_save  dw 0
-com_ss_save     dw 0
-bin_stack_save  dw 0
-bin_ss_save     dw 0
+com_stack_save       dw 0
+com_ss_save          dw 0
+bin_stack_save       dw 0
+bin_ss_save          dw 0
+program_seg_runtime  dw program_seg
 
-program_seg    equ 0x3000
-
-first_boot_value         db '1', 0
+first_boot_value     db '1', 0
 
 kernel_file          db 'KERNEL.BIN', 0
 setup_bin_file       db 'SETUP.BIN', 0
@@ -2261,37 +2389,47 @@ cfg_logo_stretch     db 0  ; 1 = Stretch, 0 = Centered
 bin_dir_name         db 'BIN.DIR', 0
 conf_dir_name        db 'CONF.DIR', 0
 
-current_drive_char db 'A'
+current_drive_char   db 'A'
 
 login_password_prompt  db 19 dup(' '), 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                        db 19 dup(' '), 0xBA, '        Enter your password:           ', 0xBA, 10, 13
                        db 19 dup(' '), 0xBA, '    _______________________________    ', 0xBA, 10, 13
                        db 19 dup(' '), 0xC0, 39 dup(0xCD), 0xBC, 10, 13, 0
 
-mt                  db '', 10, 13, 0
-Sides               dw 2
-SecsPerTrack        dw 18
-bootdev             db 0
-current_disk        db 0 
-fmt_date            dw 1
-command_history_top db 0
+mt                   db '', 10, 13, 0
+Sides                dw 2
+SecsPerTrack         dw 18
+bootdev              db 0
+current_disk         db 0 
+fmt_date             dw 1
+command_history_top  db 0
 
-saved_disk          db 0
-saved_drive_char    db 0
+saved_disk           db 0
+saved_drive_char     db 0
+autocomplete_enabled db 0
+current_dir_cluster  dw 0
+saved_dir_cluster    dw 0
 
 section .bss
 ; ------ Buffers ------
-current_logo_file resb 13
-tmp_string        resb 15
-command           resb 32
-user              resb 32
-password          resb 32
-decrypted_pass    resb 32
-timezone          resb 32
-saved_directory   resb 32
-final_prompt      resb 64
-temp_prompt       resb 64
-save_dir_buffer   resb 128 
-input             resb 256
-current_directory resb 256
-temp_saved_dir    resb 256
+current_logo_file  resb 13
+tmp_string         resb 15
+command            resb 32
+user               resb 32
+password           resb 32
+decrypted_pass     resb 32
+timezone           resb 32
+saved_directory    resb 32
+final_prompt       resb 64
+temp_prompt        resb 64
+save_dir_buffer    resb 256
+input              resb 256
+current_directory  resb 256
+temp_saved_dir     resb 256
+temp_saved_cluster resw 1
+first_boot_buf     resb 8
+
+cp866_font_buf resb 4096
+
+kernel_end:
+; kernel_end MUST stay below PROGRAM_LOAD_OFF (0x8000 = 32 KiB).

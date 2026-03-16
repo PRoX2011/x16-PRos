@@ -25,6 +25,8 @@ section .text
 
 FILE_BUFFER      equ 0xE000
 FILE_BUFFER_SIZE equ 16384
+SAVE_BUFFER      equ 0xA800
+SAVE_BUFFER_MAX  equ 0x3800
 DIRTY_MAP        equ 0xB800
 
 LINES_PER_PAGE   equ 24
@@ -844,12 +846,18 @@ save_handler:
     pusha
     cmp word [file_size], 0
     je .done
+    call copy_to_save_buf
     mov si, filename
-    mov bx, FILE_BUFFER
+    mov bx, SAVE_BUFFER
     mov cx, [file_size]
+    cmp cx, SAVE_BUFFER_MAX
+    jbe .sz_ok
+    mov cx, SAVE_BUFFER_MAX
+.sz_ok:
     mov ah, 0x03
     int 0x22
     jc .fail
+    call copy_from_save_buf
     mov byte [modified], 0
     call clear_dirty
     mov si, .ok
@@ -857,6 +865,7 @@ save_handler:
     call copy_str
     jmp .done
 .fail:
+    call copy_from_save_buf
     mov si, .err
     mov di, status_msg
     call copy_str
@@ -972,9 +981,14 @@ exit_handler:
     cmp ax, 0
     jne do_exit
 
+    call copy_to_save_buf
     mov si, filename
-    mov bx, FILE_BUFFER
+    mov bx, SAVE_BUFFER
     mov cx, [file_size]
+    cmp cx, SAVE_BUFFER_MAX
+    jbe .esz_ok
+    mov cx, SAVE_BUFFER_MAX
+.esz_ok:
     mov ah, 0x03
     int 0x22
 
@@ -1310,6 +1324,42 @@ copy_str:
     stosb
     cmp al, 0
     jne .lp
+    popa
+    ret
+
+copy_to_save_buf:
+    pusha
+    push es
+    push cs
+    pop es
+    mov si, FILE_BUFFER
+    mov di, SAVE_BUFFER
+    mov cx, [file_size]
+    cmp cx, SAVE_BUFFER_MAX
+    jbe .ok
+    mov cx, SAVE_BUFFER_MAX
+.ok:
+    cld
+    rep movsb
+    pop es
+    popa
+    ret
+
+copy_from_save_buf:
+    pusha
+    push es
+    push cs
+    pop es
+    mov si, SAVE_BUFFER
+    mov di, FILE_BUFFER
+    mov cx, [file_size]
+    cmp cx, SAVE_BUFFER_MAX
+    jbe .ok
+    mov cx, SAVE_BUFFER_MAX
+.ok:
+    cld
+    rep movsb
+    pop es
     popa
     ret
 

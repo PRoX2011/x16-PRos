@@ -120,6 +120,14 @@ ReadSectors:
     pop bx
     pop ax
     add bx, WORD [bpbBytesPerSector]
+    jnc .NEXT
+    mov dx, es
+    cmp dx, 0x2000
+    jne .WRAP_FAIL
+    jmp FAILURE
+.WRAP_FAIL:
+    int 0x18
+.NEXT:
     inc ax
     loop .MAIN
     ret
@@ -224,6 +232,7 @@ DONE:
 FAILURE:
     mov si, msgFailure
     call Print
+REBOOT:
     mov ah, 0x00
     int 0x16
     int 0x19

@@ -13,8 +13,8 @@ ROLE_OFFSET  equ 22
 START_ROW    equ 5
 
 start:
-    mov ax, 0x12
-    int 0x10
+    mov ah, 0x06
+    int 0x21
 
     mov dh, 0
     mov dl, 0

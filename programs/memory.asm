@@ -15,8 +15,8 @@ start:
     jmp main_loop
 
 clear_screen:
-    mov ax, 0x12
-    int 0x10
+    mov ah, 0x06
+    int 0x21
     ret
 
 draw_interface:
