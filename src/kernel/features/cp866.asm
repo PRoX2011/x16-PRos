@@ -4,6 +4,7 @@
 ;
 ; Loads 8x16 bitmap fonts (4096 bytes, 256 chars) from FONTS.DIR/.
 ; Hooks INT 43h so BIOS TTY and programs pick up the custom font.
+; Font data lives at FONT_SEG:0000 (physical 0x10000)
 ;
 ; https://wikipedia.org/wiki/CP866
 ; ==================================================================
@@ -89,7 +90,7 @@ font_load_from_cfg:
     jmp font_load_default
 
 ; ========================================================================
-; FONT_LOAD_DEFAULT - Load FONTS.DIR/DEFAULT.FNT into cp866_font_buf
+; FONT_LOAD_DEFAULT - Load FONTS.DIR/DEFAULT.FNT into FONT_SEG
 ; OUT : CF = 0 success, CF = 1 file missing / error
 ; ========================================================================
 font_load_default:
@@ -124,12 +125,17 @@ font_load_core:
     call fs_change_directory
     jc .fail
 
+    ; Load .FNT file into FONT_SEG:0000 via fs_load_huge_file
     mov ax, [fnt_load_name]
-    mov cx, cp866_font_buf
-    call fs_load_file
+    mov cx, 0
+    mov dx, FONT_SEG
+    call fs_load_huge_file
     jc .fail
 
-    cmp bx, 4096
+    ; Verify size: DX:AX = file size, expect exactly 4096
+    cmp dx, 0
+    jne .fail
+    cmp ax, 4096
     jne .fail
 
     call font_install_from_buf
@@ -150,7 +156,7 @@ font_load_core:
     ret
 
 ; ========================================================================
-; FONT_INSTALL_FROM_BUF - Hook INT 43h to point at cp866_font_buf
+; FONT_INSTALL_FROM_BUF - Hook INT 43h to point at FONT_SEG:0000
 ; ========================================================================
 font_install_from_buf:
     push es
@@ -159,8 +165,8 @@ font_install_from_buf:
     cli
     xor ax, ax
     mov es, ax
-    mov word [es:0x43*4],   cp866_font_buf
-    mov word [es:0x43*4+2], KERNEL_DATA_SEG
+    mov word [es:0x43*4],   0x0000
+    mov word [es:0x43*4+2], FONT_SEG
     sti
 
     mov byte [font_loaded], 1

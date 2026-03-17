@@ -123,4 +123,13 @@ and memory layout. Hope you love it :)
 
 =======================================================================================
 
+12. New emulated DOS calls (INT 0x21)
+1) 0x0F: Open file using FCB
+2) 0x10: Close file using FCB
+3) 0x13: Delete file using FCB
+4) 0x16: Create file using FCB
+5) 0x17: Rename file using FCB
+
+=======================================================================================
+
 Copyright (C) 2024-2026 PRoX2011

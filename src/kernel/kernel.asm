@@ -24,6 +24,7 @@ COM_STACK_TOP        equ 0xFFFE
 COM_ENTRY_OFFSET     equ 0x0100
 
 KERNEL_DATA_SEG      equ 0x2000
+FONT_SEG             equ 0x1000
 
 PROGRAM_LOAD_OFF     equ 0x8000
 DIRLIST_OFF          equ 0xA800
@@ -2428,8 +2429,6 @@ current_directory  resb 256
 temp_saved_dir     resb 256
 temp_saved_cluster resw 1
 first_boot_buf     resb 8
-
-cp866_font_buf resb 4096
 
 kernel_end:
 ; kernel_end MUST stay below PROGRAM_LOAD_OFF (0x8000 = 32 KiB).

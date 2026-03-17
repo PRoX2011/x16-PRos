@@ -1,7 +1,7 @@
 com_04h:
+    mov al, dl
     xor dx, dx
     mov ah, 01h
-    mov al, dl
     int 14h
 
     test ah, 80h

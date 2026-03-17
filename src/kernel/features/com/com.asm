@@ -23,15 +23,15 @@
 ;  [DONE] Function 0Ch: Clear keyboard buffer and read input
 ;  [DONE] Function 0Dh: Disk reset / flush buffers
 ;  [DONE] Function 0Eh: Select default drive
-;  Function 0Fh: Open file using FCB
-;  Function 10h: Close file using FCB
+;  [DONE] Function 0Fh: Open file using FCB
+;  [DONE] Function 10h: Close file using FCB
 ;  Function 11h: Search for first matching file using FCB
 ;  Function 12h: Search for next matching file using FCB
-;  Function 13h: Delete file using FCB
+;  [DONE] Function 13h: Delete file using FCB
 ;  Function 14h: Sequential read using FCB
 ;  Function 15h: Sequential write using FCB
-;  Function 16h: Create file using FCB
-;  Function 17h: Rename file using FCB
+;  [DONE] Function 16h: Create file using FCB
+;  [DONE] Function 17h: Rename file using FCB
 ;  Function 18h: [RESERVED]
 ;  [DONE] Function 19h: Get current default drive
 ;  [DONE] Function 1Ah: Set DTA (Disk Transfer Area) address
@@ -225,6 +225,16 @@ int21_dos_handler:
     je com_0Dh
     cmp ah, 0x0E
     je com_0Eh
+    cmp ah, 0x0F
+    je com_0Fh
+    cmp ah, 0x10
+    je com_10h
+    cmp ah, 0x13
+    je com_13h
+    cmp ah, 0x16
+    je com_16h
+    cmp ah, 0x17
+    je com_17h
     cmp ah, 0x19
     je com_19h
     cmp ah, 0x1A
@@ -268,6 +278,7 @@ last_return_code      db 0
 last_return_type      db 0
 com_tmp_drive         db 0
 com_path_buffer       times 128 db 0
+com_path_buffer2       times 128 db 0
 
 ; Copy ASCIIZ from caller DS:DX to kernel com_path_buffer.
 ; Truncates to 127 chars and always null-terminates.
@@ -331,6 +342,40 @@ bcd_to_bin:
 
     ret
 
+; bcd_to_bin_date: convert BCD date from INT 1Ah AH=04h to binary
+; IN:  CL=year(BCD), DH=month(BCD), DL=day(BCD)
+; OUT: CL=year(bin), DH=month(bin), DL=day(bin)
+bcd_to_bin_date:
+    push ax
+    mov al, cl
+    call bcd_to_bin
+    mov cl, al
+    mov al, dh
+    call bcd_to_bin
+    mov dh, al
+    mov al, dl
+    call bcd_to_bin
+    mov dl, al
+    pop ax
+    ret
+
+; bcd_to_bin_time: convert BCD time from INT 1Ah AH=02h to binary
+; IN:  CH=hours(BCD), CL=minutes(BCD), DH=seconds(BCD)
+; OUT: CH=hours(bin), CL=minutes(bin), DH=seconds(bin)
+bcd_to_bin_time:
+    push ax
+    mov al, ch
+    call bcd_to_bin
+    mov ch, al
+    mov al, cl
+    call bcd_to_bin
+    mov cl, al
+    mov al, dh
+    call bcd_to_bin
+    mov dh, al
+    pop ax
+    ret
+
 %include "src/kernel/features/com/00h.asm"
 %include "src/kernel/features/com/01h.asm"
 %include "src/kernel/features/com/02h.asm"
@@ -346,6 +391,14 @@ bcd_to_bin:
 %include "src/kernel/features/com/0Ch.asm"
 %include "src/kernel/features/com/0Dh.asm"
 %include "src/kernel/features/com/0Eh.asm"
+
+%include "src/kernel/features/com/0Fh.asm"
+%include "src/kernel/features/com/10h.asm"
+%include "src/kernel/features/com/13h.asm"
+%include "src/kernel/features/com/16h.asm"
+%include "src/kernel/features/com/17h.asm"
+%include "src/kernel/features/com/fcb.inc"
+
 %include "src/kernel/features/com/19h.asm"
 %include "src/kernel/features/com/1Ah.asm"
 %include "src/kernel/features/com/25h.asm"

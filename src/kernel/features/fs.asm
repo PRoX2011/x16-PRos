@@ -58,9 +58,13 @@ fs_get_file_list:
     jnc .show_dir_init
 
     dec byte [.read_retries]
-    jz .done
+    jz .root_read_fail
     call fs_reset_floppy
     jnc .read_root_dir
+    jmp .root_read_fail
+
+.root_read_fail:
+    popa
     jmp .done
 
 .show_dir_init:
@@ -3136,11 +3140,17 @@ fs_list_drives:
 .read_ok:
     mov bx, disk_buffer
 
+    ; Validate BPB: spc and total_sectors must be nonzero
+    cmp byte [bx + 13], 0
+    je .read_failed_mid
+
     mov ax, [bx + 19]
     cmp ax, 0
     jne .got_total
     mov ax, [bx + 32]
 .got_total:
+    cmp ax, 0
+    je .read_failed_mid
     mov [.total_sectors], ax
 
     mov al, [bx + 13]
@@ -3375,6 +3385,7 @@ fs_change_drive_letter:
     mov byte [current_directory], 0
     mov word [current_dir_cluster], 0
 
+    call fs_reset_floppy
     call fs_update_geometry
 
     popa

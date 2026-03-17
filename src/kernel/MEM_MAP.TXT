@@ -25,6 +25,16 @@ physical address = segment * 16 + offset
 
 
 ================================================================
+  Segment 1000h  (font buffer)    FONT_SEG = 0x1000
+================================================================
+
+  Physical: 0x10000 - 0x10FFF (4 KiB)
+  Holds the active 8x16 cp866 font (256 chars * 16 bytes).
+  INT 43h vector points here when a custom font is loaded.
+  Located outside the kernel segment to avoid BSS overflow.
+
+
+================================================================
   Segment 2000h  (kernel)         KERNEL_DATA_SEG = 0x2000
 ================================================================
 
@@ -34,7 +44,6 @@ physical address = segment * 16 + offset
   Offset range           Size    Name / Description
   ---------------------------------------------------------------
   0000 - kernel_end-1    ~27 KiB    Kernel image (.text / .data / .bss)
-                                    includes cp866_font_buf (4 KiB BSS)
   8000 - A7FF            10 KiB     program_load_addr
   A800 - CFFF            10 KiB     dirlist
   D000 - DFFF             4 KiB     command_history

@@ -7,8 +7,8 @@ com_35h:
     xor bh, bh
     shl bx, 1
     shl bx, 1
-    mov bx, word [ds:bx]
     mov es, word [ds:bx+2]
+    mov bx, word [ds:bx]
     pop ax
     pop ds
     iret
