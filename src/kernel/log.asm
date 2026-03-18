@@ -74,7 +74,7 @@ log_write_to_file:
 
     mov di, log_buf
     mov ax, [log_buf_used]
-    cmp ax, 0
+    test ax, ax
     jne .buf_ready
 
     mov ax, log_filename

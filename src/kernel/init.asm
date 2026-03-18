@@ -137,12 +137,12 @@ run_setup_wizard:
 
     call log_okay
 
-    mov ax, 0
-    mov bx, 0
-    mov cx, 0
-    mov dx, 0
+    xor ax, ax
+    xor bx, bx
+    xor cx, cx
+    xor dx, dx
     mov word si, [param_list]
-    mov di, 0
+    xor di, di
     call program_load_addr
 
     ; BIN programs may leave data segments changed.
@@ -261,7 +261,7 @@ decrypt_and_verify_password:
 
     cmp byte [decrypted_pass], 0
     je .no_password_set
-    cmp bx, 0
+    test bx, bx
     je .no_password_set
 
     mov si, password_check_msg
@@ -370,17 +370,17 @@ execute_autoexec_if_exists:
     call print_newline
 
     mov ax, autoexec_file
-    mov bx, 0
+    xor bx, bx
     mov cx, program_load_addr
     call fs_load_file
     jc .skip
 
-    mov ax, 0
-    mov bx, 0
-    mov cx, 0
-    mov dx, 0
+    xor ax, ax
+    xor bx, bx
+    xor cx, cx
+    xor dx, dx
     mov word si, [param_list]
-    mov di, 0
+    xor di, di
 
     call DisableMouse
     call program_load_addr
@@ -751,7 +751,7 @@ load_logo_and_display:
     jc .error_loading
 
     pop ax
-    mov cx, 0
+    xor cx, cx
     mov dx, BMP_LOAD_SEG
     call fs_load_huge_file
 
@@ -764,7 +764,7 @@ load_logo_and_display:
 
 .no_path:
     mov ax, current_logo_file
-    mov cx, 0
+    xor cx, cx
     mov dx, BMP_LOAD_SEG
     call fs_load_huge_file
     jnc .display_logo
@@ -838,7 +838,7 @@ load_first_boot_cfg:
 load_setup_bin:
     pusha
     mov ax, setup_bin_file
-    mov bx, 0
+    xor bx, bx
     mov cx, program_load_addr
     call fs_load_file
     jnc .done

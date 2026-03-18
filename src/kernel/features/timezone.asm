@@ -123,7 +123,7 @@ timezone_parse_offset:
     jbe .digit_loop
 
 .after_digits:
-    cmp cx, 0
+    test cx, cx
     je .parse_fail
 
 .skip_trailing:
@@ -388,21 +388,21 @@ timezone_apply_day_delta:
     xor dx, dx
     mov bx, 4
     div bx
-    cmp dx, 0
+    test dx, dx
     jne .not_leap
 
     mov ax, [timezone_tmp_year]
     xor dx, dx
     mov bx, 100
     div bx
-    cmp dx, 0
+    test dx, dx
     jne .leap
 
     mov ax, [timezone_tmp_year]
     xor dx, dx
     mov bx, 400
     div bx
-    cmp dx, 0
+    test dx, dx
     jne .not_leap
 
 .leap:

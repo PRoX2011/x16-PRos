@@ -11,7 +11,7 @@
 string_string_length:
     pusha
     mov bx, ax
-    mov cx, 0
+    xor cx, cx
 
 .more:
     cmp byte [bx], 0
@@ -86,7 +86,7 @@ string_string_chomp:
     pusha
     mov dx, ax
     mov di, ax
-    mov cx, 0
+    xor cx, cx
 
 .keepcounting:
     cmp byte [di], ' '
@@ -96,7 +96,7 @@ string_string_chomp:
     jmp .keepcounting
 
 .counted:
-    cmp cx, 0
+    test cx, cx
     je .finished_copy
     mov si, di
     mov di, dx
@@ -113,7 +113,7 @@ string_string_chomp:
 .finished_copy:
     mov ax, dx
     call string_string_length
-    cmp ax, 0
+    test ax, ax
     je .done
     mov si, dx
     add si, ax
@@ -220,7 +220,7 @@ string_string_tokenize:
     ret
 
 .no_more:
-    mov di, 0
+    xor di, di
     pop si
     ret
 
@@ -234,7 +234,7 @@ string_input_string:
     pusha
     mov [.start_input_buf_addr], ax
     mov di, ax
-    mov cx, 0
+    xor cx, cx
     mov word [.ac_sug_len], 0
 
     call string_get_cursor_pos
@@ -292,7 +292,7 @@ string_input_string:
     
     mov bl, 0x1F
 .handle_history_scroll_up_clear_loop:
-    cmp cx, 0
+    test cx, cx
     je .handle_history_scroll_up_loop
     mov al, 0x08
     call print_char
@@ -332,7 +332,7 @@ string_input_string:
     
     mov bl, 0x1F
 .handle_history_scroll_down_clear_loop:
-    cmp cx, 0
+    test cx, cx
     je .handle_history_scroll_down_loop
     mov al, 0x08
     call print_char
@@ -365,7 +365,7 @@ string_input_string:
 
     mov bl, 0x1F
 .handle_history_scroll_down_clear_loop_exit:
-    cmp cx, 0
+    test cx, cx
     je .handle_history_scroll_down_clear_loop_done
     mov al, 0x08
     call print_char
@@ -380,7 +380,7 @@ string_input_string:
     jmp .read_loop
 
 .handle_backspace:
-    cmp cx, 0
+    test cx, cx
     je .read_loop
 
     dec di
@@ -400,11 +400,11 @@ string_input_string:
 
 .handle_ctrl_backspace:
     mov byte [.handle_ctrl_backspace_deleting_counter], 0
-    cmp cx, 0
+    test cx, cx
     je .read_loop
 
 .handle_ctrl_backspace_loop:
-    cmp cx, 0
+    test cx, cx
     je .read_loop
     
     mov al, [di - 1]
@@ -627,7 +627,7 @@ string_input_string:
     push cx
     push dx
     mov cx, [.ac_sug_len]
-    cmp cx, 0
+    test cx, cx
     je .ac_clear_done
     call string_get_cursor_pos
     push dx
@@ -658,7 +658,7 @@ string_input_string:
 
     cmp byte [autocomplete_enabled], 0
     je .ac_update_ret
-    cmp cx, 0
+    test cx, cx
     je .ac_update_no_match
 
     mov byte [di], 0
@@ -677,7 +677,7 @@ string_input_string:
     inc si
     jmp .ac_scan_space
 .ac_scan_done:
-    cmp bx, 0
+    test bx, bx
     je .ac_try_cmd
     mov si, bx
     jmp .ac_do_file
@@ -698,7 +698,7 @@ string_input_string:
 
 .ac_show_match:
     mov [.ac_match_ptr], ax
-    cmp bx, 0
+    test bx, bx
     je .ac_prefix_full
     mov si, bx
     jmp .ac_calc_prefix
@@ -759,7 +759,7 @@ string_input_string:
     mov bx, autocomplete_cmd_table
 .ac_cmd_loop:
     mov di, [bx]
-    cmp di, 0
+    test di, di
     je .ac_cmd_fail
     mov si, [.ac_search_ptr]
     call .ac_prefix_cmp
@@ -1069,7 +1069,7 @@ string_get_date_string:
     call .add_2digits
 
 .done:
-    mov ax, 0
+    xor ax, ax
     stosw
     popa
     ret
@@ -1131,12 +1131,12 @@ string_bcd_to_int:
 ; =======================================================================
 string_int_to_string:
     pusha
-    mov cx, 0
+    xor cx, cx
     mov bx, 10
     mov di, .t
 
 .push:
-    mov dx, 0
+    xor dx, dx
     div bx
     inc cx
     push dx
@@ -1308,7 +1308,7 @@ parse_prompt:
     ret
 
 .store_char:
-    cmp cx, 0
+    test cx, cx
     je .store_full
     stosb
     dec cx

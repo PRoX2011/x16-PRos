@@ -23,7 +23,7 @@ load_and_apply_theme:
     jc .error
 
     ; Check if file is empty
-    cmp bx, 0
+    test bx, bx
     je .error
 
     ; Parse and apply theme
@@ -191,7 +191,7 @@ load_and_apply_theme:
     dec si
     mov al, bl
 
-    cmp cx, 0
+    test cx, cx
     je .parse_num_error
 
     pop cx

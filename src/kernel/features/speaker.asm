@@ -32,7 +32,7 @@ play_melody:
     pusha
 .next_note:
     mov ax, [si]
-    cmp ax, 0
+    test ax, ax
     je .done
     mov dx, [si+2]
     add si, 4

@@ -45,7 +45,7 @@ font_load_from_cfg:
     call fs_load_file
     jc .cfg_fail
 
-    cmp bx, 0
+    test bx, bx
     je .cfg_fail
 
     ; Null-terminate at file size
@@ -127,13 +127,13 @@ font_load_core:
 
     ; Load .FNT file into FONT_SEG:0000 via fs_load_huge_file
     mov ax, [fnt_load_name]
-    mov cx, 0
+    xor cx, cx
     mov dx, FONT_SEG
     call fs_load_huge_file
     jc .fail
 
     ; Verify size: DX:AX = file size, expect exactly 4096
-    cmp dx, 0
+    test dx, dx
     jne .fail
     cmp ax, 4096
     jne .fail

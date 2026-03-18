@@ -70,7 +70,7 @@ fs_get_file_list:
 .show_dir_init:
     popa
 
-    mov ax, 0
+    xor ax, ax
     mov si, disk_buffer
     jmp .process_entries
 
@@ -163,7 +163,7 @@ fs_get_file_list:
 
 .gotfilename:
     mov si, dx
-    mov cx, 0
+    xor cx, cx
 
 .loopy:
     mov byte al, [si]
@@ -317,7 +317,7 @@ fs_load_file:
     int 13h
     jc .root_problem
 
-    mov bx, 0
+    xor bx, bx
     mov cx, 16
 
 .search_entries_sub_loop:
@@ -402,7 +402,7 @@ fs_load_file:
 .found_file_to_load:
     mov ax, [di+28]
     mov word [.file_size], ax
-    cmp ax, 0
+    test ax, ax
     je .end_load
     mov ax, [di+26]
     mov word [.cluster], ax
@@ -518,7 +518,7 @@ fs_load_huge_file:
     jc .error_exit
 
     mov cx, 224
-    mov bx, 0
+    xor bx, bx
 
 .scan_root_loop:
     mov di, disk_buffer
@@ -567,7 +567,7 @@ fs_load_huge_file:
     int 13h
     jc .error_exit
 
-    mov bx, 0
+    xor bx, bx
     mov cx, 16
 
 .scan_subdir_loop:
@@ -857,7 +857,7 @@ fs_write_file:
 
     mov si, ax
     call string_string_length
-    cmp ax, 0
+    test ax, ax
     je near .failure
     mov ax, si
 
@@ -890,7 +890,7 @@ fs_write_file:
     ; Use saved filesize (CX may have been clobbered by fs_file_exists
     ; or fs_remove_file above).
     mov ax, [.filesize]
-    mov dx, 0
+    xor dx, dx
     mov bx, 512
     div bx
     cmp dx, 0
@@ -907,14 +907,14 @@ fs_write_file:
     jc near .failure
 
     mov word bx, [.filesize]
-    cmp bx, 0
+    test bx, bx
     je near .finished
 
     call fs_read_fat
     mov si, disk_buffer + 3
     mov bx, 2
     mov word cx, [.clusters_needed]
-    mov dx, 0
+    xor dx, dx
 
 .find_free_cluster:
     lodsw
@@ -938,7 +938,7 @@ fs_write_file:
     mov word [si], bx
     pop si
     dec cx
-    cmp cx, 0
+    test cx, cx
     je .finished_list
     inc dx
     inc dx
@@ -951,14 +951,14 @@ fs_write_file:
     mov word [si], bx
     pop si
     dec cx
-    cmp cx, 0
+    test cx, cx
     je .finished_list
     inc dx
     inc dx
     jmp .more_even
 
 .finished_list:
-    mov cx, 0
+    xor cx, cx
     mov word [.count], 1
 
 .chain_loop:
@@ -970,7 +970,7 @@ fs_write_file:
     add di, cx
     mov word bx, [di]
     mov ax, bx
-    mov dx, 0
+    xor dx, dx
     call fs_fat12_cluster_offset
     mov si, disk_buffer
     add si, ax
@@ -1008,7 +1008,7 @@ fs_write_file:
     add di, cx
     mov word bx, [di]
     mov ax, bx
-    mov dx, 0
+    xor dx, dx
     call fs_fat12_cluster_offset
     mov si, disk_buffer
     add si, ax
@@ -1031,12 +1031,12 @@ fs_write_file:
     call fs_write_fat
     jc .failure
 
-    mov cx, 0
+    xor cx, cx
 .save_loop:
     mov di, .free_clusters
     add di, cx
     mov word ax, [di]
-    cmp ax, 0
+    test ax, ax
     je near .write_entry
 
     pusha
@@ -1155,7 +1155,7 @@ fs_file_exists:
     call int_filename_convert
     push ax
     call string_string_length
-    cmp ax, 0
+    test ax, ax
     je .fail_ret
     pop ax
 
@@ -1484,7 +1484,7 @@ fs_remove_file:
 
 .more_clusters:
     mov word ax, [.cluster]
-    cmp ax, 0
+    test ax, ax
     je .nothing_to_do
     call fs_fat12_cluster_offset
     mov si, disk_buffer
@@ -1682,11 +1682,11 @@ int_filename_convert:
     call string_string_length
     cmp ax, 14
     jg .failure
-    cmp ax, 0
+    test ax, ax
     je .failure
     mov dx, ax
     mov di, .dest_string
-    mov cx, 0
+    xor cx, cx
 
 .copy_loop:
     lodsb
@@ -1699,7 +1699,7 @@ int_filename_convert:
     jmp .copy_loop
 
 .extension_found:
-    cmp cx, 0
+    test cx, cx
     je .failure
     cmp cx, 8
     je .do_extension
@@ -1739,7 +1739,7 @@ fs_get_root_entry:
     pusha
     mov word [.filename], ax
     mov cx, 224
-    mov ax, 0
+    xor ax, ax
 
 .to_next_root_entry:
     xchg cx, dx
@@ -1773,7 +1773,7 @@ fs_get_subdir_entry:
     pusha
     mov word [.sd_filename], ax
     mov cx, 16
-    mov ax, 0
+    xor ax, ax
 
 .to_next_sd_entry:
     xchg cx, dx
@@ -1930,7 +1930,7 @@ fs_write_root_dir:
 fs_reset_floppy:
     push ax
     push dx
-    mov ax, 0
+    xor ax, ax
     mov dl, [current_disk]
     stc
     int 13h
@@ -1942,14 +1942,14 @@ fs_convert_l2hts:
 	push bx
 	push ax
 	mov bx, ax
-	mov dx, 0
+	xor dx, dx
 	div word [SecsPerTrack]
 	add dl, 01h
 	mov cl, dl
 	mov ax, bx
-	mov dx, 0
+	xor dx, dx
 	div word [SecsPerTrack]
-	mov dx, 0
+	xor dx, dx
 	div word [Sides]
 	mov dh, dl
 	mov ch, al
@@ -2062,7 +2062,7 @@ fs_create_directory:
     mov [.cluster], bx
 
     mov ax, bx
-    mov dx, 0
+    xor dx, dx
     call fs_fat12_cluster_offset
     mov si, disk_buffer
     add si, ax
@@ -2337,17 +2337,17 @@ int_dirname_convert:
     pusha
     mov si, ax
     call string_string_length
-    cmp ax, 0
+    test ax, ax
     je .failure
 
     mov dx, ax
     mov di, .dest_string
-    mov cx, 0
+    xor cx, cx
     mov si, ax
     mov si, [esp + 14]
 
     push si
-    mov bx, 0
+    xor bx, bx
 .check_dot:
     lodsb
     cmp al, 0
@@ -2362,7 +2362,7 @@ int_dirname_convert:
 .no_dot_in_name:
     pop si
 
-    cmp bx, 0
+    test bx, bx
     jne .has_extension
 
 .copy_name_only:
@@ -2400,7 +2400,7 @@ int_dirname_convert:
 
 .has_extension:
     mov si, [esp + 14]
-    mov cx, 0
+    xor cx, cx
 
 .copy_loop:
     lodsb
@@ -2415,7 +2415,7 @@ int_dirname_convert:
     jmp .copy_loop
 
 .extension_found:
-    cmp cx, 0
+    test cx, cx
     je .failure
     cmp cx, 8
     je .do_extension
@@ -2490,7 +2490,7 @@ fs_remove_directory:
 
     mov ax, [di+26]
     mov [.cluster], ax
-    cmp ax, 0
+    test ax, ax
     je .failure
     mov [.dir_entry_pos], di
     mov byte [.rmdir_in_sub], 0
@@ -2521,7 +2521,7 @@ fs_remove_directory:
 
     mov ax, [di+26]
     mov [.cluster], ax
-    cmp ax, 0
+    test ax, ax
     je .failure
     mov [.dir_entry_pos], di
     mov byte [.rmdir_in_sub], 1
@@ -2746,7 +2746,7 @@ fs_change_directory:
     jz .failure
 
     mov ax, [di+26]
-    cmp ax, 0
+    test ax, ax
     je .failure
 
     ; Update current_dir_cluster
@@ -2835,7 +2835,7 @@ fs_parent_directory:
     jmp .pd_scan
 
 .pd_scan_done:
-    cmp bx, 0
+    test bx, bx
     je .pd_clear_all
 
     mov byte [bx], 0
@@ -3061,12 +3061,12 @@ fs_list_drives:
     call print_string
     call print_newline
 
-    mov cx, 0
+    xor cx, cx
     mov cl, [drive_count]
     mov si, drives_table
 
 .list_loop:
-    cmp cx, 0
+    test cx, cx
     je .done_list
 
     push cx
@@ -3149,7 +3149,7 @@ fs_list_drives:
     jne .got_total
     mov ax, [bx + 32]
 .got_total:
-    cmp ax, 0
+    test ax, ax
     je .read_failed_mid
     mov [.total_sectors], ax
 
@@ -3169,11 +3169,11 @@ fs_list_drives:
     mov [.root_entries], ax
 
     mov ax, [bx + 24]
-    cmp ax, 0
+    test ax, ax
     je .use_default_geom
     mov [SecsPerTrack], ax
     mov ax, [bx + 26]
-    cmp ax, 0
+    test ax, ax
     je .use_default_geom
     mov [Sides], ax
     jmp .geom_ready
@@ -3363,11 +3363,11 @@ fs_change_drive_letter:
 
 .find_drive:
     mov si, drives_table
-    mov cx, 0
+    xor cx, cx
     mov cl, [drive_count]
 
 .scan_loop:
-    cmp cx, 0
+    test cx, cx
     je .not_found
 
     cmp al, [si]
@@ -3431,12 +3431,12 @@ fs_update_geometry:
     mov bx, disk_buffer
     
     mov ax, [bx + 24]
-    cmp ax, 0
+    test ax, ax
     je .keep_default
     mov [SecsPerTrack], ax
 
     mov ax, [bx + 26]
-    cmp ax, 0
+    test ax, ax
     je .keep_default
     mov [Sides], ax
 

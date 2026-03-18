@@ -26,7 +26,7 @@ com_0Ah:
     inc bx
     jmp .input_loop
 .backspace:
-    cmp bx, 0
+    test bx, bx
     je .input_loop
     dec bx
     mov ah, 0x0E

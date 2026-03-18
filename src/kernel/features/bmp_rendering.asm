@@ -37,7 +37,7 @@ view_bmp:
     ; Parse parameters
     mov word si, [param_list]
     call string_string_parse
-    cmp ax, 0
+    test ax, ax
     jne .filename_provided
     mov si, nofilename_msg
     call print_string_red
@@ -52,7 +52,7 @@ view_bmp:
     mov word [.stretch_flag], 0
 
     ; Check first parameter
-    cmp bx, 0
+    test bx, bx
     je .check_third_param
 
     mov si, bx
@@ -76,7 +76,7 @@ view_bmp:
 
 .check_third_param:
     ; Check if there's a third parameter
-    cmp cx, 0
+    test cx, cx
     je .load_file
 
     mov si, cx
@@ -118,7 +118,7 @@ view_bmp:
     jc .not_found
 
     mov ax, [param_list]
-    mov cx, 0
+    xor cx, cx
     mov dx, BMP_LOAD_SEG
     call fs_load_huge_file
     jc .not_found
@@ -252,7 +252,7 @@ bmp_copy_row:
     ret
 
 .split_copy:
-    mov ax, 0
+    xor ax, ax
     sub ax, si
     push cx
     mov cx, ax

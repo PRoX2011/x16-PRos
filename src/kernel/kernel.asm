@@ -8,6 +8,28 @@
 [BITS 16]
 [ORG 0x0000]
 
+%macro pusha 0
+    push ax
+    push cx
+    push dx
+    push bx
+    push sp
+    push bp
+    push si
+    push di
+%endmacro
+
+%macro popa 0
+    pop di
+    pop si
+    pop bp
+    pop bx           ; discard saved SP
+    pop bx
+    pop dx
+    pop cx
+    pop ax
+%endmacro
+
 COLOR_WHITE          equ 0x0F
 COLOR_GREEN          equ 0x0A
 COLOR_CYAN           equ 0x0B
@@ -46,7 +68,7 @@ start:
     cli
 
     ; ------ Stack installation ------
-    mov ax, 0
+    xor ax, ax
     mov ss, ax
     mov sp, 0x0FFFF
     ; --------------------------------
@@ -163,10 +185,10 @@ print_string_yellow:
 ; Print decimal number
 ; IN  : AX = num location
 print_decimal:
-    mov cx, 0
-    mov dx, 0
+    xor cx, cx
+    xor dx, dx
 .setup:
-    cmp ax, 0
+    test ax, ax
     je .check_0
     mov bx, 10
     div bx
@@ -175,14 +197,14 @@ print_decimal:
     xor dx, dx
     jmp .setup
 .check_0:
-    cmp cx, 0
+    test cx, cx
     jne .print_number
     push dx
     inc cx
 .print_number:
     mov bl, COLOR_WHITE
 .print_char:
-    cmp cx, 0
+    test cx, cx
     je .return
     pop dx
     add dx, 48
@@ -285,19 +307,19 @@ print_help:
     jc .restore_and_builtin
 
     mov ax, .help_bin_file
-    mov bx, 0
+    xor bx, bx
     mov cx, program_load_addr
     call fs_load_file
     jc .restore_and_builtin
 
     call restore_current_dir
 
-    mov ax, 0
-    mov bx, 0
-    mov cx, 0
-    mov dx, 0
+    xor ax, ax
+    xor bx, bx
+    xor cx, cx
+    xor dx, dx
     mov word si, [param_list]
-    mov di, 0
+    xor di, di
 
     call DisableMouse
     call program_load_addr
@@ -378,7 +400,7 @@ get_cmd:
 .history_top_ok:
     xor cx, cx
     mov cl, [command_history_top]
-    cmp cx, 0
+    test cx, cx
     je .save_input_to_history_store_new
     cmp cx, 16
     jb .history_shift_start_ok
@@ -398,7 +420,7 @@ get_cmd:
     inc di
     cmp al, 0
     jne .shift_history_shift_char
-    cmp cx, 0
+    test cx, cx
     je .save_input_to_history_store_new
     dec cx
     jmp .shift_history_element_loop
@@ -626,7 +648,7 @@ get_cmd:
 
     ; Try to load from current directory
     mov ax, command
-    mov bx, 0
+    xor bx, bx
     mov cx, program_load_addr
     call fs_load_file
     jnc execute_bin
@@ -641,7 +663,7 @@ get_cmd:
     jc .restore_and_try_a_bin
 
     mov ax, command
-    mov bx, 0
+    xor bx, bx
     mov cx, program_load_addr
     call fs_load_file
     jc .restore_and_try_a_bin
@@ -665,7 +687,7 @@ get_cmd:
     jc .restore_and_fail_a_bin
 
     mov ax, command
-    mov bx, 0
+    xor bx, bx
     mov cx, program_load_addr
     call fs_load_file
     jc .restore_and_fail_a_bin
@@ -736,13 +758,13 @@ get_cmd:
 ; ============ Execute BIN Program ============
 
 execute_bin:
-    mov ax, 0
-    mov bx, 0
-    mov cx, 0
-    mov dx, 0
+    xor ax, ax
+    xor bx, bx
+    xor cx, cx
+    xor dx, dx
 
     mov ax, [param_list]
-    cmp ax, 0
+    test ax, ax
     je .no_params
     mov si, ax
     jmp .continue
@@ -751,7 +773,7 @@ execute_bin:
     xor si, si
 
 .continue:
-    mov di, 0
+    xor di, di
 
     ; Save kernel stack in case BIN modifies SS:SP.
     mov [bin_stack_save], sp
@@ -1284,9 +1306,9 @@ list_directory:
     push bx
     push cx
     push dx
-    mov cx, 0
+    xor cx, cx
 .sd_push_digits:
-    cmp ax, 0
+    test ax, ax
     je .sd_check_zero
     xor dx, dx
     mov bx, 10
@@ -1296,7 +1318,7 @@ list_directory:
     inc word [.size_digits]
     jmp .sd_push_digits
 .sd_check_zero:
-    cmp cx, 0
+    test cx, cx
     jne .sd_pop_digits
     mov ah, 0x0E
     mov al, '0'
@@ -1335,7 +1357,7 @@ cat_file:
 
     mov word si, [param_list]
     call string_string_parse
-    cmp ax, 0
+    test ax, ax
     jne .filename_provided
 
     mov si, nofilename_msg
@@ -1458,7 +1480,7 @@ cat_file:
 del_file:
     mov word si, [param_list]
     call string_string_parse
-    cmp ax, 0
+    test ax, ax
     jne .filename_provided
     mov si, nofilename_msg
     call print_string_red
@@ -1500,7 +1522,7 @@ del_file:
 size_file:
     mov word si, [param_list]
     call string_string_parse
-    cmp ax, 0
+    test ax, ax
     jne .filename_provided
     mov si, nofilename_msg
     call print_string_red
@@ -1534,7 +1556,7 @@ copy_file:
     mov word si, [param_list]
     call string_string_parse
     mov word [.tmp], bx
-    cmp bx, 0
+    test bx, bx
     jne .filename_provided
     mov si, nofilename_msg
     call print_string_red
@@ -1585,7 +1607,7 @@ copy_file:
 ren_file:
     mov word si, [param_list]
     call string_string_parse
-    cmp bx, 0
+    test bx, bx
     jne .filename_provided
     mov si, nofilename_msg
     call print_string_red
@@ -1623,7 +1645,7 @@ ren_file:
 touch_file:
     mov word si, [param_list]
     call string_string_parse
-    cmp ax, 0
+    test ax, ax
     jne .filename_provided
     mov si, nofilename_msg
     call print_string_red
@@ -1658,7 +1680,7 @@ touch_file:
 write_file:
     mov word si, [param_list]
     call string_string_parse
-    cmp ax, 0
+    test ax, ax
     jne .filename_provided
     mov si, nofilename_msg
     call print_string_red
@@ -1666,7 +1688,7 @@ write_file:
     jmp get_cmd
 
 .filename_provided:
-    cmp bx, 0
+    test bx, bx
     jne .text_provided
     mov si, notext_msg
     call print_string_red
@@ -1724,9 +1746,9 @@ string_move_cursor:
 string_string_parse:
     push si
     mov ax, si
-    mov bx, 0
-    mov cx, 0
-    mov dx, 0
+    xor bx, bx
+    xor cx, cx
+    xor dx, dx
     push ax
 
 .loop1:
@@ -1782,7 +1804,7 @@ set_background_color:
 
 wait_for_key:
     pusha
-    mov ax, 0
+    xor ax, ax
     mov ah, 10h
     int 16h
     mov [.tmp_buf], ax
@@ -1799,7 +1821,7 @@ mkdir_command:
 
     mov word si, [param_list]
     call string_string_parse
-    cmp ax, 0
+    test ax, ax
     je .no_dirname
 
     mov si, ax
@@ -1872,7 +1894,7 @@ deldir_command:
 
     mov word si, [param_list]
     call string_string_parse
-    cmp ax, 0
+    test ax, ax
     je .no_dirname
 
     mov si, ax
@@ -1885,7 +1907,7 @@ deldir_command:
     jg .name_too_long
 
     mov si, .dirname_buffer
-    mov cx, 0
+    xor cx, cx
 .check_dot:
     lodsb
     cmp al, 0
@@ -1986,7 +2008,7 @@ cd_command:
     mov word si, [param_list]
     call string_string_parse
 
-    cmp ax, 0
+    test ax, ax
     je .show_current
 
     ; Check for ".."
@@ -2049,7 +2071,7 @@ cd_command:
     push si                 ; save remaining path position
 
     ; Skip empty components (e.g., "//")
-    cmp cx, 0
+    test cx, cx
     je .skip_empty_comp
 
     ; Check for ".." component
@@ -2075,7 +2097,7 @@ cd_command:
 .comp_has_dot:
     mov bx, 1
 .comp_check_dot_done:
-    cmp bx, 0
+    test bx, bx
     jne .comp_has_ext
 
     ; Append .DIR

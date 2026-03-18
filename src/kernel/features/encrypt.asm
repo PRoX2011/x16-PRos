@@ -18,10 +18,10 @@ key_len equ 64
 ; OUT: Encrypted data in DI, carry clear on success
 encrypt_string:
     pusha
-    mov bx, 0
+    xor bx, bx
 
 .encrypt_loop:
-    cmp cx, 0
+    test cx, cx
     je .check_null
     jmp .do_xor
 
