@@ -8,6 +8,7 @@
 
 [BITS 16]
 [ORG 0x0000]
+[CPU 8086]
 
 start: jmp main
 
@@ -215,7 +216,10 @@ LOAD_IMAGE:
     jmp .DONE
 
 .ODD_CLUSTER:
-    shr dx, 0x0004
+    shr dx, 1
+    shr dx, 1
+    shr dx, 1
+    shr dx, 1
 
 .DONE:
     mov WORD [cluster], dx
@@ -225,8 +229,7 @@ LOAD_IMAGE:
 DONE:
     mov si, msgCRLF
     call Print
-    push WORD 0x2000
-    push WORD 0x0000
+    jmp 0x2000:0x0000
     retf
 
 FAILURE:
