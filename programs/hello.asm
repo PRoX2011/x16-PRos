@@ -12,5 +12,5 @@ start:
 
     ret                  ; Return to the terminal
 
-hello_msg_en db 'Hello, PRos! Live longg and prosper!', 10, 13, 0
+hello_msg_en db 'Hello, PRos! Live long and prosper!', 10, 13, 0
 hello_msg_ru db 'Привет, PRos! Здравствуйте и процветайте!', 10, 13, 0
