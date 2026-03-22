@@ -107,4 +107,6 @@ Use `THEME.BIN` for easier theme switching when available.
 
 ## TIMEZONE.CFG
 
-Not implemented yet. Contribution needed. 
+Defines timezone offset
+
+Write an integer to the file to change your time zone. For example `5` for UTC+5 or `-3` for UTC-3
