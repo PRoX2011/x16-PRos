@@ -215,6 +215,13 @@ mmd -i disk_img/x16pros.img ::/FONTS.DIR
 check_error "Failed to create FONTS directory"
 print_ok "FONTS directory created successfully"
 
+# Create THEMES directory
+print_splitline "Creating THEMES directory..."
+print_info "Creating THEMES directory..."
+mmd -i disk_img/x16pros.img ::/THEMES.DIR
+check_error "Failed to create THEMES directory"
+print_ok "THEMES directory created successfully"
+
 # Copy fonts
 print_info "Copying DEFAULT.FNT to disk..."
 mcopy -i disk_img/x16pros.img assets/fonts/DEFAULT.FNT ::/FONTS.DIR/
@@ -235,6 +242,32 @@ print_info "Copying ITALIC.FNT to disk..."
 mcopy -i disk_img/x16pros.img assets/fonts/ITALIC.FNT ::/FONTS.DIR/
 check_error "ITALIC.FNT copy failed"
 print_ok "ITALIC.FNT copied successfully"
+
+# Copy themes
+print_info "Copying DEFAULT.THM to disk..."
+mcopy -i disk_img/x16pros.img assets/themes/DEFAULT.THM ::/THEMES.DIR/
+check_error "DEFAULT.THM copy failed"
+print_ok "DEFAULT.THM copied successfully"
+
+print_info "Copying VGA.THM to disk..."
+mcopy -i disk_img/x16pros.img assets/themes/VGA.THM ::/THEMES.DIR/
+check_error "VGA.THM copy failed"
+print_ok "VGA.THM copied successfully"
+
+print_info "Copying UBUNTU.THM to disk..."
+mcopy -i disk_img/x16pros.img assets/themes/UBUNTU.THM ::/THEMES.DIR/
+check_error "UBUNTU.THM copy failed"
+print_ok "UBUNTU.THM copied successfully"
+
+print_info "Copying OCEAN.THM to disk..."
+mcopy -i disk_img/x16pros.img assets/themes/OCEAN.THM ::/THEMES.DIR/
+check_error "OCEAN.THM copy failed"
+print_ok "OCEAN.THM copied successfully"
+
+print_info "Copying MONO.THM to disk..."
+mcopy -i disk_img/x16pros.img assets/themes/MONO.THM ::/THEMES.DIR/
+check_error "MONO.THM copy failed"
+print_ok "MONO.THM copied successfully"
 
 echo -e "$NC"
 

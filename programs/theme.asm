@@ -1,305 +1,454 @@
 ; ==================================================================
-; x16-PRos -- THEME. Theming tool for PRos terminal
-; Copyright (C) 2025 PRoX2011
+; x16-PRos -- THEME. Theme selector for x16-PRos
+; Copyright (C) 2026 PRoX2011
 ;
-; Usage: THEME <theme name>
-;
-; Available themes:
-;   DEFAULT, VGA, UBUNTU, OCEAN
+; Made by PRoX-dev
 ; ==================================================================
 
 [BITS 16]
 [ORG 0x8000]
 
+section .text
+
+ENTRY_SIZE      equ 18
+FNAME_SIZE      equ 13
+MAX_FILES       equ 32
+VISIBLE_LINES   equ 14
+
+BOX_X           equ 22
+BOX_Y           equ 5
+BOX_W           equ 36
+BOX_H           equ 20
+
+LIST_X          equ BOX_X + 3
+LIST_Y          equ BOX_Y + 3
+
+ATTR_NORMAL     equ 0x0F
+ATTR_HIGHLIGHT  equ 0x70
+ATTR_BORDER     equ 0x0F
+ATTR_DIM        equ 0x07
+ATTR_TITLE_BAR  equ 0x1F
+ATTR_HINT_BAR   equ 0x1F
+ATTR_BG_COLOR   equ 0x00
+ATTR_OK_MSG     equ 0x0A
+ATTR_ERR_MSG    equ 0x0C
+
+THM_BUF         equ 43008
+
+jmp start
+
+%include "programs/lib/font.inc"
+%include "programs/lib/tui.inc"
+%include "programs/lib/string.inc"
+
 start:
-    mov [param_list], si
+    mov ah, 0x06
+    int 0x21
 
     push cs
     pop ds
     push cs
     pop es
+    cld
+    call tui_init
 
-    mov si, [param_list]
-    call string_string_parse
+    call load_theme_list
+    cmp word [file_count], 0
+    je .no_themes
 
-    cmp ax, 0
-    je print_usage
+    mov word [selected], 0
+    mov word [scroll_top], 0
 
-    mov [arg_ptr], ax
-    call string_string_uppercase
+    call draw_screen
 
-    mov si, [arg_ptr]
-    mov di, str_default
-    call string_string_compare
-    jc set_default
+.main_loop:
+    call tui_wait_for_key
 
-    mov si, [arg_ptr]
-    mov di, str_vga
-    call string_string_compare
-    jc set_vga
+    cmp al, 27
+    je .exit
+    cmp ah, 0x48
+    je .move_up
+    cmp ah, 0x50
+    je .move_down
+    cmp al, 13
+    je .apply_theme
+    jmp .main_loop
 
-    mov si, [arg_ptr]
-    mov di, str_ubuntu
-    call string_string_compare
-    jc set_ubuntu
+.move_up:
+    cmp word [selected], 0
+    je .main_loop
+    dec word [selected]
+    mov ax, [selected]
+    cmp ax, [scroll_top]
+    jge .redraw
+    dec word [scroll_top]
+.redraw:
+    call draw_list
+    jmp .main_loop
 
-    mov si, [arg_ptr]
-    mov di, str_ocean
-    call string_string_compare
-    jc set_ocean
+.move_down:
+    mov ax, [selected]
+    inc ax
+    cmp ax, [file_count]
+    jge .main_loop
+    mov [selected], ax
+    mov bx, [scroll_top]
+    add bx, VISIBLE_LINES
+    cmp ax, bx
+    jl .redraw2
+    inc word [scroll_top]
+.redraw2:
+    call draw_list
+    jmp .main_loop
 
-    mov si, [arg_ptr]
-    mov di, str_mono
-    call string_string_compare
-    jc set_mono
-
-    jmp print_usage
-
-; ------------------------------------------------
-; Theme Selection Handlers
-; ------------------------------------------------
-
-set_default:
-    mov si, theme_default_data
-    mov cx, theme_default_size
-    jmp save_theme
-
-set_vga:
-    mov si, theme_vga_data
-    mov cx, theme_vga_size
-    jmp save_theme
-
-set_ubuntu:
-    mov si, theme_ubuntu_data
-    mov cx, theme_ubuntu_size
-    jmp save_theme
-
-set_ocean:
-    mov si, theme_ocean_data
-    mov cx, theme_ocean_size
-    jmp save_theme
-
-set_mono:
-    mov si, theme_mono_data
-    mov cx, theme_mono_size
-    jmp save_theme
-
-save_theme:
-    mov di, 43008
-    push cx
-    rep movsb
-    pop cx
-
+.apply_theme:
     ; Save current directory
     mov ah, 0x0E
     int 0x22
 
-    ; Go to root
+    ; Goto root
     mov ah, 0x0A
     int 0x22
 
-    ; Switch to /CONF.DIR
+    ; Enter THEMES.DIR
+    mov ah, 0x09
+    mov si, themes_dir_name
+    int 0x22
+    jc .apply_fail
+ 
+    call get_selected_name
+    mov si, ax
+    mov cx, THM_BUF
+    xor bx, bx
+    mov ah, 0x02
+    int 0x22
+    jc .apply_fail
+
+    ; Save file size
+    mov [thm_file_size], bx
+
+    ; Go back to root
+    mov ah, 0x0A
+    int 0x22
+
+    ; Enter CONF.DIR
     mov ah, 0x09
     mov si, conf_dir_name
     int 0x22
+    jc .apply_fail
 
-    ; Write THEME.CFG
     mov ah, 0x03
     mov si, theme_cfg_file
-    mov bx, 43008
+    mov bx, THM_BUF
+    mov cx, [thm_file_size]
     int 0x22
+    jc .apply_fail
 
-    ; Restore current directory
+    ; Restore directory
     mov ah, 0x0F
     int 0x22
 
-    ; Success message
-    mov ah, 0x02
-    mov si, msg_success
-    int 0x21
-    mov ah, 0x05
-    int 0x21
+    call draw_screen
+
+    mov si, ok_msg
+    mov cl, BOX_X + 3
+    mov ch, BOX_Y + BOX_H
+    mov bl, ATTR_OK_MSG
+    call font_print_string
+    jmp .main_loop
+
+.apply_fail:
+    ; Restore directory if error
+    mov ah, 0x0F
+    int 0x22
+
+    call draw_screen
+
+    mov si, err_msg
+    mov cl, BOX_X + 3
+    mov ch, BOX_Y + BOX_H
+    mov bl, ATTR_ERR_MSG
+    call font_print_string
+    jmp .main_loop
+
+.no_themes:
+    call draw_bg
+
+    mov si, no_themes_msg
+    mov cl, 28
+    mov ch, 14
+    mov bl, ATTR_ERR_MSG
+    call font_print_string
+    call tui_wait_for_key
+
+.exit:
+    mov ax, 0x0012
+    int 0x10
     ret
 
-
-print_usage:
-    mov ah, 0x04
-    mov si, msg_usage
-    int 0x21
-    mov ah, 0x05
-    int 0x21
+; ==================================================================
+; get_selected_name -- Return pointer to selected theme filename
+; OUT: AX = pointer to filename string
+; ==================================================================
+get_selected_name:
+    push bx
+    push dx
+    mov ax, [selected]
+    mov bx, FNAME_SIZE
+    mul bx
+    add ax, name_list
+    pop dx
+    pop bx
     ret
 
-string_string_parse:
-    push si
-    mov ax, si
-    xor bx, bx
-    xor cx, cx
-    xor dx, dx
-    push ax
-.loop1:
-    lodsb
-    cmp al, 0
-    je .finish
-    cmp al, ' '
-    jne .loop1
-    dec si
-    mov byte [si], 0
-    inc si
-    mov bx, si
-.finish:
-    pop ax
-    pop si
-    ret
-
-string_string_uppercase:
-    push di
-    mov di, [arg_ptr]
-.more:
-    cmp byte [di], 0
-    je .done
-    cmp byte [di], 'a'
-    jb .next
-    cmp byte [di], 'z'
-    ja .next
-    sub byte [di], 20h
-.next:
-    inc di
-    jmp .more
-.done:
-    pop di
-    ret
-
-string_string_compare:
+; ==================================================================
+; load_theme_list -- Read THEMES.DIR/ and build name_list[]
+; ==================================================================
+load_theme_list:
     pusha
+
+    mov ah, 0x0E
+    int 0x22
+
+    mov ah, 0x0A
+    int 0x22
+
+    mov si, themes_dir_name
+    mov ah, 0x09
+    int 0x22
+    jc .done
+
+    mov ah, 0x01
+    mov si, file_list_buf
+    int 0x22
+
+    mov ah, 0x0F
+    int 0x22
+
+    mov word [file_count], 0
+    mov si, file_list_buf
+    mov di, name_list
+
+.scan:
+    cmp byte [si], 0
+    je .done
+
+    test byte [si+16], 0x10
+    jnz .skip
+
+    ; Check extension is 'THM'
+    cmp byte [si+9], 'T'
+    jne .skip
+    cmp byte [si+10], 'H'
+    jne .skip
+    cmp byte [si+11], 'M'
+    jne .skip
+
+    push si
+    push di
+
+    mov cx, 8
+.copy_name:
+    lodsb
+    cmp al, ' '
+    je .name_pad
+    stosb
+    dec cx
+    jnz .copy_name
+    jmp .add_ext
+.name_pad:
+    dec cx
+    add si, cx
+
+.add_ext:
+    mov al, '.'
+    stosb
+    mov al, 'T'
+    stosb
+    mov al, 'H'
+    stosb
+    mov al, 'M'
+    stosb
+    xor al, al
+    stosb
+
+    pop di
+    pop si
+
+    add di, FNAME_SIZE
+    inc word [file_count]
+    cmp word [file_count], MAX_FILES
+    jge .done
+
+.skip:
+    add si, ENTRY_SIZE
+    jmp .scan
+
+.done:
+    popa
+    ret
+
+; ==================================================================
+; Drawing routines
+; ==================================================================
+
+draw_screen:
+    call draw_bg
+    call draw_box
+    call draw_list
+    ret
+
+draw_bg:
+    pusha
+
+    mov al, ATTR_BG_COLOR
+    call font_clear_screen
+
+    mov al, ATTR_TITLE_BAR >> 4
+    mov ch, 0
+    call font_fill_row
+
+    mov si, title_str
+    mov cl, 2
+    mov ch, 0
+    mov bl, ATTR_TITLE_BAR
+    call font_print_string
+
+    mov al, ATTR_HINT_BAR >> 4
+    mov ch, 29
+    call font_fill_row
+
+    mov si, hint_str
+    mov cl, 1
+    mov ch, 29
+    mov bl, ATTR_HINT_BAR
+    call font_print_string
+
+    popa
+    ret
+
+draw_box:
+    pusha
+
+    mov cl, BOX_X
+    mov ch, BOX_Y
+    mov dl, BOX_W
+    mov dh, BOX_H
+    mov bl, ATTR_BORDER
+    call tui_draw_box
+
+    mov si, box_title
+    mov cl, BOX_X + 2
+    mov ch, BOX_Y + 1
+    mov bl, ATTR_DIM
+    call font_print_string
+
+    popa
+    ret
+
+draw_list:
+    pusha
+
+    mov al, ATTR_BORDER >> 4
+    mov cl, LIST_X - 1
+    mov ch, LIST_Y
+    mov dl, BOX_W - 4
+    mov dh, VISIBLE_LINES
+    call font_fill_rect
+
+    cmp word [file_count], 0
+    je .done
+
+    mov word [.vis], 0
+    mov ax, [scroll_top]
+    mov [.idx], ax
+
 .loop:
-    mov al, [si]
-    mov bl, [di]
-    cmp al, bl
-    jne .not_equal
-    cmp al, 0
-    je .equal
-    inc si
-    inc di
+    mov ax, [.vis]
+    cmp ax, VISIBLE_LINES
+    jge .done
+
+    mov ax, [.idx]
+    cmp ax, [file_count]
+    jge .done
+
+    mov bx, FNAME_SIZE
+    mul bx
+    add ax, name_list
+    mov [.name_ptr], ax
+
+    mov ax, [.idx]
+    cmp ax, [selected]
+    jne .not_sel
+
+    ; Highlight row background
+    mov al, [.vis]
+    add al, LIST_Y
+    mov ch, al
+    mov al, ATTR_HIGHLIGHT >> 4
+    mov cl, LIST_X - 1
+    mov dl, BOX_W - 4
+    mov dh, 1
+    call font_fill_rect
+
+    ; Arrow indicator
+    mov al, 0x10
+    mov cl, LIST_X
+    mov ch, [.vis]
+    add ch, LIST_Y
+    mov bl, ATTR_HIGHLIGHT
+    call font_put_char
+
+    mov si, [.name_ptr]
+    mov cl, LIST_X + 2
+    mov ch, [.vis]
+    add ch, LIST_Y
+    mov bl, ATTR_HIGHLIGHT
+    call font_print_string
+
+    jmp .next
+
+.not_sel:
+    mov si, [.name_ptr]
+    mov cl, LIST_X + 2
+    mov ch, [.vis]
+    add ch, LIST_Y
+    mov bl, ATTR_NORMAL
+    call font_print_string
+
+.next:
+    inc word [.vis]
+    inc word [.idx]
     jmp .loop
-.not_equal:
+
+.done:
     popa
-    clc
-    ret
-.equal:
-    popa
-    stc
     ret
 
+.vis      dw 0
+.idx      dw 0
+.name_ptr dw 0
 
-param_list      dw 0
-arg_ptr         dw 0
+; ==================================================================
+; Data section
+; ==================================================================
 
+section .data
+
+title_str       db 'THEME SELECTOR', 0
+hint_str        db ' Up/Down: Select   Enter: Apply   Esc: Exit', 0
+box_title       db 'Available themes:', 0
+no_themes_msg   db 'No .THM files in THEMES.DIR/', 0
+ok_msg          db 'Theme applied!', 0
+err_msg         db 'Failed to apply theme!', 0
+themes_dir_name db 'THEMES.DIR', 0
 conf_dir_name   db 'CONF.DIR', 0
 theme_cfg_file  db 'THEME.CFG', 0
 
-str_default     db 'DEFAULT', 0
-str_vga         db 'VGA', 0
-str_ubuntu      db 'UBUNTU', 0
-str_ocean       db 'OCEAN', 0
-str_mono        db 'MONO', 0
+selected        dw 0
+scroll_top      dw 0
+file_count      dw 0
+thm_file_size   dw 0
 
-msg_usage       db 'Usage: THEME <DEFAULT | VGA | UBUNTU | OCEAN | MONO', 0
-msg_success     db 'Theme applied successfully.', 0
-
-; --- THEME DATA ---
-
-theme_default_data:
-    db '0,2,3,5', 10
-    db '1,25,24,52', 10
-    db '2,21,37,10', 10
-    db '3,18,26,40', 10
-    db '4,46,9,12', 10
-    db '5,27,28,48', 10
-    db '6,10,40,38', 10
-    db '7,63,56,50', 10
-    db '8,3,14,17', 10
-    db '9,50,19,5', 10
-    db '10,33,53,22', 10
-    db '11,16,53,56', 10
-    db '12,53,17,20', 10
-    db '13,32,37,37', 10
-    db '14,56,55,27', 10
-    db '15,63,63,63', 0
-theme_default_size equ $ - theme_default_data
-
-theme_ubuntu_data:
-    db '0,20,9,14', 10
-    db '1,18,26,40', 10
-    db '2,21,37,10', 10
-    db '3,18,26,40', 10
-    db '4,46,9,12', 10
-    db '5,29,25,36', 10
-    db '6,41,15,12', 10
-    db '7,22,26,28', 10
-    db '8,14,19,22', 10
-    db '9,28,41,53', 10
-    db '10,33,53,22', 10
-    db '11,16,53,56', 10
-    db '12,53,17,20', 10
-    db '13,41,34,45', 10
-    db '14,56,55,27', 10
-    db '15,47,50,52', 0
-theme_ubuntu_size equ $ - theme_ubuntu_data
-
-theme_vga_data:
-    db '0,0,0,0', 10
-    db '1,0,0,42', 10
-    db '2,0,42,0', 10
-    db '3,0,42,42', 10
-    db '4,42,0,0', 10
-    db '5,42,0,42', 10
-    db '6,42,21,0', 10
-    db '7,42,42,42', 10
-    db '8,21,21,21', 10
-    db '9,21,21,63', 10
-    db '10,21,63,21', 10
-    db '11,21,63,63', 10
-    db '12,63,21,21', 10
-    db '13,63,21,63', 10
-    db '14,63,63,21', 10
-    db '15,63,63,63', 0
-theme_vga_size equ $ - theme_vga_data
-
-theme_ocean_data:
-    db '0,5,8,15', 10
-    db '1,10,15,30', 10
-    db '2,15,40,35', 10
-    db '3,20,45,50', 10
-    db '4,50,20,25', 10
-    db '5,35,25,45', 10
-    db '6,25,35,40', 10
-    db '7,45,50,55', 10
-    db '8,15,20,25', 10
-    db '9,25,35,55', 10
-    db '10,30,55,50', 10
-    db '11,35,60,63', 10
-    db '12,60,30,35', 10
-    db '13,50,40,55', 10
-    db '14,55,58,45', 10
-    db '15,58,60,63', 0
-theme_ocean_size equ $ - theme_ocean_data
-
-theme_mono_data:
-    db '0,2,3,5', 10
-    db '1,25,24,52', 10
-    db '2,41,52,31', 10
-    db '3,12,32,32', 10
-    db '4,52,13,32', 10
-    db '5,27,28,48', 10
-    db '6,10,40,38', 10
-    db '7,63,57,45', 10
-    db '8,3,14,17', 10
-    db '9,50,19,5', 10
-    db '10,22,27,29', 10
-    db '11,45,34,0', 10
-    db '12,25,30,32', 10
-    db '13,32,37,37', 10
-    db '14,36,40,40', 10
-    db '15,63,58,44', 0
-theme_mono_size equ $ - theme_mono_data
+file_list_buf   times 2048 db 0
+name_list       times MAX_FILES * FNAME_SIZE db 0
