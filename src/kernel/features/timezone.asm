@@ -13,9 +13,15 @@ load_timezone_cfg:
 
     mov word [timezone_offset], 0
 
+    call save_current_dir
+    mov al, 'A'
+    call fs_change_drive_letter
+    mov byte [current_directory], 0
+    mov word [current_dir_cluster], 0
+
     mov ax, conf_dir_name
     call fs_change_directory
-    jc .done
+    jc .restore_done
 
     mov ax, timezone_cfg_file
     mov cx, program_load_addr
@@ -34,6 +40,9 @@ load_timezone_cfg:
 
 .restore_dir:
     call fs_parent_directory
+
+.restore_done:
+    call restore_current_dir
 
 .done:
     popa
@@ -114,7 +123,7 @@ timezone_parse_offset:
     jbe .digit_loop
 
 .after_digits:
-    cmp cx, 0
+    test cx, cx
     je .parse_fail
 
 .skip_trailing:
@@ -379,21 +388,21 @@ timezone_apply_day_delta:
     xor dx, dx
     mov bx, 4
     div bx
-    cmp dx, 0
+    test dx, dx
     jne .not_leap
 
     mov ax, [timezone_tmp_year]
     xor dx, dx
     mov bx, 100
     div bx
-    cmp dx, 0
+    test dx, dx
     jne .leap
 
     mov ax, [timezone_tmp_year]
     xor dx, dx
     mov bx, 400
     div bx
-    cmp dx, 0
+    test dx, dx
     jne .not_leap
 
 .leap:

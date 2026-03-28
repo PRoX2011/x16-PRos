@@ -1,0 +1,147 @@
+----------------------- Key changes x16-PRos v0.8 ----------------------
+
+This release introduces custom font support (cp866), a completely
+rewritten BMP renderer, new programs, shell UX improvements, and many
+kernel-level bugfixes and optimizations across the file system, themes,
+and memory layout. Hope you love it :)
+                                        -- PRoX
+
+=======================================================================================
+
+1. Custom font support (cp866)
+1) New kernel subsystem for loading 8x16 bitmap fonts from FONTS.DIR
+   - Hooks INT 43h so BIOS TTY and all programs automatically use the custom font
+   - Supports loading fonts from .FNT files (4096 bytes, 256 chars)
+2) FONT.CFG configuration file in CONF.DIR
+   - Defines which font to load at boot (falls back to DEFAULT.FNT)
+3) New FONT.BIN program
+   - TUI-based font selector that lists available .FNT files and applies them
+4) Bundled fonts: DEFAULT.FNT, BOLD.FNT, THIN.FNT, ITALIC.FNT
+5) Font is automatically reinstalled after video mode changes and program execution
+6) INT 0x21 AH=0x09 extended with AL=0x02 to load a font by filename
+
+=======================================================================================
+
+2. BMP renderer rewrite
+1) BMP files now loaded via fs_load_huge_file to dedicated BMP_LOAD_SEG (0x3000)
+   - Removes the old 16-bit size limit; supports large BMP files
+2) New bmp_src_seg/bmp_src_off pointer system for segment-based pixel reading
+   - Renderer no longer relies on program_load_addr offset
+3) Fixed boot logo rendering (load_logo_and_display)
+   - Was commented out due to system hang; now fully functional
+   - Properly sets bmp_src_seg/bmp_src_off before display
+   - Restores DS/ES to KERNEL_DATA_SEG after VGA rendering
+4) Stretch and upscale modes updated to work with new segment-based loading
+
+=======================================================================================
+
+3. New programs
+1) TREE.BIN - Directory tree viewer
+   - Recursively displays directory structure with visual tree lines
+   - Supports depth up to 6 levels
+2) FONT.BIN - Font selector TUI
+   - Lists .FNT files from FONTS.DIR and lets user preview/apply fonts
+
+=======================================================================================
+
+4. Shell UX improvements
+1) Blinking block cursor in command line input
+   - Visual cursor that blinks at ~500ms intervals using timer tick
+   - Properly saves/restores character under cursor
+2) Tab-completion for filenames
+   - Autocomplete suggestions based on current directory file listing
+   - Tab key completes the suggestion
+3) Programs now use INT 0x21 AH=0x06 for clear screen instead of direct BIOS calls
+   - Ensures font is preserved after screen clear
+
+=======================================================================================
+
+5. Theme system fixes and updates
+1) Fixed VGA DAC register mapping for mode 0x12
+   - Colors 8-15 now correctly mapped to DAC registers 56-63
+   - Color 6 (brown) correctly mapped to DAC register 20
+   - Themes now display correct colors instead of wrong palette entries
+2) Updated default theme palette values
+3) New "mono" theme added to theme program
+4) Theme loading order changed: now loads after fs_list_drives
+
+=======================================================================================
+
+6. Kernel memory layout redesign
+1) Named constants for all major memory regions
+   - PROGRAM_LOAD_OFF, DIRLIST_OFF, COMMAND_HISTORY_OFF, DISK_BUFFER_OFF
+   - KERNEL_WORK_END_OFF marks the end of kernel work area (0xFC00)
+2) Disk buffer moved to 0xE000 with explicit size limit (DISK_BUFFER_SIZE = 0x1C00)
+3) Launch program trampoline addresses updated to match new layout
+
+=======================================================================================
+
+7. File system improvements
+1) Directory navigation now uses cluster-based tracking (current_dir_cluster)
+   - Replaces string-based directory lookup that re-scanned root directory
+   - Faster and more reliable subdirectory operations
+2) File loading refactored with pre-built cluster chain
+   - Load loop no longer depends on disk_buffer contents
+3) COM program loading switched to fs_load_huge_file
+   - Uses runtime program segment instead of compile-time constant
+4) Timezone config loading now saves/restores current directory state
+
+=======================================================================================
+
+8. Bootloader safety improvements
+1) Added segment overflow check in ReadSectors
+   - Detects when BX wraps past segment boundary during kernel loading
+   - Prevents silent memory corruption from oversized kernel
+
+=======================================================================================
+
+9. New API system calls
+1) INT 0x21 AH=0x0A: Get System Time
+   - Returns timezone-adjusted time: CH=hour, CL=minute, DH=second
+2) INT 0x21 AH=0x0B: Get System Date
+   - Returns timezone-adjusted date: CH=century, CL=year, DH=month, DL=day
+3) API documentation (docs/API.md) updated with new calls
+
+=======================================================================================
+
+10. Program bugfixes and improvements
+1) HEXEDIT: save operations now use separate SAVE_BUFFER to avoid disk_buffer conflicts
+2) HELLO: added Russian language string (cp866 test)
+3) SETUP: updated default theme palette data
+4) WRITE: rendering improvements
+5) Removed obsolete FNT_TEST program (replaced by FONT.BIN)
+
+=======================================================================================
+
+11. Build system enhancements
+1) Kernel size guard in build-linux.sh
+   - Warns when kernel approaches bootloader load limit (30720 bytes)
+   - Fails build if kernel exceeds 32768 bytes
+2) FONTS.DIR creation and font file copying added to build pipeline
+3) FONT.CFG added to config file deployment
+4) project_philosophy.txt now copied to disk as PROJECT.TXT
+
+=======================================================================================
+
+12. New emulated DOS calls (INT 0x21)
+1) 0x0F: Open file using FCB
+2) 0x10: Close file using FCB
+3) 0x13: Delete file using FCB
+4) 0x16: Create file using FCB
+5) 0x17: Rename file using FCB
+
+=======================================================================================
+
+13. IMFPLAY now checks for file existence before playing
+
+=======================================================================================
+
+14. FETCH now shows BIOS release date
+
+=======================================================================================
+
+15. The CLI utility for changing themes has been replaced by a new and more convenient TUI program
+
+=======================================================================================
+
+Copyright (C) 2024-2026 PRoX2011

@@ -2,6 +2,8 @@
 ; x16-PRos - BMP rendering for x16-PRos in VGA mode 0x13 (320x200, 256 colors)
 ; Copyright (C) 2025 PRoX2011
 ;
+; Uses direct VGA memory writes at 0xA000 for fast rendering.
+; Supports large BMP files via fs_load_huge_file (segment-based loading).
 ; ==================================================================
 
 ; Constants
@@ -10,6 +12,10 @@ BMP_HEADER_SIZE     equ 54
 BMP_PALETTE_SIZE    equ 1024 ; 256 colors * 4 bytes
 BMP_HEADER_WIDTH    equ 18   ; Offset 0x12 in BMP header
 BMP_HEADER_HEIGHT   equ 22   ; Offset 0x16 in BMP header
+BMP_LOAD_SEG        equ 0x3000
+VGA_SEG             equ 0xA000
+VGA_WIDTH           equ 320
+VGA_HEIGHT          equ 200
 
 ; Data section
 _bmpSingleLine      times BMP_MAX_WIDTH db 0
@@ -17,6 +23,10 @@ _palSet             db 0  ; Palette set flag (0 = not set, 1 = set)
 bmp_width           dw 0
 bmp_height          dw 0
 padding             dw 0
+bmp_src_seg         dw 0
+bmp_src_off         dw 0
+bmp_pixel_seg       dw 0
+bmp_pixel_off       dw 0
 
 ; ===================== BMP Viewing Command with Options =====================
 
@@ -27,7 +37,7 @@ view_bmp:
     ; Parse parameters
     mov word si, [param_list]
     call string_string_parse
-    cmp ax, 0
+    test ax, ax
     jne .filename_provided
     mov si, nofilename_msg
     call print_string_red
@@ -42,7 +52,7 @@ view_bmp:
     mov word [.stretch_flag], 0
 
     ; Check first parameter
-    cmp bx, 0
+    test bx, bx
     je .check_third_param
 
     mov si, bx
@@ -66,7 +76,7 @@ view_bmp:
 
 .check_third_param:
     ; Check if there's a third parameter
-    cmp cx, 0
+    test cx, cx
     je .load_file
 
     mov si, cx
@@ -108,20 +118,26 @@ view_bmp:
     jc .not_found
 
     mov ax, [param_list]
-    mov cx, program_load_addr
-    call fs_load_file
-    mov word [file_size], bx
-    cmp bx, 0
-    je .empty_file
+    xor cx, cx
+    mov dx, BMP_LOAD_SEG
+    call fs_load_huge_file
+    jc .not_found
+    ; DX:AX = file size
+    or ax, ax
+    jnz .has_data
+    or dx, dx
+    jz .empty_file
+.has_data:
+
+    ; Set up BMP source
+    mov word [bmp_src_seg], BMP_LOAD_SEG
+    mov word [bmp_src_off], 0
 
     ; Switch to VGA mode 0x13 (320x200, 256 colors)
     mov ax, 0x13
     int 0x10
 
     ; Load and display BMP based on flags
-    push bx
-    mov si, program_load_addr    ; Point to loaded file data
-
     cmp word [.stretch_flag], 1
     je .display_stretched
 
@@ -139,8 +155,6 @@ view_bmp:
     call display_bmp_stretched
 
 .display_done:
-    pop bx
-
     ; Show resolution info
     mov dh, 0
     mov dl, 0
@@ -183,12 +197,14 @@ view_bmp:
     call wait_for_key
 
     ; Return to original video mode 0x12 (640x480, 16 colors)
+    call set_video_mode
     call string_clear_screen
 
     mov byte [_palSet], 0
 
     popa
     call EnableMouse
+    call string_clear_screen
     jmp get_cmd
 
 .not_found:
@@ -213,14 +229,82 @@ view_bmp:
 .stretch_status db ' (stretched to fit)', 0
 .conflict_msg db 'Warning: Cannot use -upscale and -stretch together. Using -stretch.', 0
 
+; ===================== BMP Row Copy Helper =====================
+
+bmp_copy_row:
+    push es
+    mov si, KERNEL_DATA_SEG
+    mov es, si
+
+    mov si, [bmp_src_off]
+
+    mov ax, si
+    add ax, cx
+    jc .split_copy
+
+    push ds
+    mov ax, [bmp_src_seg]
+    mov ds, ax
+    rep movsb
+    pop ds
+    mov [bmp_src_off], si
+    pop es
+    ret
+
+.split_copy:
+    xor ax, ax
+    sub ax, si
+    push cx
+    mov cx, ax
+    push ax
+    push ds
+    mov ax, [bmp_src_seg]
+    mov ds, ax
+    rep movsb
+    pop ds
+    add word [bmp_src_seg], 0x1000
+
+    pop ax
+    pop cx
+    sub cx, ax
+    xor si, si
+    push ds
+    mov ax, [bmp_src_seg]
+    mov ds, ax
+    rep movsb
+    pop ds
+    mov [bmp_src_off], si
+    pop es
+    ret
+
+; ===================== Padding Calculation =====================
+
+bmp_calc_padding:
+    xor dx, dx
+    mov ax, [bmp_width]
+    mov bx, 4
+    div bx
+    mov ax, 4
+    sub ax, dx
+    and ax, 3
+    mov [padding], ax
+    ret
+
 ; ===================== BMP Display Function without upscaling =====================
 
 display_bmp:
     pusha
+
+    ; Read header from BMP segment
+    mov ax, [bmp_src_seg]
+    mov si, [bmp_src_off]
+    push ds
+    mov ds, ax
     mov ax, [si + BMP_HEADER_WIDTH]
+    mov bx, [si + BMP_HEADER_HEIGHT]
+    pop ds
     mov [bmp_width], ax
-    mov ax, [si + BMP_HEADER_HEIGHT]
-    mov [bmp_height], ax
+    mov [bmp_height], bx
 
     cmp byte [_palSet], 1
     je .skip_palette
@@ -228,68 +312,56 @@ display_bmp:
     mov byte [_palSet], 1
 
 .skip_palette:
-    xor dx, dx
-    mov ax, [bmp_width]
-    mov bx, 4
-    div bx
-    mov [padding], dx
+    call bmp_calc_padding
 
-    mov ax, 320
+    mov ax, VGA_WIDTH
     sub ax, [bmp_width]
     shr ax, 1
     mov [x_offset], ax
 
-    mov ax, 200
+    mov ax, VGA_HEIGHT
     sub ax, [bmp_height]
     shr ax, 1
     mov [y_offset], ax
 
-    add si, BMP_HEADER_SIZE + BMP_PALETTE_SIZE
+    ; Advance past header + palette
+    mov ax, [bmp_src_off]
+    add ax, BMP_HEADER_SIZE + BMP_PALETTE_SIZE
+    mov [bmp_src_off], ax
+
     mov cx, [bmp_height]
     mov dx, [bmp_height]
     dec dx
     add dx, [y_offset]
-    mov bx, 0
 
 .draw_row:
     push cx
     push dx
-    push bx
-    push si
 
+    ; Copy BMP row to line buffer
     mov cx, [bmp_width]
     add cx, [padding]
     mov di, _bmpSingleLine
-    push ds
-    mov ax, 0x2000
-    mov ds, ax
-    rep movsb
-    pop ds
+    call bmp_copy_row
 
+    ; Write line buffer directly to VGA memory
+    pop dx
+    push dx
+
+    mov ax, dx
+    mov bx, VGA_WIDTH
+    mul bx                   ; AX = y * 320
+    add ax, [x_offset]
+    mov di, ax
+
+    mov ax, VGA_SEG
+    mov es, ax
     mov si, _bmpSingleLine
     mov cx, [bmp_width]
-    mov bx, [x_offset]
-.draw_pixel:
-    lodsb
-    push cx
-    push dx
-    push bx
-    mov ah, 0x0C
-    mov bh, 0
-    mov cx, bx
-    int 0x10
-    pop bx
-    pop dx
-    pop cx
-    inc bx
-    loop .draw_pixel
+    rep movsb                ; write row to screen
 
-    pop si
-    pop bx
     pop dx
     pop cx
-    add si, [bmp_width]
-    add si, [padding]
     dec dx
     loop .draw_row
 
@@ -297,13 +369,21 @@ display_bmp:
     ret
 
 ; ===================== 2x Upscaled BMP Display Function =====================
+; Each BMP pixel becomes a 2x2 block on screen.
 
 display_bmp_upscaled:
     pusha
+
+    ; Read header from BMP segment
+    mov ax, [bmp_src_seg]
+    mov si, [bmp_src_off]
+    push ds
+    mov ds, ax
     mov ax, [si + BMP_HEADER_WIDTH]
+    mov bx, [si + BMP_HEADER_HEIGHT]
+    pop ds
     mov [bmp_width], ax
-    mov ax, [si + BMP_HEADER_HEIGHT]
-    mov [bmp_height], ax
+    mov [bmp_height], bx
 
     cmp byte [_palSet], 1
     je .skip_palette
@@ -311,92 +391,84 @@ display_bmp_upscaled:
     mov byte [_palSet], 1
 
 .skip_palette:
-    xor dx, dx
-    mov ax, [bmp_width]
-    mov bx, 4
-    div bx
-    mov [padding], dx
+    call bmp_calc_padding
 
     mov ax, [bmp_width]
     shl ax, 1
-    mov bx, 320
+    mov bx, VGA_WIDTH
     sub bx, ax
     shr bx, 1
     mov [x_offset], bx
 
     mov ax, [bmp_height]
     shl ax, 1
-    mov bx, 200
+    mov bx, VGA_HEIGHT
     sub bx, ax
     shr bx, 1
     mov [y_offset], bx
 
-    add si, BMP_HEADER_SIZE + BMP_PALETTE_SIZE
+    ; Advance past header + palette
+    mov ax, [bmp_src_off]
+    add ax, BMP_HEADER_SIZE + BMP_PALETTE_SIZE
+    mov [bmp_src_off], ax
+
     mov cx, [bmp_height]
     mov dx, [bmp_height]
     dec dx
     shl dx, 1
     add dx, [y_offset]
-    mov bx, 0
 
 .draw_row:
     push cx
     push dx
-    push bx
-    push si
 
+    ; Copy BMP row to line buffer
     mov cx, [bmp_width]
     add cx, [padding]
     mov di, _bmpSingleLine
-    push ds
-    mov ax, 0x2000
-    mov ds, ax
-    rep movsb
-    pop ds
+    call bmp_copy_row
 
-    mov cx, 2
-.row_repeat:
-    push cx
+    ; Draw two screen rows per BMP row
+    pop dx
+    push dx
 
+    ; --- First screen row (y = DX) ---
+    mov ax, dx
+    mov bx, VGA_WIDTH
+    mul bx
+    add ax, [x_offset]
+    mov di, ax
+    mov ax, VGA_SEG
+    mov es, ax
     mov si, _bmpSingleLine
     mov cx, [bmp_width]
-    mov bx, [x_offset]
-.draw_pixel:
+.up_row1:
     lodsb
-    push cx
+    stosb
+    stosb                    ; 2x horizontal
+    loop .up_row1
+
+    ; --- Second screen row (y = DX - 1) ---
+    pop dx
     push dx
-    push bx
-
-    mov cx, 2
-.pixel_repeat_h:
-    push cx
-
-    mov ah, 0x0C
-    mov bh, 0
-    mov cx, bx
-    int 0x10
-
-    inc bx
-    pop cx
-    loop .pixel_repeat_h
-
-    pop bx
-    add bx, 2
-    pop dx
-    pop cx
-    loop .draw_pixel
-
     dec dx
+    mov ax, dx
+    mov bx, VGA_WIDTH
+    mul bx
+    add ax, [x_offset]
+    mov di, ax
+    mov ax, VGA_SEG
+    mov es, ax
+    mov si, _bmpSingleLine
+    mov cx, [bmp_width]
+.up_row2:
+    lodsb
+    stosb
+    stosb
+    loop .up_row2
 
-    pop cx
-    loop .row_repeat
-
-    pop si
-    pop bx
     pop dx
     pop cx
-    add si, [bmp_width]
-    add si, [padding]
     sub dx, 2
     loop .draw_row
 
@@ -407,10 +479,17 @@ display_bmp_upscaled:
 
 display_bmp_stretched:
     pusha
+
+    ; Read header from BMP segment
+    mov ax, [bmp_src_seg]
+    mov si, [bmp_src_off]
+    push ds
+    mov ds, ax
     mov ax, [si + BMP_HEADER_WIDTH]
+    mov bx, [si + BMP_HEADER_HEIGHT]
+    pop ds
     mov [bmp_width], ax
-    mov ax, [si + BMP_HEADER_HEIGHT]
-    mov [bmp_height], ax
+    mov [bmp_height], bx
 
     cmp byte [_palSet], 1
     je .skip_palette
@@ -418,21 +497,28 @@ display_bmp_stretched:
     mov byte [_palSet], 1
 
 .skip_palette:
-    xor dx, dx
-    mov ax, [bmp_width]
-    mov bx, 4
-    div bx
-    mov [padding], dx
+    call bmp_calc_padding
 
-    add si, BMP_HEADER_SIZE + BMP_PALETTE_SIZE
+    mov ax, [bmp_src_off]
+    add ax, BMP_HEADER_SIZE + BMP_PALETTE_SIZE
+    mov [bmp_pixel_off], ax
+    mov ax, [bmp_src_seg]
+    mov [bmp_pixel_seg], ax
+
+    mov ax, _bmpSingleLine
+    cmp word [bmp_width], BMP_MAX_WIDTH
+    jbe .buf_ok
+    mov ax, program_load_addr
+.buf_ok:
+    mov [.row_buffer], ax
 
     mov word [.screen_y], 0
-    mov word [.src_row], 0
+    mov word [.src_row], 0xFFFF
 
 .draw_row:
     mov ax, [.screen_y]
     mul word [bmp_height]
-    mov bx, 200
+    mov bx, VGA_HEIGHT
     div bx
 
     mov bx, [bmp_height]
@@ -448,63 +534,67 @@ display_bmp_stretched:
     mov bx, [bmp_width]
     add bx, [padding]
     mul bx
-    mov bx, ax
 
-    push si
-    add si, bx
+    add ax, [bmp_pixel_off]
+    adc dx, 0
+
+    mov [bmp_src_off], ax
+
+    mov cl, 12
+    shl dx, cl
+    mov ax, [bmp_pixel_seg]
+    add ax, dx
+    mov [bmp_src_seg], ax
+
     mov cx, [bmp_width]
     add cx, [padding]
-    mov di, _bmpSingleLine
-    push ds
-    mov ax, 0x2000
-    mov ds, ax
-    rep movsb
-    pop ds
-    pop si
+    mov di, [.row_buffer]
+    call bmp_copy_row
 
 .same_row:
-    mov word [.screen_x], 0
+    mov ax, VGA_SEG
+    mov es, ax
+    mov ax, [.screen_y]
+    mov bx, VGA_WIDTH
+    mul bx
+    mov di, ax
 
+    xor bx, bx
 .draw_pixel:
-    mov ax, [.screen_x]
+    mov ax, bx
     mul word [bmp_width]
-    mov bx, 320
-    div bx
+    mov cx, VGA_WIDTH
+    div cx
 
-    push si
-    mov si, _bmpSingleLine
+    mov si, [.row_buffer]
     add si, ax
-    lodsb
-    pop si
+    mov al, [si]
+    stosb
 
-    push ax
-    mov ah, 0x0C
-    mov bh, 0
-    mov cx, [.screen_x]
-    mov dx, [.screen_y]
-    int 0x10
-    pop ax
-
-    inc word [.screen_x]
-    cmp word [.screen_x], 320
+    inc bx
+    cmp bx, VGA_WIDTH
     jl .draw_pixel
 
     inc word [.screen_y]
-    cmp word [.screen_y], 200
+    cmp word [.screen_y], VGA_HEIGHT
     jl .draw_row
 
     popa
     ret
 
-.screen_x dw 0
-.screen_y dw 0
-.src_row dw 0
+.screen_y  dw 0
+.src_row   dw 0
+.row_buffer dw 0
 
 ; ===================== Palette Setup =====================
 
 set_palette:
     pusha
+    mov ax, [bmp_src_seg]
+    mov si, [bmp_src_off]
     add si, BMP_HEADER_SIZE
+    push ds
+    mov ds, ax
     mov cx, 256
     mov dx, 3C8h
     mov al, 0
@@ -522,6 +612,7 @@ set_palette:
     out dx, al
     add si, 4
     loop .next_color
+    pop ds
     popa
     ret
 

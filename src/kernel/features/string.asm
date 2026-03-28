@@ -11,7 +11,7 @@
 string_string_length:
     pusha
     mov bx, ax
-    mov cx, 0
+    xor cx, cx
 
 .more:
     cmp byte [bx], 0
@@ -86,7 +86,7 @@ string_string_chomp:
     pusha
     mov dx, ax
     mov di, ax
-    mov cx, 0
+    xor cx, cx
 
 .keepcounting:
     cmp byte [di], ' '
@@ -96,7 +96,7 @@ string_string_chomp:
     jmp .keepcounting
 
 .counted:
-    cmp cx, 0
+    test cx, cx
     je .finished_copy
     mov si, di
     mov di, dx
@@ -113,7 +113,7 @@ string_string_chomp:
 .finished_copy:
     mov ax, dx
     call string_string_length
-    cmp ax, 0
+    test ax, ax
     je .done
     mov si, dx
     add si, ax
@@ -220,7 +220,7 @@ string_string_tokenize:
     ret
 
 .no_more:
-    mov di, 0
+    xor di, di
     pop si
     ret
 
@@ -234,16 +234,30 @@ string_input_string:
     pusha
     mov [.start_input_buf_addr], ax
     mov di, ax
-    mov cx, 0
+    xor cx, cx
+    mov word [.ac_sug_len], 0
 
     call string_get_cursor_pos
     mov word [.cursor_col], dx
 
 .read_loop:
+    call .ac_update
+    call .cur_draw
+.wait_key:
+    mov ah, 0x01
+    int 0x16
+    jnz .key_ready
+    call .cur_tick
+    jmp .wait_key
+.key_ready:
+    call .cur_erase
     mov ah, 0x00
     int 0x16
     cmp al, 0x0D
     je .done_read
+    cmp al, 0x09
+    je .ac_complete_tab
+    call .ac_clear
     cmp al, 0x08
     je .handle_backspace
     cmp al, 0x7F
@@ -278,7 +292,7 @@ string_input_string:
     
     mov bl, 0x1F
 .handle_history_scroll_up_clear_loop:
-    cmp cx, 0
+    test cx, cx
     je .handle_history_scroll_up_loop
     mov al, 0x08
     call print_char
@@ -318,7 +332,7 @@ string_input_string:
     
     mov bl, 0x1F
 .handle_history_scroll_down_clear_loop:
-    cmp cx, 0
+    test cx, cx
     je .handle_history_scroll_down_loop
     mov al, 0x08
     call print_char
@@ -351,7 +365,7 @@ string_input_string:
 
     mov bl, 0x1F
 .handle_history_scroll_down_clear_loop_exit:
-    cmp cx, 0
+    test cx, cx
     je .handle_history_scroll_down_clear_loop_done
     mov al, 0x08
     call print_char
@@ -366,7 +380,7 @@ string_input_string:
     jmp .read_loop
 
 .handle_backspace:
-    cmp cx, 0
+    test cx, cx
     je .read_loop
 
     dec di
@@ -386,11 +400,11 @@ string_input_string:
 
 .handle_ctrl_backspace:
     mov byte [.handle_ctrl_backspace_deleting_counter], 0
-    cmp cx, 0
+    test cx, cx
     je .read_loop
 
 .handle_ctrl_backspace_loop:
-    cmp cx, 0
+    test cx, cx
     je .read_loop
     
     mov al, [di - 1]
@@ -456,6 +470,8 @@ string_input_string:
     jmp .read_loop
 
 .done_read:
+    call .cur_erase
+    call .ac_clear
     mov byte [di], 0
     popa
     mov byte [.current_history_pos], 0
@@ -467,6 +483,441 @@ string_input_string:
 .cursor_col dw 0
 .current_history_pos db 0
 .history_using db 0
+.cur_visible db 0
+.cur_last_tick dw 0
+.cur_saved_char db 0
+.cur_saved_attr db 0x07
+
+; --------------- Blinking block cursor ---------------
+.cur_draw:
+    pusha
+    cmp byte [.cur_visible], 1
+    je short .cur_draw_done
+    ; Save the character currently at cursor position before drawing block
+    mov ah, 0x08
+    mov bh, 0
+    int 0x10
+    mov [.cur_saved_char], al
+    mov [.cur_saved_attr], ah
+    ; Now draw the block cursor
+    mov ah, 0x09
+    mov al, 0xDB
+    mov bh, 0
+    mov bl, 0x1F
+    mov cx, 1
+    int 0x10
+    mov byte [.cur_visible], 1
+    mov ah, 0x00
+    int 0x1A
+    mov [.cur_last_tick], dx
+.cur_draw_done:
+    popa
+    ret
+
+.cur_erase:
+    pusha
+    cmp byte [.cur_visible], 0
+    je short .cur_erase_done
+    ; Read the character that was under the cursor before we drew the block
+    mov ah, 0x08
+    mov bh, 0
+    int 0x10
+    ; AL = char under cursor, AH = attribute
+    ; If it was our block cursor (0xDB), replace with the saved char
+    cmp al, 0xDB
+    je .cur_erase_use_saved
+    ; Otherwise restore whatever was there (shouldn't happen, but be safe)
+    mov bl, ah
+    mov ah, 0x09
+    mov bh, 0
+    mov cx, 1
+    int 0x10
+    jmp .cur_erase_mark_hidden
+.cur_erase_use_saved:
+    mov ah, 0x09
+    mov al, [.cur_saved_char]
+    mov bh, 0
+    mov bl, [.cur_saved_attr]
+    mov cx, 1
+    int 0x10
+.cur_erase_mark_hidden:
+    mov byte [.cur_visible], 0
+.cur_erase_done:
+    popa
+    ret
+
+.cur_tick:
+    pusha
+    mov ah, 0x00
+    int 0x1A
+    sub dx, [.cur_last_tick]
+    cmp dx, 9              ; ~500ms at 18.2 Hz
+    jb short .cur_tick_done
+    cmp byte [.cur_visible], 1
+    jne short .cur_tick_show
+    ; hide cursor
+    mov ah, 0x09
+    mov al, [.cur_saved_char]
+    mov bh, 0
+    mov bl, [.cur_saved_attr]
+    mov cx, 1
+    int 0x10
+    mov byte [.cur_visible], 0
+    jmp short .cur_tick_update
+.cur_tick_show:
+    mov ah, 0x09
+    mov al, 0xDB
+    mov bh, 0
+    mov bl, 0x1F
+    mov cx, 1
+    int 0x10
+    mov byte [.cur_visible], 1
+.cur_tick_update:
+    mov ah, 0x00
+    int 0x1A
+    mov [.cur_last_tick], dx
+.cur_tick_done:
+    popa
+    ret
+
+; --------------- Autocomplete: Tab handler ---------------
+.ac_complete_tab:
+    cmp word [.ac_sug_len], 0
+    je .read_loop
+    call .ac_clear
+    mov ax, [.ac_match_off]
+    sub di, ax
+    sub cx, ax
+    push cx
+    mov cx, ax
+    jcxz .ac_tab_erase_done
+.ac_tab_erase:
+    mov bl, 0x1F
+    mov al, 0x08
+    call print_char
+    mov al, ' '
+    call print_char
+    mov al, 0x08
+    call print_char
+    dec cx
+    jnz .ac_tab_erase
+.ac_tab_erase_done:
+    pop cx
+    mov si, [.ac_match_ptr]
+    mov bl, 0x1F
+.ac_tab_copy:
+    mov al, [si]
+    cmp al, 0
+    je .ac_tab_done
+    stosb
+    call print_char
+    inc cx
+    inc si
+    cmp cx, 255
+    jge .ac_tab_done
+    jmp .ac_tab_copy
+.ac_tab_done:
+    mov word [.ac_sug_len], 0
+    jmp .read_loop
+
+; --------------- Autocomplete: clear old suggestion ---------------
+.ac_clear:
+    push ax
+    push bx
+    push cx
+    push dx
+    mov cx, [.ac_sug_len]
+    test cx, cx
+    je .ac_clear_done
+    call string_get_cursor_pos
+    push dx
+    mov bl, 0x07
+    mov al, ' '
+.ac_clear_loop:
+    call print_char
+    dec cx
+    jnz .ac_clear_loop
+    pop dx
+    call string_move_cursor
+    mov word [.ac_sug_len], 0
+.ac_clear_done:
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+; --------------- Autocomplete: update suggestion ---------------
+.ac_update:
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+
+    cmp byte [autocomplete_enabled], 0
+    je .ac_update_ret
+    test cx, cx
+    je .ac_update_no_match
+
+    mov byte [di], 0
+    call .ac_clear
+
+    mov si, [.start_input_buf_addr]
+    xor bx, bx
+.ac_scan_space:
+    mov al, [si]
+    cmp al, 0
+    je .ac_scan_done
+    cmp al, ' '
+    jne .ac_scan_next
+    lea bx, [si + 1]
+.ac_scan_next:
+    inc si
+    jmp .ac_scan_space
+.ac_scan_done:
+    test bx, bx
+    je .ac_try_cmd
+    mov si, bx
+    jmp .ac_do_file
+
+.ac_try_cmd:
+    mov si, [.start_input_buf_addr]
+    call .ac_find_cmd
+    jc .ac_show_match
+
+    mov si, [.start_input_buf_addr]
+    xor bx, bx
+
+.ac_do_file:
+    cmp byte [si], 0
+    je .ac_update_no_match
+    call .ac_find_file
+    jnc .ac_update_no_match
+
+.ac_show_match:
+    mov [.ac_match_ptr], ax
+    test bx, bx
+    je .ac_prefix_full
+    mov si, bx
+    jmp .ac_calc_prefix
+.ac_prefix_full:
+    mov si, [.start_input_buf_addr]
+.ac_calc_prefix:
+    xor cx, cx
+.ac_count_prefix:
+    cmp byte [si], 0
+    je .ac_prefix_counted
+    inc si
+    inc cx
+    jmp .ac_count_prefix
+.ac_prefix_counted:
+    mov [.ac_match_off], cx
+
+    mov si, [.ac_match_ptr]
+    add si, cx
+    cmp byte [si], 0
+    je .ac_update_no_match
+
+    call string_get_cursor_pos
+    push dx
+    mov bl, 0x07
+    xor cx, cx
+.ac_print_sug:
+    mov al, [si]
+    cmp al, 0
+    je .ac_print_sug_done
+    call print_char
+    inc si
+    inc cx
+    jmp .ac_print_sug
+.ac_print_sug_done:
+    mov [.ac_sug_len], cx
+    pop dx
+    call string_move_cursor
+    jmp .ac_update_ret
+
+.ac_update_no_match:
+    mov word [.ac_sug_len], 0
+.ac_update_ret:
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+; --------------- Autocomplete: find command match ---------------
+.ac_find_cmd:
+    push bx
+    push cx
+    push si
+    push di
+    mov [.ac_search_ptr], si
+    mov bx, autocomplete_cmd_table
+.ac_cmd_loop:
+    mov di, [bx]
+    test di, di
+    je .ac_cmd_fail
+    mov si, [.ac_search_ptr]
+    call .ac_prefix_cmp
+    jc .ac_cmd_ok
+    add bx, 2
+    jmp .ac_cmd_loop
+.ac_cmd_ok:
+    mov ax, di
+    pop di
+    pop si
+    pop cx
+    pop bx
+    stc
+    ret
+.ac_cmd_fail:
+    pop di
+    pop si
+    pop cx
+    pop bx
+    clc
+    ret
+
+; --------------- Autocomplete: find file match ---------------
+.ac_find_file:
+    push bx
+    push cx
+    push si
+    push di
+    mov [.ac_search_ptr], si
+    mov bx, dirlist
+.ac_file_loop:
+    cmp byte [bx], 0
+    je .ac_file_fail
+    push bx
+    mov si, bx
+    call .ac_entry_to_name
+    pop bx
+    mov si, [.ac_search_ptr]
+    mov di, .ac_name_buf
+    call .ac_prefix_cmp
+    jc .ac_file_ok
+    add bx, 18
+    jmp .ac_file_loop
+.ac_file_ok:
+    mov ax, .ac_name_buf
+    pop di
+    pop si
+    pop cx
+    pop bx
+    stc
+    ret
+.ac_file_fail:
+    pop di
+    pop si
+    pop cx
+    pop bx
+    clc
+    ret
+
+; --------------- Autocomplete: convert dirlist entry to NAME.EXT ---------------
+.ac_entry_to_name:
+    push ax
+    push cx
+    push si
+    push di
+    mov di, .ac_name_buf
+    mov cx, 9
+.ac_e2n_name:
+    mov al, [si]
+    cmp al, ' '
+    je .ac_e2n_skip_ns
+    mov [di], al
+    inc di
+.ac_e2n_skip_ns:
+    inc si
+    dec cx
+    jnz .ac_e2n_name
+    cmp byte [si], ' '
+    jne .ac_e2n_has_ext
+    cmp byte [si+1], ' '
+    jne .ac_e2n_has_ext
+    cmp byte [si+2], ' '
+    jne .ac_e2n_has_ext
+    jmp .ac_e2n_done
+.ac_e2n_has_ext:
+    mov byte [di], '.'
+    inc di
+    mov cx, 3
+.ac_e2n_ext:
+    mov al, [si]
+    cmp al, ' '
+    je .ac_e2n_skip_es
+    mov [di], al
+    inc di
+.ac_e2n_skip_es:
+    inc si
+    dec cx
+    jnz .ac_e2n_ext
+.ac_e2n_done:
+    mov byte [di], 0
+    pop di
+    pop si
+    pop cx
+    pop ax
+    ret
+
+; --------------- Autocomplete: case-insensitive prefix compare ---------------
+.ac_prefix_cmp:
+    push ax
+    push bx
+    push si
+    push di
+.ac_cmp_loop:
+    mov al, [si]
+    cmp al, 0
+    je .ac_cmp_end
+    mov bl, [di]
+    cmp bl, 0
+    je .ac_cmp_no
+    cmp al, 'a'
+    jb .ac_cmp_u1
+    cmp al, 'z'
+    ja .ac_cmp_u1
+    sub al, 32
+.ac_cmp_u1:
+    cmp bl, 'a'
+    jb .ac_cmp_u2
+    cmp bl, 'z'
+    ja .ac_cmp_u2
+    sub bl, 32
+.ac_cmp_u2:
+    cmp al, bl
+    jne .ac_cmp_no
+    inc si
+    inc di
+    jmp .ac_cmp_loop
+.ac_cmp_end:
+    cmp byte [di], 0
+    je .ac_cmp_no
+    pop di
+    pop si
+    pop bx
+    pop ax
+    stc
+    ret
+.ac_cmp_no:
+    pop di
+    pop si
+    pop bx
+    pop ax
+    clc
+    ret
+
+.ac_sug_len      dw 0
+.ac_match_ptr    dw 0
+.ac_match_off    dw 0
+.ac_search_ptr   dw 0
+.ac_name_buf     times 14 db 0
 
 ; =======================================================================
 ; STRING_CLEAR_SCREEN - Clears the screen and applies theme
@@ -475,10 +926,8 @@ string_input_string:
 ; =======================================================================
 string_clear_screen:
     pusha
-    mov ax, 0x12
-    int 0x10
+    call set_video_mode
     popa
-    ; Load and aply theme from THEME.CFG file
     call load_and_apply_theme
     ret
 
@@ -620,7 +1069,7 @@ string_get_date_string:
     call .add_2digits
 
 .done:
-    mov ax, 0
+    xor ax, ax
     stosw
     popa
     ret
@@ -682,12 +1131,12 @@ string_bcd_to_int:
 ; =======================================================================
 string_int_to_string:
     pusha
-    mov cx, 0
+    xor cx, cx
     mov bx, 10
     mov di, .t
 
 .push:
-    mov dx, 0
+    xor dx, dx
     div bx
     inc cx
     push dx
@@ -859,7 +1308,7 @@ parse_prompt:
     ret
 
 .store_char:
-    cmp cx, 0
+    test cx, cx
     je .store_full
     stosb
     dec cx

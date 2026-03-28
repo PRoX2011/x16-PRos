@@ -521,6 +521,25 @@ start:
     ; -----------------------------------------
     mov ah, 0x05
     int 0x21
+
+    mov ah, 0x03
+    xor bh, bh
+    int 0x10
+    mov dl, 40
+    mov ah, 0x02
+    xor bh, bh
+    int 0x10
+
+    ; ---------------- Resolution--------------
+    mov ah, 0x03
+    mov si, bios_release_msg
+    int 0x21
+
+    call print_bios_release
+
+    ; -----------------------------------------
+    mov ah, 0x05
+    int 0x21
     mov ah, 0x05
     int 0x21
 
@@ -645,18 +664,44 @@ print_number:
     pop ax
     ret
 
-user_cfg       db 'USER.CFG', 0
+print_bios_release:
+    push es
+    pusha
+    mov ax, 0xF000
+    mov es, ax
+    mov di, 0xFFF5
+    mov cx, 8
+.read_char:
+    push cx
+    mov al, [es:di]     
+    
+    mov [bios_char_tmp], al 
+    
+    mov si, bios_char_tmp
+    mov ah, 0x01
+    int 0x21
 
-sep            db '---------------', 0
-dog_symbol     db '@', 0
+    inc di
+    pop cx
+    loop .read_char
 
-os_msg         db 'OS: ', 0
-host_name_msg  db 'Host: ', 0
-kernel_msg     db 'Kernel: ', 0
-shell_msg      db 'Shell: ', 0
-cpu_msg        db 'CPU: ', 0
-vesa_msg       db 'VESA: ', 0
-resolution_msg db 'Resolution: ', 0
+    popa
+    pop es
+    ret
+
+user_cfg         db 'USER.CFG', 0
+
+sep              db '---------------', 0
+dog_symbol       db '@', 0
+
+os_msg           db 'OS: ', 0
+host_name_msg    db 'Host: ', 0
+kernel_msg       db 'Kernel: ', 0
+shell_msg        db 'Shell: ', 0
+cpu_msg          db 'CPU: ', 0
+vesa_msg         db 'VESA: ', 0
+resolution_msg   db 'Resolution: ', 0
+bios_release_msg db 'BIOS release date: ', 0
 
 os_name        db 'PRos', 0
 os_full_name   db 'x16-PRos', 0
@@ -735,6 +780,8 @@ ps2_35_s_str   db 'IBM PS/2 Model 35S', 0
 ps2_p75_str    db 'IBM PS/2 Model P75', 0
 ps2_90_xp      db 'IBM PS/2 Model 90 XP 486', 0
 ps2_95_xp      db 'IBM PS/2 Model 95 XP 486', 0
+
+bios_char_tmp db 0, 0
 
 buffer resb 32
 vesa_buffer resb 512

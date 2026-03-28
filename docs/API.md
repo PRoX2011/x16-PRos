@@ -122,6 +122,33 @@ mode (640x480, 16 colors).
     - The color is determined by the value set by function 0x07 (stored in `current_color`).
     - Handles newline characters (`0x0A`) by outputting carriage return (`0x0D`) followed by line feed (`0x0A`).
 
+### Function 0x0A: Get System Time
+
+- **Description**: Returns the current system time with timezone offset applied.
+- **Input**:
+    - `AH` = 0x0A
+- **Output**:
+    - `CH` = Hours (0–23)
+    - `CL` = Minutes (0–59)
+    - `DH` = Seconds (0–59)
+- **Preserves**: All registers except `CX`, `DX`
+- **Error Handling**: No errors reported
+- **Notes**: Reads the RTC via BIOS `INT 0x1A` and applies the timezone offset from `CONF.DIR/TIMEZONE.CFG`. Values are returned in binary (not BCD).
+
+### Function 0x0B: Get System Date
+
+- **Description**: Returns the current system date with timezone offset applied.
+- **Input**:
+    - `AH` = 0x0B
+- **Output**:
+    - `CH` = Century (e.g., 20)
+    - `CL` = Year (0–99, e.g., 26 for 2026)
+    - `DH` = Month (1–12)
+    - `DL` = Day (1–31)
+- **Preserves**: All registers except `CX`, `DX`
+- **Error Handling**: No errors reported
+- **Notes**: Reads the RTC via BIOS `INT 0x1A` and applies the timezone offset from `CONF.DIR/TIMEZONE.CFG`. Day boundaries are handled correctly (e.g., UTC+5 at 23:00 rolls the date forward). Values are returned in binary (not BCD).
+
 ## Color Palette
 
 The following table lists the valid color codes for VGA mode 0x12 (16 colors):
@@ -267,40 +294,41 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Notes**: Reads the file size from the directory entry (offset 28).
 
 ### Function 0x09: Change Current Directory
-- **Description**: Navigates into the specified directory.
+- **Description**: Navigates into the specified directory. Supports nested subdirectories.
 - **Input**:
   - `AH` = 0x09
   - `SI` = Pointer to directory name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR)
 - **Output**: CF set on error
+- **Notes**: Changes into a single directory component relative to the current directory. To navigate a multi-level path (e.g. `CONF.DIR/SUB.DIR`), call this function once per component. All filesystem operations (load, write, list, etc.) operate relative to the current directory.
 
 ### Function 0x0A: Go to Parent Directory
-- **Description**: Moves the current path up one level to the parent directory.
+- **Description**: Moves the current path up one level to the parent directory using the `..` entry.
 - **Input**: `AH` = 0x0A
-- **Output**: CF set on error
+- **Output**: CF set if already at root
 
 ### Function 0x0B: Create Directory
-- **Description**: Creates a new directory entry on the disk.
+- **Description**: Creates a new directory entry in the current directory.
 - **Input**:
   - `AH` = 0x0B
   - `SI` = Pointer to directory name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR)
 - **Output**: CF set on error
 
 ### Function 0x0C: Remove Directory
-- **Description**: Deletes an empty directory.
+- **Description**: Deletes an empty directory from the current directory.
 - **Input**:
   - `AH` = 0x0C
   - `SI` = Pointer to directory name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR)
 - **Output**: CF set on error
 
 ### Function 0x0D: Check if Directory
-- **Description**: Determines if the specified name is a directory.
+- **Description**: Determines if the specified name is a directory in the current directory.
 - **Input**:
   - `AH` = 0x0D
   - `SI` = Pointer to name in 8.3 format (e.g TEST.DIR; CONF.DIR; BIN.DIR)
 - **Output**: CF set if it is a directory
 
 ### Function 0x0E: Save Current Directory
-- **Description**: Saves the current directory state to internal kernel storage.
+- **Description**: Saves the current directory state (path, cluster, disk, drive) to internal kernel storage.
 - **Input**: `AH` = 0x0E
 - **Output**: None
 
@@ -352,4 +380,4 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 The x16-PRos operating system and its API are licensed under the MIT License. See the LICENSE.TXT for details.
 
 **Author**: PRoX (https://github.com/PRoX2011)
-**Version**: 0.4, 0.5, 0.6
+**Version**: 0.4, 0.5, 0.6, 0.7, 0.8

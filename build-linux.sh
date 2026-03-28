@@ -10,6 +10,13 @@ FLAG_NO_MUSIC=0
 FLAG_NO_TXT=0
 FLAG_NO_BOOT_RECOMP=0
 FLAG_NO_KERNEL_RECOMP=0
+FLAG_NO_PROGRAMS_RECOMP=0
+FLAG_NO_LOGO_DISPLAY=0
+FLAG_NO_SETUP=0
+FLAG_DTM=0  # DTM - Dev Tesing Mode
+
+MAX_KERNEL_LOADER_BYTES=32768
+KERNEL_SIZE_WARN_BYTES=30720
 
 for arg in $@; do
     if [ $arg == "-quiet" ]; then FLAG_QUIET_MODE=1; continue; fi
@@ -17,6 +24,10 @@ for arg in $@; do
     if [ $arg == "-no-txt" ]; then FLAG_NO_TXT=1; continue; fi
     if [ $arg == "-no-boot-recomp" ]; then FLAG_NO_BOOT_RECOMP=1; continue; fi
     if [ $arg == "-no-kernel-recomp" ]; then FLAG_NO_KERNEL_RECOMP=1; continue; fi
+    if [ $arg == "-no-programs-recomp" ]; then FLAG_NO_PROGRAMS_RECOMP=1; continue; fi
+    if [ $arg == "-no-logo-display" ]; then FLAG_NO_LOGO_DISPLAY=1; continue; fi
+    if [ $arg == "-no-setup" ]; then FLAG_NO_SETUP=1; continue; fi
+    if [ $arg == "-dtm" ]; then FLAG_NO_SETUP=1; FLAG_NO_LOGO_DISPLAY=1; FLAG_NO_BOOT_RECOMP=1; continue; fi
 done
 
 RED='\033[31m'
@@ -73,6 +84,25 @@ print_kernel_size() {
     fi
 }
 
+check_kernel_size_guard() {
+    local size_bytes
+    size_bytes=$(stat -c%s bin/KERNEL.BIN 2>/dev/null || echo 0)
+
+    if [ "$size_bytes" -le 0 ]; then
+        print_failed "Kernel image missing: bin/KERNEL.BIN"
+    fi
+
+    print_info "Loader window limit: ${MAX_KERNEL_LOADER_BYTES} bytes"
+
+    if [ "$size_bytes" -gt "$KERNEL_SIZE_WARN_BYTES" ]; then
+        print_info "Kernel size warning: ${size_bytes} bytes is close to loader limit"
+    fi
+
+    if [ "$size_bytes" -gt "$MAX_KERNEL_LOADER_BYTES" ]; then
+        print_failed "Kernel too large for bootloader window (${size_bytes} > ${MAX_KERNEL_LOADER_BYTES})"
+    fi
+}
+
 mkdir -p bin
 mkdir -p disk_img
 
@@ -90,9 +120,13 @@ fi
 
 # Compile kernel
 if [ $FLAG_NO_KERNEL_RECOMP == 0 ]; then
+    addition_flags=""
+    if [ $FLAG_NO_LOGO_DISPLAY == 1 ]; then
+        addition_flags="-d NO_LOGO_DISPLAY"
+    fi
     baseline_kernel_size=$(stat -c%s bin/KERNEL.BIN 2>/dev/null || echo 0)
     print_info "Compiling kernel (kernel.asm => bin/KERNEL.BIN)..."
-    nasm -f bin src/kernel/kernel.asm -o bin/KERNEL.BIN
+    nasm -f bin src/kernel/kernel.asm -o bin/KERNEL.BIN $addition_flags
     check_error "Kernel compilation failed"
     print_ok "Kernel compiled successfully"
     current_kernel_size=$(stat -c%s bin/KERNEL.BIN 2>/dev/null || echo 0)
@@ -106,6 +140,8 @@ if [ $FLAG_NO_KERNEL_RECOMP == 0 ]; then
     fi
     print_kernel_size "Current"
 fi
+
+check_kernel_size_guard
 
 # Create and format disk image
 print_info "Creating disk image (disk_img/x16pros.img)..."
@@ -172,6 +208,67 @@ mmd -i disk_img/x16pros.img ::/MUSIC.DIR
 check_error "Failed to create MUSIC directory"
 print_ok "MUSIC directory created successfully"
 
+# Create FONTS directory
+print_splitline "Creating FONTS directory..."
+print_info "Creating FONTS directory..."
+mmd -i disk_img/x16pros.img ::/FONTS.DIR
+check_error "Failed to create FONTS directory"
+print_ok "FONTS directory created successfully"
+
+# Create THEMES directory
+print_splitline "Creating THEMES directory..."
+print_info "Creating THEMES directory..."
+mmd -i disk_img/x16pros.img ::/THEMES.DIR
+check_error "Failed to create THEMES directory"
+print_ok "THEMES directory created successfully"
+
+# Copy fonts
+print_info "Copying DEFAULT.FNT to disk..."
+mcopy -i disk_img/x16pros.img assets/fonts/DEFAULT.FNT ::/FONTS.DIR/
+check_error "DEFAULT.FNT copy failed"
+print_ok "DEFAULT.FNT copied successfully"
+
+print_info "Copying BOLD.FNT to disk..."
+mcopy -i disk_img/x16pros.img assets/fonts/BOLD.FNT ::/FONTS.DIR/
+check_error "BOLD.FNT copy failed"
+print_ok "BOLD.FNT copied successfully"
+
+print_info "Copying THIN.FNT to disk..."
+mcopy -i disk_img/x16pros.img assets/fonts/THIN.FNT ::/FONTS.DIR/
+check_error "THIN.FNT copy failed"
+print_ok "THIN.FNT copied successfully"
+
+print_info "Copying ITALIC.FNT to disk..."
+mcopy -i disk_img/x16pros.img assets/fonts/ITALIC.FNT ::/FONTS.DIR/
+check_error "ITALIC.FNT copy failed"
+print_ok "ITALIC.FNT copied successfully"
+
+# Copy themes
+print_info "Copying DEFAULT.THM to disk..."
+mcopy -i disk_img/x16pros.img assets/themes/DEFAULT.THM ::/THEMES.DIR/
+check_error "DEFAULT.THM copy failed"
+print_ok "DEFAULT.THM copied successfully"
+
+print_info "Copying VGA.THM to disk..."
+mcopy -i disk_img/x16pros.img assets/themes/VGA.THM ::/THEMES.DIR/
+check_error "VGA.THM copy failed"
+print_ok "VGA.THM copied successfully"
+
+print_info "Copying UBUNTU.THM to disk..."
+mcopy -i disk_img/x16pros.img assets/themes/UBUNTU.THM ::/THEMES.DIR/
+check_error "UBUNTU.THM copy failed"
+print_ok "UBUNTU.THM copied successfully"
+
+print_info "Copying OCEAN.THM to disk..."
+mcopy -i disk_img/x16pros.img assets/themes/OCEAN.THM ::/THEMES.DIR/
+check_error "OCEAN.THM copy failed"
+print_ok "OCEAN.THM copied successfully"
+
+print_info "Copying MONO.THM to disk..."
+mcopy -i disk_img/x16pros.img assets/themes/MONO.THM ::/THEMES.DIR/
+check_error "MONO.THM copy failed"
+print_ok "MONO.THM copied successfully"
+
 echo -e "$NC"
 
 # Copy config files
@@ -194,6 +291,9 @@ print_ok "PROMPT.CFG copied successfully"
 mcopy -i disk_img/x16pros.img src/kernel/configs/THEME.CFG ::/CONF.DIR/
 check_error "THEME.CFG copy failed"
 print_ok "THEME.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/FONT.CFG ::/CONF.DIR/
+check_error "FONT.CFG copy failed"
+print_ok "FONT.CFG copied successfully"
 mcopy -i disk_img/x16pros.img src/kernel/configs/SYSTEM.CFG ::/
 check_error "SYSTEM.CFG copy failed"
 print_ok "SYSTEM.CFG copied successfully"
@@ -211,10 +311,17 @@ for prog in "${programs_root[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
 
-    print_info "Compiling $src => bin/$bin_name..."
-    nasm -f bin $src -o bin/$bin_name
-    check_error "Compilation of $src failed"
-    print_ok "$bin_name compiled successfully"
+    addition_flags=""
+    if [ $FLAG_NO_SETUP == 1 ]; then
+        addition_flags="-d NO_SETUP"
+    fi
+
+    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+        print_info "Compiling $src => bin/$bin_name..."
+        nasm -f bin $src -o bin/$bin_name $addition_flags
+        check_error "Compilation of $src failed"
+        print_ok "$bin_name compiled successfully"
+    fi
     
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/
@@ -255,16 +362,20 @@ programs=(
     "programs/ed.asm ED.BIN"
     "programs/fdisk.asm FDISK.BIN"
     "programs/launch.asm LAUNCH.BIN"
+    "programs/font.asm FONT.BIN"
+    "programs/tree.asm TREE.BIN"
 )
 
 for prog in "${programs[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
 
-    print_info "Compiling $src => bin/$bin_name..."
-    nasm -f bin $src -o bin/$bin_name
-    check_error "Compilation of $src failed"
-    print_ok "$bin_name compiled successfully"
+    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+        print_info "Compiling $src => bin/$bin_name..."
+        nasm -f bin $src -o bin/$bin_name
+        check_error "Compilation of $src failed"
+        print_ok "$bin_name compiled successfully"
+    fi
 
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/BIN.DIR/
@@ -283,10 +394,12 @@ for prog in "${programs_com[@]}"; do
     src=$(echo $prog | cut -d' ' -f1)
     bin_name=$(echo $prog | cut -d' ' -f2)
 
-    print_info "Compiling $src => bin/$bin_name..."
-    nasm -f bin $src -o bin/$bin_name
-    check_error "Compilation of $src failed"
-    print_ok "$bin_name compiled successfully"
+    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+        print_info "Compiling $src => bin/$bin_name..."
+        nasm -f bin $src -o bin/$bin_name
+        check_error "Compilation of $src failed"
+        print_ok "$bin_name compiled successfully"
+    fi
     
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/COM.DIR/
@@ -294,6 +407,7 @@ for prog in "${programs_com[@]}"; do
     print_ok "$bin_name copied successfully"
 done
 
+mcopy -i disk_img/x16pros.img bin/prasm.bin ::/BIN.DIR/
 
 # Copy text files
 if [ $FLAG_NO_TXT == 0 ]; then
@@ -308,6 +422,11 @@ if [ $FLAG_NO_TXT == 0 ]; then
         check_error "Copy of $file failed"
         print_ok "$file copied successfully"
     done
+
+    print_info "Copying project_philosophy.txt as PROJECT.TXT..."
+    mcopy -o -i disk_img/x16pros.img project_philosophy.txt ::/PROJECT.TXT
+    check_error "Copy of PROJECT.TXT failed"
+    print_ok "PROJECT.TXT copied successfully"
 
     text_files_doc=(
         "src/txt/README.TXT"

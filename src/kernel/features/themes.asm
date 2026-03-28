@@ -23,7 +23,7 @@ load_and_apply_theme:
     jc .error
 
     ; Check if file is empty
-    cmp bx, 0
+    test bx, bx
     je .error
 
     ; Parse and apply theme
@@ -87,8 +87,15 @@ load_and_apply_theme:
 
     call .skip_to_newline
 
-    mov ax, 1010h
+    mov [.next_si], si
+
+    ; Translate color index to actual DAC register for VGA mode 0x12.
+    ; In mode 0x12 the ATC remaps: colors 8-15 -> DAC 56-63, color 6 -> DAC 20.
+    xor bx, bx
     mov bl, [.color_index]
+    mov bl, [.atc_to_dac + bx]
+
+    mov ax, 1010h
     mov bh, 0
     mov dh, [.red]
     mov ch, [.green]
@@ -96,6 +103,7 @@ load_and_apply_theme:
     int 10h
 
     popa
+    mov si, [.next_si]
     clc
     ret
 
@@ -183,7 +191,7 @@ load_and_apply_theme:
     dec si
     mov al, bl
 
-    cmp cx, 0
+    test cx, cx
     je .parse_num_error
 
     pop cx
@@ -202,3 +210,9 @@ load_and_apply_theme:
 .red          db 0
 .green        db 0
 .blue         db 0
+.next_si      dw 0
+
+; VGA mode 0x12 ATC -> DAC mapping for colors 0-15:
+;   colors 0-5 direct, color 6 -> DAC 20, color 7 direct,
+;   colors 8-15 -> DAC 56-63
+.atc_to_dac   db 0, 1, 2, 3, 4, 5, 20, 7, 56, 57, 58, 59, 60, 61, 62, 63

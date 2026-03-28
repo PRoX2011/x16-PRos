@@ -5,7 +5,7 @@
 <h1>x16-PRos Operating System</h1>
 
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE.TXT)
-[![Version](https://img.shields.io/badge/version-0.7-blue?style=for-the-badge)](docs/changes/v0.7.txt)
+[![Version](https://img.shields.io/badge/version-0.8-blue?style=for-the-badge)](docs/changes/v0.8.txt)
 [![Assembler](https://img.shields.io/badge/assembler-NASM-1f425f?style=for-the-badge)](https://nasm.us/)
 [![Boot Mode](https://img.shields.io/badge/boot-BIOS%20Legacy-orange?style=for-the-badge)](#running-x16-pros)
 
@@ -79,9 +79,11 @@ Thanks to everyone who supported me financially. All your nicknames will appear 
 - **File Inspection**: CAT, SIZE, HEAD, TAIL, GREP utilities
 - **BMP Image Viewer**: 256-color BMP rendering with 2x upscaling support
 - **Parameter Passing**: Command-line argument support for applications
-- **API Access**: Comprehensive kernel API for file, string, and output operations
+- **API Access**: Comprehensive kernel API for file, disk, time and output operations
 - **Debugging Tools**: CPU info display, memory viewer, register inspection
 - **Multiple disk support**: detect/list available drives and switch drives in the terminal
+- **cp866 fonts support**: change system font using config or TUI application
+- **Timezones support**: change your time zone via TIMEZONE.CFG
 
 ---
 
@@ -412,6 +414,7 @@ sudo dd if=disk_img/x16pros.img of=/dev/sdX bs=512
 
 ## Contributors
 
+[<img src="https://wsrv.nl/?url=https://github.com/desvor58.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="leo-ono" />](https://github.com/desvor58)
 [<img src="https://wsrv.nl/?url=github.com/akbe2020.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="akbe2020" />](https://github.com/akbe2020)
 [<img src="https://wsrv.nl/?url=github.com/ilnarildarovuch2.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="ilnarildarovuch2" />](https://github.com/ilnarildarovuch2)
 [<img src="https://wsrv.nl/?url=github.com/dexoron.png?w=64&h=64&mask=circle&fit=cover&maxage=1w" width="64" height="64" alt="dexoron" />](https://github.com/dexoron)

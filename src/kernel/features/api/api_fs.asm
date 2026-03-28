@@ -35,7 +35,7 @@ api_fs_init:
     mov word [es:0x22*4], int22_handler
     mov word [es:0x22*4+2], cs
     sti
-    mov ax, 0
+    xor ax, ax
     call fs_reset_floppy
     pop es
     popa
@@ -95,7 +95,7 @@ int22_handler:
     jmp .done
 
 .init:
-    mov ax, 0
+    xor ax, ax
     call fs_reset_floppy
     jmp .done
 

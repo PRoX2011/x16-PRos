@@ -22,6 +22,11 @@ start:
 		mov si, loading_msg
 		int 0x21
 
+		mov ah, 0x04
+		mov si, [filename_ptr]
+		int 0x22
+		jc .not_found
+
 		mov ah, 0x10
         mov si, [filename_ptr]
         mov cx, 43008
@@ -86,6 +91,18 @@ start:
 		mov ax, [bytes_read]
 		cmp ax, [music_length]
 		jb .next_note
+
+		jmp .exit
+
+	.not_found:
+	    mov ah, 0x04
+	    mov si, notfound_msg
+		int 0x21
+
+		mov ah, 0x05
+		int 0x21
+
+		jmp .exit
 
 	.exit:
 		call stop_fast_clock
@@ -206,3 +223,4 @@ bytes_read   dw 0
 loading_msg  db '  Loading IMF file...', 10, 13, 0
 playing_msg  db '  Playing IMF file. ', 0
 any_key_msg  db 'Press any key to stop.', 10, 13, 0
+notfound_msg db 'File not found', 0

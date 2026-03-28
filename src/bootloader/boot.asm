@@ -8,6 +8,7 @@
 
 [BITS 16]
 [ORG 0x0000]
+[CPU 8086]
 
 start: jmp main
 
@@ -120,6 +121,14 @@ ReadSectors:
     pop bx
     pop ax
     add bx, WORD [bpbBytesPerSector]
+    jnc .NEXT
+    mov dx, es
+    cmp dx, 0x2000
+    jne .WRAP_FAIL
+    jmp FAILURE
+.WRAP_FAIL:
+    int 0x18
+.NEXT:
     inc ax
     loop .MAIN
     ret
@@ -207,7 +216,10 @@ LOAD_IMAGE:
     jmp .DONE
 
 .ODD_CLUSTER:
-    shr dx, 0x0004
+    shr dx, 1
+    shr dx, 1
+    shr dx, 1
+    shr dx, 1
 
 .DONE:
     mov WORD [cluster], dx
@@ -217,13 +229,13 @@ LOAD_IMAGE:
 DONE:
     mov si, msgCRLF
     call Print
-    push WORD 0x2000
-    push WORD 0x0000
+    jmp 0x2000:0x0000
     retf
 
 FAILURE:
     mov si, msgFailure
     call Print
+REBOOT:
     mov ah, 0x00
     int 0x16
     int 0x19
