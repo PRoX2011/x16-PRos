@@ -140,4 +140,8 @@ and memory layout. Hope you love it :)
 
 =======================================================================================
 
+15. The CLI utility for changing themes has been replaced by a new and more convenient TUI program
+
+=======================================================================================
+
 Copyright (C) 2024-2026 PRoX2011
