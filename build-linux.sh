@@ -364,6 +364,7 @@ programs=(
     "programs/launch.asm LAUNCH.BIN"
     "programs/font.asm FONT.BIN"
     "programs/tree.asm TREE.BIN"
+    "programs/print.asm PRINT.BIN"
 )
 
 for prog in "${programs[@]}"; do
