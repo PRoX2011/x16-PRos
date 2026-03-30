@@ -80,9 +80,9 @@
 ;  Function 45h: Duplicate file handle
 ;  Function 46h: Force duplicate file handle
 ;  Function 47h: Get current directory path
-;  Function 48h: Allocate memory block
-;  Function 49h: Free allocated memory block
-;  Function 4Ah: Resize memory block
+;  [DONE] Function 48h: Allocate memory block
+;  [DONE] Function 49h: Free allocated memory block
+;  [DONE] Function 4Ah: Resize memory block
 ;  Function 4Bh: Load/Execute program (EXEC)
 ;  [DONE] Function 4Ch: Terminate program with return code
 ;  [DONE] Function 4Dh: Get program return code
@@ -249,6 +249,8 @@ int21_dos_handler:
     je com_2Fh
     cmp ah, 0x30
     je com_30h
+    cmp ah, 0x31
+    je com_31h
     cmp ah, 0x35
     je com_35h
     cmp ah, 0x36
@@ -265,8 +267,22 @@ int21_dos_handler:
     je com_4Ch
     cmp ah, 0x4D
     je com_4Dh
+    cmp ah, 0x4B
+    je com_4Bh
+    cmp ah, 0x48
+    je com_48h
+    cmp ah, 0x49
+    je com_49h
+    cmp ah, 0x4A
+    je com_4Ah
     cmp ah, 0x54
     je com_54h
+    cmp ah, 0x5E
+    je com_5Eh
+    cmp ah, 0x5F
+    je com_5Fh
+    mov ax, 0x0001
+    stc
     iret
 
 
@@ -279,6 +295,16 @@ last_return_type      db 0
 com_tmp_drive         db 0
 com_path_buffer       times 128 db 0
 com_path_buffer2       times 128 db 0
+
+; simple DOS memory allocator for INT 21h AH=48h/49h/4Ah
+; pool: conventional RAM paragraphs from 0x0500..0x7C00
+mem_pool_top          dw 0x0500
+mem_pool_end          dw 0x7C00
+
+; LIFO free stack, last freed is merged immediately via bump rollback
+mem_stack_sp          db 0
+mem_stack_seg         times 8 dw 0
+mem_stack_size        times 8 dw 0
 
 ; Copy ASCIIZ from caller DS:DX to kernel com_path_buffer.
 ; Truncates to 127 chars and always null-terminates.
@@ -376,6 +402,142 @@ bcd_to_bin_time:
     pop ax
     ret
 
+; mem_alloc: allocate BX paragraphs, return AX=segment, CF set on error
+; IN:  BX = size in paragraphs
+; OUT: AX = start segment (DOS expects segment in AX), CF=0 on success
+mem_alloc:
+    push ds
+    mov ax, 0x2000
+    mov ds, ax
+
+    cmp bx, 0
+    je .no_mem
+
+    mov ax, [mem_pool_top]
+    mov cx, ax                      ; start seg
+    add ax, bx                      ; end seg
+    jc .no_mem
+    cmp ax, [mem_pool_end]
+    ja .no_mem
+
+    mov [mem_pool_top], ax
+
+    xor si, si
+    mov si, [mem_stack_sp]
+    cmp si, 8
+    jae .no_mem
+
+    shl si, 1
+    mov [mem_stack_seg+si], cx
+    mov [mem_stack_size+si], bx
+    inc byte [mem_stack_sp]
+
+    mov ax, cx
+    clc
+    pop ds
+    ret
+
+.no_mem:
+    mov ax, 0x0008                 ; insufficient memory
+    stc
+    pop ds
+    ret
+
+; mfree: free ES segment, LIFO only, CF set on error
+; IN:  ES = segment returned by mem_alloc
+; OUT: CF=0 on success
+mfree:
+    push ds
+    mov ax, 0x2000
+    mov ds, ax
+
+    cmp byte [mem_stack_sp], 0
+    je .invalid
+
+    mov bl, [mem_stack_sp]
+    dec bl
+    xor bh, bh
+    shl bx, 1
+    mov ax, [mem_stack_seg+bx]
+    mov dx, es
+    cmp ax, dx
+    jne .invalid
+
+    dec byte [mem_stack_sp]
+    mov [mem_pool_top], ax
+
+    clc
+    pop ds
+    ret
+
+.invalid:
+    mov ax, 0x0006                 ; invalid memory block
+    stc
+    pop ds
+    ret
+
+; mem_resize: resize ES segment to BX paragraphs, LIFO only
+; IN:  ES = segment, BX = new size (paragraphs)
+; OUT: CF=0 on success, AX=ES
+mem_resize:
+    push ds
+    mov ax, 0x2000
+    mov ds, ax
+
+    mov di, bx                      ; new size
+
+    cmp byte [mem_stack_sp], 0
+    je .invalid
+
+    mov bl, [mem_stack_sp]
+    dec bl
+    xor bh, bh
+    shl bx, 1                       ; offset in bytes
+
+    mov ax, [mem_stack_seg+bx]     ; start seg
+    mov dx, es
+    cmp ax, dx
+    jne .invalid
+
+    mov dx, [mem_stack_size+bx]    ; old size
+
+    cmp di, dx
+    jbe .shrink
+
+    ; expand
+    add ax, di
+    jc .no_mem
+    cmp ax, [mem_pool_end]
+    ja .no_mem
+
+    mov [mem_pool_top], ax
+    mov [mem_stack_size+bx], di
+    mov ax, es
+    clc
+    pop ds
+    ret
+
+.shrink:
+    add ax, di
+    mov [mem_pool_top], ax
+    mov [mem_stack_size+bx], di
+    mov ax, es
+    clc
+    pop ds
+    ret
+
+.no_mem:
+    mov ax, 0x0008                 ; insufficient memory
+    stc
+    pop ds
+    ret
+
+.invalid:
+    mov ax, 0x0006                 ; invalid memory block
+    stc
+    pop ds
+    ret
+
 %include "src/kernel/features/com/00h.asm"
 %include "src/kernel/features/com/01h.asm"
 %include "src/kernel/features/com/02h.asm"
@@ -406,6 +568,7 @@ bcd_to_bin_time:
 %include "src/kernel/features/com/2Ch.asm"
 %include "src/kernel/features/com/2Fh.asm"
 %include "src/kernel/features/com/30h.asm"
+%include "src/kernel/features/com/31h.asm"
 %include "src/kernel/features/com/35h.asm"
 %include "src/kernel/features/com/36h.asm"
 %include "src/kernel/features/com/39h.asm"
@@ -414,4 +577,10 @@ bcd_to_bin_time:
 %include "src/kernel/features/com/41h.asm"
 %include "src/kernel/features/com/4Ch.asm"
 %include "src/kernel/features/com/4Dh.asm"
+%include "src/kernel/features/com/4Bh.asm"
+%include "src/kernel/features/com/48h.asm"
+%include "src/kernel/features/com/49h.asm"
+%include "src/kernel/features/com/4Ah.asm"
 %include "src/kernel/features/com/54h.asm"
+%include "src/kernel/features/com/5Eh.asm"
+%include "src/kernel/features/com/5Fh.asm"

@@ -501,12 +501,21 @@ if [ $FLAG_QUIET_MODE == 0 ]; then
     mdir -i disk_img/x16pros.img ::/
 fi
 
-# Create ISO
-# rm -f disk_img/x16pros.iso
-# print_info "Creating ISO image (disk_img/x16pros.iso)..."
-# mkisofs -quiet -V 'x16-PROS' -input-charset iso8859-1 -o disk_img/x16pros.iso -b x16pros.img disk_img/
-# check_error "ISO creation failed"
-# print_ok "ISO image created successfully"
+# Create ISO (optional)
+rm -f disk_img/x16pros.iso 2>/dev/null || true
+if command -v mkisofs >/dev/null 2>&1; then
+    print_info "Creating ISO image (disk_img/x16pros.iso)..."
+    mkisofs -quiet -V 'x16-PROS' -input-charset iso8859-1 -o disk_img/x16pros.iso -b x16pros.img disk_img/
+    check_error "ISO creation failed"
+    print_ok "ISO image created successfully"
+elif command -v genisoimage >/dev/null 2>&1; then
+    print_info "Creating ISO image (disk_img/x16pros.iso)..."
+    genisoimage -quiet -V 'x16-PROS' -input-charset iso8859-1 -o disk_img/x16pros.iso -b x16pros.img disk_img/
+    check_error "ISO creation failed"
+    print_ok "ISO image created successfully"
+else
+    print_info "ISO tools not installed (mkisofs/genisoimage). Skipping ISO creation."
+fi
 
 
 print_splitline "Build completed successfully!"

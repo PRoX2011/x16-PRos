@@ -1,7 +1,7 @@
-[ IN PROGRESS ] Implement all MS-DOS system calls for the compatibility layer (37/87)
+[ IN PROGRESS ] Implement all MS-DOS system calls for the compatibility layer (40/87)
 [     TODO    ] Implement cooperative multitasking
-[     TODO    ] Add malloc, mfree
-[     TODO    ] Add the ability to compile x16-PRos to ISO image
+[    DONE     ] Add malloc, mfree
+[    DONE     ] Add the ability to compile x16-PRos to ISO image
 [     TODO    ] Add internet driver
 [     TODO    ] Separate PRos Terminal from kernel
 [     TODO    ] I/O redirection and pipes (cmd > file, cmd1 | cmd2)
