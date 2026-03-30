@@ -109,7 +109,7 @@ string_move_cursor:
     ret
 
 help_categories:
-    dw  help_menu_1, help_menu_2, help_menu_3, help_menu_4, help_menu_5
+    dw  help_menu_1, help_menu_2, help_menu_3, help_menu_4, help_menu_5, help_menu_6
     dw 0
 
 current_category dw 0
@@ -212,6 +212,28 @@ help_menu_5 db 0xC9, 18 dup(0xCD), ' PRos help ', 18 dup(0xCD), 0xBB, 10, 13
      db 0xBA, '                                               ', 0xBA, 10, 13
      db 0xBA, '                                               ', 0xBA, 10, 13
      db 0xBA, '                                               ', 0xBA, 10, 13
+     db 0xBA, '                                               ', 0xBA, 10, 13
+     db 0xBA, '                                               ', 0xBA, 10, 13
+     db 0xBA, '                                               ', 0xBA, 10, 13
+     db 0xBA, '                                               ', 0xBA, 10, 13
+     db 0xBA, '                                               ', 0xBA, 10, 13
+     db 0xBA, '                                               ', 0xBA, 10, 13
+     db 0xBA, '                                               ', 0xBA, 10, 13
+     db 0xBA, '                                               ', 0xBA, 10, 13
+     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
+     db 0xBA, ' <-- Back   |  Press ESC to exit   |  Next --> ', 0xBA, 10, 13
+     db 0xC8, 47 dup(0xCD), 0xBC, 0
+
+help_menu_6 db 0xC9, 18 dup(0xCD), ' PRos help ', 18 dup(0xCD), 0xBB, 10, 13
+     db 0xBA, ' Networking operations                   [6/6] ', 0xBA, 10, 13
+     db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
+     db 0xBA, '  ip               - show current IP           ', 0xBA, 10, 13
+     db 0xBA, '  setip <IPv4>     - set own static IP address ', 0xBA, 10, 13
+     db 0xBA, '  ping <IPv4 Addr> - ping a target             ', 0xBA, 10, 13
+     db 0xBA, '  netinfo          - show interface info       ', 0xBA, 10, 13
+     db 0xBA, '                                               ', 0xBA, 10, 13
+     db 0xBA, '  Example: ping 10.0.2.2                       ', 0xBA, 10, 13
+     db 0xBA, '  setip 10.0.2.5                               ', 0xBA, 10, 13
      db 0xBA, '                                               ', 0xBA, 10, 13
      db 0xBA, '                                               ', 0xBA, 10, 13
      db 0xBA, '                                               ', 0xBA, 10, 13
