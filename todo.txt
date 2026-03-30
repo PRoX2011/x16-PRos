@@ -2,7 +2,7 @@
 [     TODO    ] Implement cooperative multitasking
 [     TODO    ] Add malloc, mfree
 [     TODO    ] Add the ability to compile x16-PRos to ISO image
-[     TODO    ] Add internet driver
+[     DONE    ] Add internet driver
 [     TODO    ] Separate PRos Terminal from kernel
 [     TODO    ] I/O redirection and pipes (cmd > file, cmd1 | cmd2)
 [     TODO    ] Batch script support (.BAT / .SH style)

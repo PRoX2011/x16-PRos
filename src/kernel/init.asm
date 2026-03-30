@@ -14,6 +14,7 @@ init_system:
     call init_configs
     call init_display
     call init_security
+    call init_network
     call init_autoexec
     ret
 
@@ -97,6 +98,22 @@ init_security:
     mov si, security_init_msg
     call log_okay
 
+    ret
+
+init_network:
+    mov si, network_init_msg
+    call log_okay
+
+    call ne2000_probe
+    jnc .network_ok
+
+    mov si, network_fail_msg
+    call log_warn
+    ret
+
+.network_ok:
+    mov si, network_ok_msg
+    call log_okay
     ret
 
 init_autoexec:
@@ -953,6 +970,7 @@ display_init_msg         db 'Display initialization', 0
 mouse_init_msg           db 'Mouse driver loaded', 0
 security_init_msg        db 'Security check', 0
 shell_init_msg           db 'Shell initialization', 0
+network_init_msg         db 'NIC (Ne2000) initialization', 0
 
 ; Boot process messages
 first_boot_detected_msg  db 'First boot detected', 0
@@ -973,6 +991,8 @@ user_cfg_missed          db 'USER.CFG not found', 0
 pass_cfg_missed          db 'PASSWORD.CFG not found', 0
 prompt_cfg_missed        db 'PROMPT.CFG not found', 0
 logo_missed              db 'LOGO.BMP not found', 0
+network_ok_msg           db 'Net OK', 0
+network_fail_msg         db 'Net FAIL', 0
 user_cfg_size            dw 0
 prompt_cfg_size          dw 0
 password_cfg_size        dw 0

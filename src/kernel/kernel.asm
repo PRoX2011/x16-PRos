@@ -579,6 +579,22 @@ get_cmd:
     call string_string_compare
     jc near cd_command
 
+    mov di, ping_string
+    call string_string_compare
+    jc near do_ping
+
+    mov di, setip_string
+    call string_string_compare
+    jc near do_setip
+
+    mov di, ip_string
+    call string_string_compare
+    jc near do_ip
+
+    mov di, netinfo_string
+    call string_string_compare
+    jc near do_netinfo
+
     mov si, command
     mov di, kernel_file
     call string_string_compare
@@ -2208,6 +2224,197 @@ cd_command:
 .already_root_msg   db 'Already in root directory', 0
 .failure_msg        db 'Directory not found or invalid', 0
 
+do_ping:
+    call print_newline
+    pusha
+
+    mov word si, [param_list]
+    call string_string_parse
+
+    test ax, ax
+    je .no_args
+
+    mov si, ax
+    call icmp_ping
+
+    popa
+    call print_newline
+    jmp get_cmd
+
+.no_args:
+    mov si, .no_args_msg
+    call print_string_red
+    call print_newline
+    popa
+    call print_newline
+    jmp get_cmd
+
+.no_args_msg db 'Usage: PING <IPv4 address>', 0
+
+do_ip:
+    call print_newline
+    pusha
+    mov ax, KERNEL_DATA_SEG
+    mov ds, ax
+    mov es, ax
+
+    mov si, do_ip_debug_msg
+    call print_string
+    call print_newline
+
+    mov si, ip_status_msg
+    call print_string
+    
+    mov al, [net_local_ip]
+    xor ah, ah
+    call .print_ip_part
+    
+    mov al, '.'
+    call print_char
+    
+    mov al, [net_local_ip+1]
+    xor ah, ah
+    call .print_ip_part
+    
+    mov al, '.'
+    call print_char
+    
+    mov al, [net_local_ip+2]
+    xor ah, ah
+    call .print_ip_part
+    
+    mov al, '.'
+    call print_char
+    
+    mov al, [net_local_ip+3]
+    xor ah, ah
+    call .print_ip_part
+    
+    popa
+    call print_newline
+    jmp get_cmd
+
+.print_ip_part:
+    call string_int_to_string
+    mov si, ax
+    call print_string
+    ret
+
+do_setip:
+    call print_newline
+    pusha
+
+    mov ax, KERNEL_DATA_SEG
+    mov ds, ax
+    mov es, ax
+    
+    mov word si, [param_list]
+    call string_string_parse
+    test ax, ax
+    je .no_args
+    
+    mov si, ax
+    lea di, [net_local_ip]
+    call icmp_parse_ip
+    jc .error_parse
+    
+    mov ax, KERNEL_DATA_SEG
+    mov ds, ax
+    mov es, ax
+    
+    mov si, ip_set_success
+    call print_string_green
+    call print_newline
+
+    mov si, ip_set_debug_msg
+    call print_string
+    mov al, [net_local_ip]
+    xor ah, ah
+    call print_decimal
+    mov al, '.'
+    call print_char
+    mov al, [net_local_ip+1]
+    xor ah, ah
+    call print_decimal
+    mov al, '.'
+    call print_char
+    mov al, [net_local_ip+2]
+    xor ah, ah
+    call print_decimal
+    mov al, '.'
+    call print_char
+    mov al, [net_local_ip+3]
+    xor ah, ah
+    call print_decimal
+
+    popa
+    call print_newline
+    jmp get_cmd
+
+.no_args:
+    mov si, ip_usage_msg
+    call print_string_red
+    jmp .exit
+.error_parse:
+    mov si, ip_invalid_msg
+    call print_string_red
+.exit:
+    popa
+    call print_newline
+    jmp get_cmd
+
+do_netinfo:
+    call print_newline
+    pusha
+    
+    ; Show I/O Port
+    mov si, ni_io_msg
+    call print_string
+    mov ax, [ne2k_iobase]
+    mov al, ah
+    call print_hex_byte
+    mov ax, [ne2k_iobase]
+    call print_hex_byte
+    call print_newline
+    
+    ; Show MAC Address
+    mov si, ni_mac_msg
+    call print_string
+    lea si, [ne2k_mac]
+    mov cx, 5
+.mac_loop:
+    mov al, [si]
+    call print_hex_byte
+    mov al, ':'
+    call print_char
+    inc si
+    loop .mac_loop
+    mov al, [si]
+    call print_hex_byte
+    
+    call print_newline
+    popa
+    jmp get_cmd
+
+; IN: AL = byte to print in hex
+print_hex_byte:
+    push ax
+    shr al, 4
+    call .nibble_to_hex
+    call print_char
+    pop ax
+    and al, 0x0F
+    call .nibble_to_hex
+    call print_char
+    ret
+.nibble_to_hex:
+    add al, '0'
+    cmp al, '9'
+    jbe .hex_done
+    add al, 7
+.hex_done:
+    ret
+
 %INCLUDE "src/kernel/init.asm"                      ; x16-PRos initialisation
 %INCLUDE "src/kernel/log.asm"                       ; Log functions
 %INCLUDE "src/kernel/features/fs.asm"               ; FAT12 filesystem functions
@@ -2222,7 +2429,14 @@ cd_command:
 
 ; ====== DRIVERS ======
 %INCLUDE "src/drivers/ps2_mouse.asm"                ; Mouse driver
+%INCLUDE "src/drivers/net/ne2000/ne2000.asm"        ; NE2000 driver
 ; =====================
+
+; ====== NETWORK STACK ======
+%INCLUDE "src/kernel/InternetProtocol/arp.asm"
+%INCLUDE "src/kernel/InternetProtocol/ip.asm"
+%INCLUDE "src/kernel/InternetProtocol/icmp.asm"
+; ===========================
 
 ; ====== API ======
 %INCLUDE "src/kernel/features/api/api_output.asm"
@@ -2231,47 +2445,23 @@ cd_command:
 
 ; ===================== Data Section =====================
 section .data
+net_local_ip      db 10, 0, 2, 15
 ; ------ Header ------
 header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v0.8', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
 
 ; ------ Help ------
-kshell_comands db 'HELP               - get list of commands', 10, 13
-               db 'INFO               - system information', 10, 13
-               db 'VER                - terminal version', 10, 13
-               db 'CLS                - clear screen', 10, 13
-               db 'SHUT               - shutdown', 10, 13
-               db 'REBOOT             - restart', 10, 13
-               db 'DATE               - current date (DD/MM/YY)', 10, 13
-               db 'TIME               - current time (HH:MM:SS)', 10, 13
-               db 'CPU                - CPU info', 10, 13
-               db 'DIR                - list files', 10, 13
-               db 'SIZE   <f>         - file size', 10, 13
-               db 'CAT    <f>         - show file', 10, 13
-               db 'DEL    <f>         - delete file', 10, 13
-               db 'COPY   <f1> <f2>   - copy file (root only)', 10, 13
-               db 'REN    <f1> <f2>   - rename file (root only)', 10, 13
-               db 'TOUCH  <f>         - create empty file', 10, 13
-               db 'WRITE  <f> <text>  - write to file', 10, 13
-               db 'VIEW   <f> <flags> - view BMP image', 10, 13
-               db 'CD     <dir>       - change directory', 10, 13
-               db 'MKDIR  <dir>       - create directory', 10, 13
-               db 'DELDIR <dir>       - delete directory', 10, 13
-               db 'EXIT               - exit to bootloader', 10, 13, 0
+kshell_comands db 'HELP,INFO,VER,CLS,SHUT,REBOOT,DATE,TIME,CPU,DIR,CD,MKDIR,DELDIR', 10, 13
+               db 'SIZE,CAT,DEL,COPY,REN,TOUCH,WRITE,VIEW<f>,PING<ip>,SETIP<ip>,IP,NET,EXIT', 10, 13, 0
 
 ; ------ About OS ------
 info db 10, 13
      db 20 dup(0xC4), ' INFO ', 21 dup(0xC4), 10, 13
-     db '  x16 PRos is the simple 16 bit operating', 10, 13
-     db '  system written in NASM for x86 PC`s ', 10, 13
-     db 47 dup(0xC4), 10, 13
-     db '  Author:           PRoX   (https://github.com/PRoX2011)', 10, 13
-     db '  Support project:  DALink (https://dalink.to/PRoXdev)', 10, 13
-     db '  Source code:      GitHub (https://github.com/PRoX2011/x16-PRos)', 10, 13
-     db '  License:          MIT', 10, 13
-     db '  OS version:       0.8', 10, 13
+     db '  x16 PRos - Simple 16-bit NASM OS', 10, 13
+     db '  Author  : PRoX (proxdev.com)', 10, 13
+     db '  Version : 0.8 / License: MIT', 10, 13
      db 0
 
-version_msg db 'PRos Terminal v0.3', 10, 13, 0
+version_msg db 'v0.3', 10, 13, 0
 
 ; ------ Commands ------
 exit_string    db 'EXIT', 0
@@ -2296,6 +2486,10 @@ view_string    db 'VIEW', 0
 mkdir_string   db 'MKDIR', 0
 deldir_string  db 'DELDIR', 0
 cd_string      db 'CD', 0
+ping_string    db 'PING', 0
+setip_string   db 'SETIP', 0
+ip_string      db 'IP', 0
+netinfo_string db 'NETINFO', 0
 
 autocomplete_cmd_table:
     dw exit_string, help_string, info_string, cls_string
@@ -2303,7 +2497,7 @@ autocomplete_cmd_table:
     dw cat_string, del_string, copy_string, ren_string
     dw size_string, shut_string, reboot_string, cpu_string
     dw touch_string, write_string, view_string, mkdir_string
-    dw deldir_string
+    dw deldir_string, ping_string, setip_string, ip_string, netinfo_string
     dw 0
 
 ; ------ Errors ------
@@ -2317,6 +2511,14 @@ kern_warn2_msg    db 'Cannot delete kernel file!', 0
 notext_msg        db 'No text provided for writing', 0
 APM_error_msg     db "APM error or APM not available",0
 bad_drive_msg     db 'Drive not ready or does not exist!', 0
+ip_status_msg     db 'Current local IP: ', 0
+ip_usage_msg      db 'Usage: SETIP <ip>', 0
+ip_invalid_msg    db 'Bad IP', 0
+ip_set_success    db 'IP set', 0
+ip_set_debug_msg  db 'DBG net_local_ip: ', 0
+do_ip_debug_msg   db 'DBG do_ip entry', 0
+ni_io_msg         db 'IO:', 0
+ni_mac_msg        db 'MA:', 0
 
 ; ------ CPU info ------
 flags_str          db '  FLAGS: ', 0
@@ -2414,10 +2616,7 @@ conf_dir_name        db 'CONF.DIR', 0
 
 current_drive_char   db 'A'
 
-login_password_prompt  db 19 dup(' '), 0xC9, 39 dup(0xCD), 0xBB, 10, 13
-                       db 19 dup(' '), 0xBA, '        Enter your password:           ', 0xBA, 10, 13
-                       db 19 dup(' '), 0xBA, '    _______________________________    ', 0xBA, 10, 13
-                       db 19 dup(' '), 0xC0, 39 dup(0xCD), 0xBC, 10, 13, 0
+login_password_prompt  db 10, 13, ' [ Password: ] ', 0
 
 mt                   db '', 10, 13, 0
 Sides                dw 2
