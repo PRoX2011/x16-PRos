@@ -15,8 +15,9 @@ FLAG_NO_LOGO_DISPLAY=0
 FLAG_NO_SETUP=0
 FLAG_DTM=0  # DTM - Dev Tesing Mode
 
-MAX_KERNEL_LOADER_BYTES=32768
-KERNEL_SIZE_WARN_BYTES=30720
+# Max8086Memory - KernelAddress - FatBootCHSBuffer
+MAX_KERNEL_LOADER_BYTES=$((655360-0x20000-65536))
+KERNEL_SIZE_WARN_BYTES= $(($MAX_KERNEL_LOADER_BYTES - 2048))
 
 for arg in $@; do
     if [ $arg == "-quiet" ]; then FLAG_QUIET_MODE=1; continue; fi
@@ -113,7 +114,12 @@ echo -e "$NC"
 # Compile bootloader
 if [ $FLAG_NO_BOOT_RECOMP == 0 ]; then
     print_info "Compiling bootloader (boot.asm => bin/BOOT.BIN)..."
-    nasm -f bin src/bootloader/boot.asm -o bin/BOOT.BIN
+    nasm -f bin src/bootloader/boot.asm -o bin/BOOT.BIN \
+        -DFILENAME="\"KERNEL  BIN\"" \
+        -DLOAD_SEGMENT="0x2000" \
+        -DLOAD_OFFSET="0x0000" \
+        -DJMP_SEGMENT="0x2000" \
+        -DJMP_OFFSET="0x0000"
     check_error "Bootloader compilation failed"
     print_ok "Bootloader compiled successfully"
 fi
@@ -150,13 +156,13 @@ check_error "Disk image creation failed"
 print_ok "Disk image created successfully"
 
 print_info "Formatting disk image..."
-mkfs.vfat disk_img/x16pros.img -n "x16-PROS"
+mkfs.vfat -F 12 disk_img/x16pros.img -n "x16-PROS"
 check_error "Disk formatting failed"
 print_ok "Disk image formatted successfully"
 
 # Write bootloader
 print_info "Writing bootloader to disk..."
-dd status=none if=bin/BOOT.BIN of=disk_img/x16pros.img conv=notrunc
+dd status=none if=bin/BOOT.BIN of=disk_img/x16pros.img bs=1 seek=62 conv=notrunc # Write boot code after BPB
 check_error "Bootloader writing failed"
 print_ok "Bootloader written successfully"
 
