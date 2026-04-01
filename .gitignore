@@ -25,3 +25,5 @@ out/
 clang-tidy-fixes.patch
 
 disk_img/
+
+lpt/
