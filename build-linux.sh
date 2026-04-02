@@ -365,6 +365,7 @@ programs=(
     "programs/font.asm FONT.BIN"
     "programs/tree.asm TREE.BIN"
     "programs/print.asm PRINT.BIN"
+    "programs/calendar.asm CALENDAR.BIN"
 )
 
 for prog in "${programs[@]}"; do
