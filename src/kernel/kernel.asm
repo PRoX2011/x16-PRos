@@ -551,10 +551,6 @@ get_cmd:
     call string_string_compare
     jc near do_reboot
 
-    mov di, cpu_string
-    call string_string_compare
-    jc near do_CPUinfo
-
     mov di, touch_string
     call string_string_compare
     jc near touch_file
@@ -864,218 +860,6 @@ print_ver:
 
 exit:
     jmp reboot_system
-
-; ===================== CPU Info Functions =====================
-
-print_edx:
-    mov ah, 0eh
-    mov bx, 4
-.loop4r:
-    mov al, dl
-    int 10h
-    ror edx, 8
-    dec bx
-    jnz .loop4r
-    ret
-
-print_full_name_part:
-    cpuid
-    push edx
-    push ecx
-    push ebx
-    push eax
-    mov cx, 4
-.loop4n:
-    pop edx
-    call print_edx
-    loop .loop4n
-    ret
-
-print_cores:
-    mov si, cores
-    call print_string
-    mov eax, 1
-    cpuid
-    ror ebx, 16
-    mov al, bl
-    call print_al
-    ret
-
-print_cache_line:
-    mov si, cache_line
-    call print_string
-    mov eax, 1
-    cpuid
-    ror ebx, 8
-    mov al, bl
-    mov bl, 8
-    mul bl
-    call print_al
-    ret
-
-print_stepping:
-    mov si, stepping
-    call print_string
-    mov eax, 1
-    cpuid
-    and al, 15
-    call print_al
-    ret
-
-print_al:
-    mov ah, 0
-    mov dl, 10
-    div dl
-    add ax, '00'
-    mov dx, ax
-
-    mov bl, COLOR_WHITE
-    mov al, dl
-    cmp dl, '0'
-    jz skip_fn
-    call print_char
-skip_fn:
-    mov al, dh
-    call print_char
-    ret
-
-; -----------------------------
-; Prints CPU information
-; IN  : Nothing
-do_CPUinfo:
-    call print_newline
-
-    pusha
-
-    ; Print FLAGS register
-    mov si, flags_str
-    call print_string
-    xor ax, ax
-    lahf
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Control Register (CR0)
-    mov si, control_reg
-    call print_string
-    mov eax, cr0
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Code Segment (CS)
-    mov si, code_segment
-    call print_string
-    mov ax, cs
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Data Segment (DS)
-    mov si, data_segment
-    call print_string
-    mov ax, ds
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Extra Segment (ES)
-    mov si, extra_segment
-    call print_string
-    mov ax, es
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Stack Segment (SS)
-    mov si, stack_segment
-    call print_string
-    mov ax, ss
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Base Pointer (BP)
-    mov si, base_pointer
-    call print_string
-    mov ax, bp
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Stack Pointer (SP)
-    mov si, stack_pointer
-    call print_string
-    mov ax, sp
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    call print_newline
-
-    popa
-
-    pusha
-
-    ; Print CPU Family name
-    mov si, family_str
-    call print_string
-    mov eax, 1
-    cpuid
-    mov ebx, eax
-    shr eax, 8
-    and eax, 0x0F
-    mov ecx, ebx
-    shr ecx, 20
-    and ecx, 0xFF
-    add eax, ecx
-
-    mov si, family_table
-.lookup_loop:
-    cmp word [si], 0
-    je .unknown_family
-    cmp ax, word [si]
-    je .found_family
-    add si, 4
-    jmp .lookup_loop
-
-.found_family:
-    mov si, word [si + 2]
-    call print_string_cyan
-    jmp .family_done
-
-.unknown_family:
-    mov si, unknown_family_str
-    call print_string_cyan
-
-.family_done:
-    mov si, mt
-    call print_string
-
-    ; Print CPU name
-    mov si, cpu_name
-    call print_string
-    mov eax, 80000002h
-    call print_full_name_part
-    mov eax, 80000003h
-    call print_full_name_part
-    mov eax, 80000004h
-    call print_full_name_part
-    mov si, mt
-    call print_string
-    call print_cores
-    mov si, mt
-    call print_string
-    call print_cache_line
-    mov si, mt
-    call print_string
-    call print_stepping
-    mov si, mt
-    call print_string
-    popa
-    call print_newline
-    jmp get_cmd
 
 ; ===================== Date and Time Functions =====================
 
@@ -2243,7 +2027,6 @@ kshell_comands db 'HELP               - get list of commands', 10, 13
                db 'REBOOT             - restart', 10, 13
                db 'DATE               - current date (DD/MM/YY)', 10, 13
                db 'TIME               - current time (HH:MM:SS)', 10, 13
-               db 'CPU                - CPU info', 10, 13
                db 'DIR                - list files', 10, 13
                db 'SIZE   <f>         - file size', 10, 13
                db 'CAT    <f>         - show file', 10, 13
@@ -2268,7 +2051,7 @@ info db 10, 13
      db '  Support project:  DALink (https://dalink.to/PRoXdev)', 10, 13
      db '  Source code:      GitHub (https://github.com/PRoX2011/x16-PRos)', 10, 13
      db '  License:          MIT', 10, 13
-     db '  OS version:       0.8', 10, 13
+     db '  OS version:       0.8.5', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.3', 10, 13, 0
@@ -2289,7 +2072,6 @@ ren_string     db 'REN', 0
 size_string    db 'SIZE', 0
 shut_string    db 'SHUT', 0
 reboot_string  db 'REBOOT', 0
-cpu_string     db 'CPU', 0
 touch_string   db 'TOUCH', 0
 write_string   db 'WRITE', 0
 view_string    db 'VIEW', 0
@@ -2301,7 +2083,7 @@ autocomplete_cmd_table:
     dw exit_string, help_string, info_string, cls_string
     dw dir_string, cd_string, ver_string, time_string, date_string
     dw cat_string, del_string, copy_string, ren_string
-    dw size_string, shut_string, reboot_string, cpu_string
+    dw size_string, shut_string, reboot_string
     dw touch_string, write_string, view_string, mkdir_string
     dw deldir_string
     dw 0
@@ -2317,35 +2099,6 @@ kern_warn2_msg    db 'Cannot delete kernel file!', 0
 notext_msg        db 'No text provided for writing', 0
 APM_error_msg     db "APM error or APM not available",0
 bad_drive_msg     db 'Drive not ready or does not exist!', 0
-
-; ------ CPU info ------
-flags_str          db '  FLAGS: ', 0
-control_reg        db '  Control Reg   (CR) : ', 0
-stack_segment      db '  Stack Seg     (SS) : ', 0
-code_segment       db '  Code Seg      (CS) : ', 0
-data_segment       db '  Data Seg      (DS) : ', 0
-extra_segment      db '  Extra Seg     (ES) : ', 0
-base_pointer       db '  Base Pointer  (BP) : ', 0
-stack_pointer      db '  Stack Pointer (SP) : ', 0
-
-family_str         db '  CPU Family         : ', 0
-unknown_family_str db 'Unknown', 0
-intel_core_str     db 'Intel', 0
-intel_pentium_str  db 'Intel Pentium', 0
-amd_ryzen_str      db 'AMD Ryzen', 0
-amd_athlon_str     db 'AMD Athlon', 0
-
-family_table:
-    dw 6, intel_core_str
-    dw 5, intel_pentium_str
-    dw 15, amd_athlon_str
-    dw 21, amd_ryzen_str
-    dw 0, 0
-
-cpu_name           db '  CPU name           : ', 0
-cores              db '  CPU cores          : ', 0
-stepping           db '  Stepping ID        : ', 0
-cache_line         db '  Cache line         : ', 0
 
 time_msg  db 'Current time: ', 0
 date_msg  db 'Current date: ', 0
