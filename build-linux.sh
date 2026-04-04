@@ -407,6 +407,67 @@ for prog in "${programs_com[@]}"; do
     print_ok "$bin_name copied successfully"
 done
 
+c_api_modules=(
+    "c-api/src/pros.c bin/c-api/pros.o"
+    "c-api/src/i86.asm bin/c-api/i86.o"
+)
+
+c_api_lib="bin/c-api.a"
+c_api_headers_dir="c-api/include"
+
+programs_c=()
+
+# Build this only if gcc-ia16 and binutils-ia16 are installed and available
+if command -v ia16-elf-gcc >/dev/null 2>&1 && \
+   command -v ia16-elf-ld >/dev/null 2>&1 && \
+   command -v ia16-elf-ar >/dev/null 2>&1; then
+    # Build and link C API modules
+    mkdir -p bin/c-api
+    rm -f bin/c-api.a # Remove old library
+    for module in "${c_api_modules[@]}"; do
+        src=$(echo $module | cut -d' ' -f1)
+        dist=$(echo $module | cut -d' ' -f2)
+
+        print_info "Compiling $src => $dist..."
+        if [[ $src == *.asm ]]; then
+            nasm -f elf32 $src -o $dist
+        elif [[ $src == *.c ]]; then
+            ia16-elf-gcc \
+                -mno-callee-assume-ss-data-segment \
+                -mcmodel=tiny \
+                -I$c_api_headers_dir \
+                -o $dist \
+                -c $src
+        else
+            print_failed "$src: unknown source file format"
+        fi
+        check_error "Compilation of $src failed"
+        print_info "Linking $dist => $c_api_lib..."
+        ia16-elf-ar r $c_api_lib $dist
+        check_error "Linking of $dist failed"
+        print_ok "$dist linked to $c_api_lib successfully"
+    done
+
+    # Build C programs
+    for prog in "${programs_c[@]}"; do
+        build_script=$(echo $prog | cut -d' ' -f1)
+        bin_path=$(echo $prog | cut -d' ' -f2)
+
+        print_info "Running $build_script to get $bin_path..."
+        $build_script $bin_path $c_api_lib $c_api_headers_dir
+        check_error "$build_script returned error code"
+        print_ok "$build_script finished successfully"
+
+        print_info "Copying $bin_path to disk..."
+        mcopy -i disk_img/x16pros.img $bin_path ::/BIN.DIR/
+        check_error "Copy of $bin_path failed"
+        print_ok "$bin_path copied successfully"
+    done
+else # If there's no 16-bit C compiler and tools
+    print_info "gcc-ia16 and binutils-ia16 are not available."
+    print_info "Skipping build of C programs..."
+fi
+
 mcopy -i disk_img/x16pros.img bin/prasm.bin ::/BIN.DIR/
 
 # Copy text files
