@@ -415,7 +415,9 @@ c_api_modules=(
 c_api_lib="bin/c-api.a"
 c_api_headers_dir="c-api/include"
 
-programs_c=()
+programs_c=(
+    "programs/hello-c/build.sh bin/HELLO_C.BIN"
+)
 
 # Build this only if gcc-ia16 and binutils-ia16 are installed and available
 if command -v ia16-elf-gcc >/dev/null 2>&1 && \
