@@ -3,5 +3,5 @@ com_30h:
     mov ah, 22       ; Minor
     mov bh, 0        ; OEM
     mov bl, 0        ; Revision
-    clc              ; CF = 0 (ОБОВ'ЯЗКОВО)
+    clc              ; CF = 0
     i
