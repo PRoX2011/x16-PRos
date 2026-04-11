@@ -259,6 +259,10 @@ int21_dos_handler:
     je com_3Ah
     cmp ah, 0x3B
     je com_3Bh
+    cmp ah, 0x3C
+    je com_3Ch
+    cmp ah, 0x3D
+    je com_3Dh
     cmp ah, 0x41
     je com_41h
     cmp ah, 0x4C
@@ -411,6 +415,8 @@ bcd_to_bin_time:
 %include "src/kernel/features/com/39h.asm"
 %include "src/kernel/features/com/3Ah.asm"
 %include "src/kernel/features/com/3Bh.asm"
+%include "src/kernel/features/com/3Ch.asm"
+%include "src/kernel/features/com/3Dh.asm"
 %include "src/kernel/features/com/41h.asm"
 %include "src/kernel/features/com/4Ch.asm"
 %include "src/kernel/features/com/4Dh.asm"
