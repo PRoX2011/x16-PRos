@@ -1,5 +1,7 @@
 com_30h:
-    mov ax, 0x0005      ; AL=major(5), AH=minor(0)
-    xor bx, bx          ; BH=OEM, BL=revision
-    xor cx, cx
-    iret
+    mov al, 6        ; Major
+    mov ah, 22       ; Minor
+    mov bh, 0        ; OEM
+    mov bl, 0        ; Revision
+    clc              ; CF = 0 (ОБОВ'ЯЗКОВО)
+    i
