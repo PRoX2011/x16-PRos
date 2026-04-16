@@ -351,6 +351,25 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Notes**: Converts the filename to uppercase and FAT12’s 11-character format. Reads the root directory and FAT to
   locate and load file sectors.
 
+### Function 0x13: Write Huge File
+
+- **Description**: Writes a large file from an arbitrary segment:offset in memory to the current directory. Supports
+  files larger than 64 KB with automatic segment boundary wrapping. If a file with the same name exists, it is
+  replaced.
+- **Input**:
+    - `AH` = 0x13
+    - `SI` = Pointer to null-terminated filename (8.3 format)
+    - `CX` = source data offset
+    - `DX` = source data segment
+    - `BX` = file size low word (bits 0-15)
+    - `DI` = file size high word (bits 16-31)
+- **Output**:
+    - Carry flag set on error (e.g., disk full, write error)
+- **Error Handling**: Sets CF on filename conversion failure, disk write error, or FAT exhaustion
+- **Notes**: Writes data in batches of up to 128 clusters (64 KB) per pass. Automatically advances the source segment
+  when the offset wraps past 0xFFFF. Creates the directory entry first, then allocates clusters, builds the FAT chain,
+  and writes data sectors. The 32-bit file size is stored in the directory entry (bytes 28-31).
+
 ---
 
 ## Usage Notes
@@ -380,4 +399,4 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 The x16-PRos operating system and its API are licensed under the MIT License. See the LICENSE.TXT for details.
 
 **Author**: PRoX (https://github.com/PRoX2011)
-**Version**: 0.4, 0.5, 0.6, 0.7, 0.8
+**Version**: 0.4, 0.5, 0.6, 0.7, 0.8, 0.9

@@ -1,0 +1,27 @@
+----------------------- Key changes x16-PRos v0.9 ----------------------
+
+For me, this update was one of the most interesting and at the same
+time difficult. I hope you appreciate my efforts
+                                        -- PRoX
+
+=======================================================================================
+
+1. MZ EXE program support
+1) New EXE loader (src/kernel/features/exe/exe.asm)
+   - Full MZ header parsing: signature, header size, relocations, CS:IP, SS:SP
+   - Relocation table support: applies segment fixups for multi-segment EXE files
+2) MZ header include file (programs/EXE/mz.inc) for building EXE programs
+
+=======================================================================================
+
+2. Write Huge File system call (fs_write_huge_file)
+1) New kernel function for writing large files from arbitrary segment:offset
+   - Supports files larger than 64 KB
+2) INT 0x22 AH=0x13 API call
+   - SI = filename, CX = source offset, DX = source segment
+   - BX = file size low word, DI = file size high word
+   - CF set on error
+
+=======================================================================================
+
+Copyright (C) 2024-2026 PRoX2011

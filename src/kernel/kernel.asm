@@ -606,6 +606,17 @@ get_cmd:
     call string_string_compare
     jc .load_bin_program
 
+.check_exe_extension:
+    ; Check if command ends with .EXE
+    mov ax, command
+    call string_string_length
+    mov si, command
+    add si, ax
+    sub si, 4
+    mov di, exe_extension
+    call string_string_compare
+    jc .load_exe_program
+
     ; ============ Auto-append Extensions ============
 
     ; No extension found, try .COM first
@@ -624,7 +635,24 @@ get_cmd:
     call fs_file_exists
     jnc .load_com_program
 
-    ; .COM not found, try .BIN
+    ; .COM not found, try .EXE
+    mov ax, command
+    call string_string_length
+    mov si, command
+    add si, ax
+    sub si, 4
+    mov byte [si], '.'
+    mov byte [si+1], 'E'
+    mov byte [si+2], 'X'
+    mov byte [si+3], 'E'
+    mov byte [si+4], 0
+
+    ; Check if .EXE file exists
+    mov ax, command
+    call fs_file_exists
+    jnc .load_exe_program
+
+    ; .EXE not found, try .BIN
     mov ax, command
     call string_string_length
     mov si, command
@@ -748,6 +776,52 @@ get_cmd:
 .restore_and_fail_a_com:
     call restore_current_dir
     jmp total_fail
+
+.load_exe_program:
+    ; Try to load EXE from current directory
+    mov ax, command
+    call exe_execute
+    jnc get_cmd
+
+    ; If not found, try /BIN.DIR on current drive
+    call save_current_dir
+    mov byte [current_directory], 0
+    mov word [current_dir_cluster], 0
+
+    mov ax, bin_dir_name
+    call fs_change_directory
+    jc .restore_and_try_a_exe
+
+    mov ax, command
+    call exe_execute
+    jnc .restore_and_done_exe
+
+.restore_and_try_a_exe:
+    call restore_current_dir
+    cmp byte [current_drive_char], 'A'
+    je total_fail
+
+    ; Try A:/BIN.DIR
+    call save_current_dir
+    mov al, 'A'
+    call fs_change_drive_letter
+    jc .restore_and_fail_a_exe
+
+    mov ax, bin_dir_name
+    call fs_change_directory
+    jc .restore_and_fail_a_exe
+
+    mov ax, command
+    call exe_execute
+    jnc .restore_and_done_exe
+
+.restore_and_fail_a_exe:
+    call restore_current_dir
+    jmp total_fail
+
+.restore_and_done_exe:
+    call restore_current_dir
+    jmp get_cmd
 
 .success_disk_change_msg db 'Disk changed', 0
 
@@ -2002,6 +2076,7 @@ cd_command:
 %INCLUDE "src/kernel/features/themes.asm"           ; Themes
 %INCLUDE "src/kernel/features/encrypt.asm"          ; Encryption
 %INCLUDE "src/kernel/features/com/com.asm"          ; COM
+%INCLUDE "src/kernel/features/exe/exe.asm"          ; MZ EXE
 %INCLUDE "src/kernel/features/cp866.asm"            ; .FNT font loading
 
 ; ====== DRIVERS ======
@@ -2016,7 +2091,7 @@ cd_command:
 ; ===================== Data Section =====================
 section .data
 ; ------ Header ------
-header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v0.8', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
+header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v0.9', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
 
 ; ------ Help ------
 kshell_comands db 'HELP               - get list of commands', 10, 13
@@ -2051,7 +2126,7 @@ info db 10, 13
      db '  Support project:  DALink (https://dalink.to/PRoXdev)', 10, 13
      db '  Source code:      GitHub (https://github.com/PRoX2011/x16-PRos)', 10, 13
      db '  License:          MIT', 10, 13
-     db '  OS version:       0.8.5', 10, 13
+     db '  OS version:       0.9', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.3', 10, 13, 0

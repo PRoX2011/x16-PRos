@@ -848,6 +848,424 @@ fs_load_huge_file:
 .chain_idx           dw 0
 
 ; ========================================================================
+; FS_WRITE_HUGE_FILE - Writes a large file from arbitrary segment:offset
+; IN : AX = filename, CX = source offset, DX = source segment
+;      BX = filesize low word, DI = filesize high word
+; OUT : CF = error flag
+; ========================================================================
+fs_write_huge_file:
+    push bx
+    push cx
+    push si
+    push di
+    push es
+    push ds
+
+    mov [.wh_src_offset], cx
+    mov [.wh_src_segment], dx
+    mov [.wh_size_low], bx
+    mov [.wh_size_high], di
+
+    call string_string_uppercase
+    call int_filename_convert
+    jc .wh_error
+    mov [.wh_filename], ax
+
+    call fs_reset_floppy
+    jc .wh_error
+
+    ; Remove existing file if present
+    mov ax, [.wh_filename]
+    call fs_file_exists
+    jc .wh_no_existing
+    mov ax, [.wh_filename]
+    call fs_remove_file
+    jc .wh_error
+
+.wh_no_existing:
+    ; Handle zero size - just create empty file
+    mov ax, [.wh_size_low]
+    or ax, [.wh_size_high]
+    jnz .wh_calc_clusters
+
+    mov ax, [.wh_filename]
+    call fs_create_file
+    jc .wh_error
+    jmp .wh_success
+
+.wh_calc_clusters:
+    ; clusters_needed = ceil(filesize / 512)
+    ; (size_high:size_low + 511) >> 9
+    mov ax, [.wh_size_low]
+    mov dx, [.wh_size_high]
+    add ax, 511
+    adc dx, 0
+    ; shift DX:AX right by 9
+    shr ax, 1
+    mov cl, 8
+    shr ax, cl
+    push dx
+    mov cl, 7
+    shl dx, cl
+    or ax, dx
+    pop dx
+    mov [.wh_clusters_needed], ax
+
+    ; Create empty file entry in directory
+    mov ax, [.wh_filename]
+    call fs_create_file
+    jc .wh_error
+
+    mov word [.wh_clusters_done], 0
+    mov word [.wh_first_cluster], 0
+    mov word [.wh_prev_last], 0
+
+.wh_next_batch:
+    ; Clean free_clusters buffer
+    pusha
+    mov di, .wh_free_clusters
+    push cx
+    mov cx, 128
+.wh_clean:
+    mov word [di], 0
+    add di, 2
+    loop .wh_clean
+    pop cx
+    popa
+
+    mov ax, [.wh_clusters_needed]
+    sub ax, [.wh_clusters_done]
+    cmp ax, 128
+    jbe .wh_batch_ok
+    mov ax, 128
+.wh_batch_ok:
+    mov [.wh_batch_size], ax
+
+    call fs_read_fat
+
+    mov si, disk_buffer + 3
+    mov bx, 2
+    mov cx, [.wh_batch_size]
+    xor dx, dx
+
+.wh_find_free:
+    lodsw
+    and ax, 0FFFh
+    jz .wh_free_even
+.wh_next_odd:
+    inc bx
+    dec si
+    lodsw
+    shr ax, 4
+    or ax, ax
+    jz .wh_free_odd
+.wh_next_even:
+    inc bx
+    jmp .wh_find_free
+
+.wh_free_even:
+    push si
+    mov si, .wh_free_clusters
+    add si, dx
+    mov [si], bx
+    pop si
+    dec cx
+    jz .wh_batch_found
+    add dx, 2
+    jmp .wh_next_odd
+
+.wh_free_odd:
+    push si
+    mov si, .wh_free_clusters
+    add si, dx
+    mov [si], bx
+    pop si
+    dec cx
+    jz .wh_batch_found
+    add dx, 2
+    jmp .wh_next_even
+
+.wh_batch_found:
+    ; Record first cluster of the whole file
+    cmp word [.wh_first_cluster], 0
+    jne .wh_link_prev
+    mov ax, [.wh_free_clusters]
+    mov [.wh_first_cluster], ax
+    jmp .wh_build_chain
+
+.wh_link_prev:
+    ; Link previous batch last -> this batch first
+    mov ax, [.wh_prev_last]
+    xor dx, dx
+    call fs_fat12_cluster_offset
+    mov si, disk_buffer
+    add si, ax
+    mov ax, [ds:si]
+    or dx, dx
+    jz .wh_lnk_even
+    and ax, 000Fh
+    mov bx, [.wh_free_clusters]
+    shl bx, 4
+    or ax, bx
+    mov [ds:si], ax
+    jmp .wh_build_chain
+.wh_lnk_even:
+    and ax, 0F000h
+    mov bx, [.wh_free_clusters]
+    or ax, bx
+    mov [ds:si], ax
+
+.wh_build_chain:
+    xor cx, cx
+    mov word [.wh_chain_pos], 1
+
+.wh_chain_loop:
+    mov ax, [.wh_chain_pos]
+    cmp ax, [.wh_batch_size]
+    jae .wh_chain_last
+
+    mov di, .wh_free_clusters
+    add di, cx
+    mov bx, [di]
+    mov ax, bx
+    xor dx, dx
+    call fs_fat12_cluster_offset
+    mov si, disk_buffer
+    add si, ax
+    mov ax, [ds:si]
+    or dx, dx
+    jz .wh_ch_even
+
+    and ax, 000Fh
+    mov di, .wh_free_clusters
+    add di, cx
+    mov bx, [di+2]
+    shl bx, 4
+    or ax, bx
+    mov [ds:si], ax
+    inc word [.wh_chain_pos]
+    add cx, 2
+    jmp .wh_chain_loop
+
+.wh_ch_even:
+    and ax, 0F000h
+    mov di, .wh_free_clusters
+    add di, cx
+    mov bx, [di+2]
+    or ax, bx
+    mov [ds:si], ax
+    inc word [.wh_chain_pos]
+    add cx, 2
+    jmp .wh_chain_loop
+
+.wh_chain_last:
+    ; Save last cluster of this batch for linking
+    mov di, .wh_free_clusters
+    add di, cx
+    mov ax, [di]
+    mov [.wh_prev_last], ax
+
+    ; If this is the final batch, mark EOF
+    mov ax, [.wh_clusters_done]
+    add ax, [.wh_batch_size]
+    cmp ax, [.wh_clusters_needed]
+    jb .wh_write_fat
+
+    ; Mark EOF on last cluster
+    mov ax, [.wh_prev_last]
+    xor dx, dx
+    call fs_fat12_cluster_offset
+    mov si, disk_buffer
+    add si, ax
+    mov ax, [ds:si]
+    or dx, dx
+    jz .wh_eof_even
+    and ax, 000Fh
+    or ax, 0FF80h
+    mov [ds:si], ax
+    jmp .wh_write_fat
+.wh_eof_even:
+    and ax, 0F000h
+    or ax, 0FF8h
+    mov [ds:si], ax
+
+.wh_write_fat:
+    call fs_write_fat
+    jc .wh_error
+
+    ; Write data sectors
+    xor cx, cx
+
+.wh_write_loop:
+    mov di, .wh_free_clusters
+    add di, cx
+    mov ax, [di]
+    test ax, ax
+    jz .wh_batch_done
+
+    mov [.wh_write_idx], cx
+    mov [.wh_cur_cluster], ax
+
+    ; Check if source offset is near segment boundary
+    cmp word [.wh_src_offset], 0xFE00
+    ja .wh_via_buf
+
+    ; Direct write from source segment:offset
+    mov ax, [.wh_cur_cluster]
+    add ax, 31
+    call fs_convert_l2hts
+    mov es, [.wh_src_segment]
+    mov bx, [.wh_src_offset]
+    mov ah, 3
+    mov al, 1
+    stc
+    int 13h
+    push ds
+    pop es
+    jc .wh_error
+    jmp .wh_advance
+
+.wh_via_buf:
+    ; Copy 512 bytes from source to disk_buffer
+    mov si, [.wh_src_offset]
+    mov ax, [.wh_src_segment]
+    push ds
+    push es
+    mov ds, ax
+    push cs
+    pop es
+    mov di, disk_buffer
+    mov cx, 256
+    rep movsw
+    pop es
+    pop ds
+
+    ; Write disk_buffer to disk
+    mov ax, [.wh_cur_cluster]
+    add ax, 31
+    call fs_convert_l2hts
+    mov bx, disk_buffer
+    mov ah, 3
+    mov al, 1
+    stc
+    int 13h
+    jc .wh_error
+
+.wh_advance:
+    add word [.wh_src_offset], 512
+    jnc .wh_no_wrap
+    add word [.wh_src_segment], 0x1000
+.wh_no_wrap:
+    mov cx, [.wh_write_idx]
+    add cx, 2
+    mov ax, cx
+    shr ax, 1
+    cmp ax, [.wh_batch_size]
+    jb .wh_write_loop
+
+.wh_batch_done:
+    mov ax, [.wh_batch_size]
+    add [.wh_clusters_done], ax
+    mov ax, [.wh_clusters_done]
+    cmp ax, [.wh_clusters_needed]
+    jb .wh_next_batch
+
+    ; Update directory entry with first cluster and 32-bit file size
+    cmp word [current_dir_cluster], 0
+    je .wh_update_root
+    jmp .wh_update_subdir
+
+.wh_update_root:
+    call fs_read_root_dir
+    jc .wh_error
+
+    mov ax, [.wh_filename]
+    mov di, disk_buffer
+    call fs_get_root_entry
+    jc .wh_error
+
+    mov ax, [.wh_first_cluster]
+    mov [di+26], ax
+    mov ax, [.wh_size_low]
+    mov [di+28], ax
+    mov ax, [.wh_size_high]
+    mov [di+30], ax
+
+    call fs_write_root_dir
+    jc .wh_error
+    jmp .wh_success
+
+.wh_update_subdir:
+    mov ax, [current_dir_cluster]
+    mov [.wh_dir_cluster], ax
+    add ax, 31
+    call fs_convert_l2hts
+    mov bx, disk_buffer
+    mov ah, 2
+    mov al, 1
+    stc
+    int 13h
+    jc .wh_error
+
+    mov ax, [.wh_filename]
+    mov di, disk_buffer
+    call fs_get_subdir_entry
+    jc .wh_error
+
+    mov ax, [.wh_first_cluster]
+    mov [di+26], ax
+    mov ax, [.wh_size_low]
+    mov [di+28], ax
+    mov ax, [.wh_size_high]
+    mov [di+30], ax
+
+    mov ax, [.wh_dir_cluster]
+    add ax, 31
+    call fs_convert_l2hts
+    mov bx, disk_buffer
+    mov ah, 3
+    mov al, 1
+    stc
+    int 13h
+    jc .wh_error
+
+.wh_success:
+    pop ds
+    pop es
+    pop di
+    pop si
+    pop cx
+    pop bx
+    clc
+    ret
+
+.wh_error:
+    pop ds
+    pop es
+    pop di
+    pop si
+    pop cx
+    pop bx
+    stc
+    ret
+
+.wh_filename         dw 0
+.wh_src_segment      dw 0
+.wh_src_offset       dw 0
+.wh_size_low         dw 0
+.wh_size_high        dw 0
+.wh_clusters_needed  dw 0
+.wh_clusters_done    dw 0
+.wh_batch_size       dw 0
+.wh_first_cluster    dw 0
+.wh_prev_last        dw 0
+.wh_chain_pos        dw 0
+.wh_write_idx        dw 0
+.wh_cur_cluster      dw 0
+.wh_dir_cluster      dw 0
+.wh_free_clusters    times 128 dw 0
+
+; ========================================================================
 ; FS_WRITE_FILE - Writes a file to the current directory
 ; IN : AX = file name, BX = data address, CX = size
 ; OUT : CF = error flag

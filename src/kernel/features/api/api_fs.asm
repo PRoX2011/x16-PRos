@@ -22,6 +22,7 @@
 ;   0x10: Load huge file (SI = filename, CX = load offset (position), DX = load segment address)
 ;   0x11: List drives
 ;   0x12: Change drive (SI = Drive letter pointer)
+;   0x13: Write huge file (SI = filename, CX = source offset, DX = source segment, BX = size low, DI = size high)
 ; ==================================================================
 
 [BITS 16]
@@ -91,6 +92,8 @@ int22_handler:
     je .list_drives
     cmp al, 0x12
     je .change_drive
+    cmp al, 0x13
+    je .write_huge_file
     stc
     jmp .done
 
@@ -200,8 +203,13 @@ int22_handler:
     jmp .done
 
 .change_drive:
-    mov al, [si]               
+    mov al, [si]
     call fs_change_drive_letter
+    jmp .done
+
+.write_huge_file:
+    mov ax, si
+    call fs_write_huge_file
     jmp .done
     
 .done:

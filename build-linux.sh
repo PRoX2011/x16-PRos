@@ -180,6 +180,13 @@ mmd -i disk_img/x16pros.img ::/COM.DIR
 check_error "Failed to create COM directory"
 print_ok "COM directory created successfully"
 
+# Create EXE directory
+print_splitline "Creating EXE directory..."
+print_info "Creating EXE directory..."
+mmd -i disk_img/x16pros.img ::/EXE.DIR
+check_error "Failed to create EXE directory"
+print_ok "EXE directory created successfully"
+
 # Create BMP directory
 print_splitline "Creating BMP directory..."
 print_info "Creating BMP directory..."
@@ -406,6 +413,27 @@ for prog in "${programs_com[@]}"; do
     
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/COM.DIR/
+    check_error "Copy of $bin_name failed"
+    print_ok "$bin_name copied successfully"
+done
+
+programs_exe=(
+    "programs/EXE/hello.asm HELLO.EXE"
+)
+
+for prog in "${programs_exe[@]}"; do
+    src=$(echo $prog | cut -d' ' -f1)
+    bin_name=$(echo $prog | cut -d' ' -f2)
+
+    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+        print_info "Compiling $src => bin/$bin_name..."
+        nasm -f bin -I programs/EXE/ $src -o bin/$bin_name
+        check_error "Compilation of $src failed"
+        print_ok "$bin_name compiled successfully"
+    fi
+
+    print_info "Copying $bin_name to disk..."
+    mcopy -i disk_img/x16pros.img bin/$bin_name ::/EXE.DIR/
     check_error "Copy of $bin_name failed"
     print_ok "$bin_name copied successfully"
 done

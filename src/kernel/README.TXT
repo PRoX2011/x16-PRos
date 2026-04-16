@@ -3,7 +3,7 @@
 |                                                                           |
 |   +----------------------------+   +---------------------------------+    |
 |   |        DOS Programs        |   |      Native PRos Programs       |    |
-|   |          (.COM)            |   |            (.BIN)               |    |
+|   |       (.COM / .EXE)        |   |            (.BIN)               |    |
 |   |                            |   |                                 |    |
 |   |  INT 20h / INT 21h DOS API |   |  PRos Native API (INT 0x21,22)  |    |
 |   |  PSP-style environment     |   |                                 |    |
@@ -15,7 +15,7 @@
 +---------------------------------------------------------------------------+
 |                  Program Loader / Execution Control                       |
 |                                                                           |
-|   - File type detection (.COM / .BIN)                                     |
+|   - File type detection (.COM / .BIN / .EXE)                              |
 |   - Execution mode selection                                              |
 |   - Context preparation                                                   |
 +---------------------------------------------------------------------------+
