@@ -3,6 +3,14 @@
 ; Copyright (C) 2025 PRoX2011
 ; ==================================================================
 
+; ==================================================================
+; Some of the low-level FAT12 routines below are taken from MikeOS
+;
+; In its current form, most of the functions have been completely 
+; or almost completely redesigned, but I still express my 
+; enormous gratitude to MikeOS
+; ==================================================================
+
 ; =======================================================================
 ; FS_GET_FILE_LIST - Gets a list of files in the current directory
 ; IN : AX = pointer to the buffer for the list
