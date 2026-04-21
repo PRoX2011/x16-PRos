@@ -251,30 +251,14 @@ check_error "ITALIC.FNT copy failed"
 print_ok "ITALIC.FNT copied successfully"
 
 # Copy themes
-print_info "Copying DEFAULT.THM to disk..."
-mcopy -i disk_img/x16pros.img assets/themes/DEFAULT.THM ::/THEMES.DIR/
-check_error "DEFAULT.THM copy failed"
-print_ok "DEFAULT.THM copied successfully"
-
-print_info "Copying VGA.THM to disk..."
-mcopy -i disk_img/x16pros.img assets/themes/VGA.THM ::/THEMES.DIR/
-check_error "VGA.THM copy failed"
-print_ok "VGA.THM copied successfully"
-
-print_info "Copying UBUNTU.THM to disk..."
-mcopy -i disk_img/x16pros.img assets/themes/UBUNTU.THM ::/THEMES.DIR/
-check_error "UBUNTU.THM copy failed"
-print_ok "UBUNTU.THM copied successfully"
-
-print_info "Copying OCEAN.THM to disk..."
-mcopy -i disk_img/x16pros.img assets/themes/OCEAN.THM ::/THEMES.DIR/
-check_error "OCEAN.THM copy failed"
-print_ok "OCEAN.THM copied successfully"
-
-print_info "Copying MONO.THM to disk..."
-mcopy -i disk_img/x16pros.img assets/themes/MONO.THM ::/THEMES.DIR/
-check_error "MONO.THM copy failed"
-print_ok "MONO.THM copied successfully"
+print_splitline "Copying themes..."
+for thm in assets/themes/*.THM; do
+    fname=$(basename "$thm")
+    print_info "Copying $fname to disk..."
+    mcopy -i disk_img/x16pros.img "$thm" ::/THEMES.DIR/
+    check_error "$fname copy failed"
+    print_ok "$fname copied successfully"
+done
 
 echo -e "$NC"
 
