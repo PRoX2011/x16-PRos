@@ -43,13 +43,17 @@ __mz_hdr:
     dw 0x0000                   ; +0Eh Initial SS
     dw 0xFFFE                   ; +10h Initial SP
     dw 0x0000                   ; +12h Checksum
-    dw %1                       ; +14h Initial IP (label from vstart=0 section)
+    dw __mz_entry               ; +14h Initial IP (prologue, DS=ES=PSP on entry)
     dw 0x0000                   ; +16h Initial CS
     dw __MZ_HDR_BYTES           ; +18h Relocation table offset
     dw 0x0000                   ; +1Ah Overlay number
     times __MZ_HDR_BYTES - ($ - __mz_hdr) db 0
 
 SECTION .text follows=.mzhdr vstart=0
+__mz_entry:
+    push cs
+    pop ds
+    jmp %1
 
 %endmacro
 
