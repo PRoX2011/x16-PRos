@@ -3425,8 +3425,13 @@ fs_init_drives:
     jc .done_init
     call .add_drive_c
 
+    mov dl, 0x81
+    call .check_drive
+    jc .done_init
+    call .add_drive_d
+
 .done_init:
-    call fs_reset_floppy 
+    call fs_reset_floppy
     popa
     ret
 
@@ -3461,6 +3466,14 @@ fs_init_drives:
 .add_drive_c:
     mov byte [di], 'C'
     mov byte [di+1], 0x80
+    mov byte [di+2], 2
+    add di, 3
+    inc byte [drive_count]
+    ret
+
+.add_drive_d:
+    mov byte [di], 'D'
+    mov byte [di+1], 0x81
     mov byte [di+2], 2
     add di, 3
     inc byte [drive_count]

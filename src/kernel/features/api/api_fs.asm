@@ -23,6 +23,7 @@
 ;   0x11: List drives
 ;   0x12: Change drive (SI = Drive letter pointer)
 ;   0x13: Write huge file (SI = filename, CX = source offset, DX = source segment, BX = size low, DI = size high)
+;   0x14: Get current drive letter (returns AL = drive letter)
 ; ==================================================================
 
 [BITS 16]
@@ -94,6 +95,8 @@ int22_handler:
     je .change_drive
     cmp al, 0x13
     je .write_huge_file
+    cmp al, 0x14
+    je .get_current_drive
     stc
     jmp .done
 
@@ -211,7 +214,13 @@ int22_handler:
     mov ax, si
     call fs_write_huge_file
     jmp .done
-    
+
+.get_current_drive:
+    mov al, [current_drive_char]
+    mov bp, sp
+    mov [bp+18], al
+    jmp .done
+
 .done:
     jc .set_cf
     push bp

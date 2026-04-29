@@ -154,6 +154,20 @@ mkfs.vfat disk_img/x16pros.img -n "x16-PROS"
 check_error "Disk formatting failed"
 print_ok "Disk image formatted successfully"
 
+# ==================================================================
+# This section of the script creates the FLOPPY2.IMG disk image. 
+# It connects to the emulator launched with run-linux.sh and is simply 
+# used to demonstrate the system's ability to operate with multiple 
+# disks and to store additional files. 
+# Removing it won't cause any serious problems.
+# ==================================================================
+dd if=/dev/zero of=disk_img/FLOPPY2.img bs=512 count=2880 conv=notrunc status=none
+check_error "FLOPPY2.img creation failed"
+
+mkfs.vfat disk_img/FLOPPY2.img -n "x16-PROS"
+check_error "FLOPPY2.img formatting failed"
+# ==================================================================
+
 # Write bootloader
 print_info "Writing bootloader to disk..."
 dd status=none if=bin/BOOT.BIN of=disk_img/x16pros.img conv=notrunc

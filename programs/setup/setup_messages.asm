@@ -111,10 +111,11 @@ setup_stagebar_top      db 0xC9, 76 dup(0xCD), 0xBB, 0
 setup_stagebar_bottom   db 0xC8, 76 dup(0xCD), 0xBC, 0
 
 setup_stagebar_welcome  db 0xBA, ' welcome                                                                    ', 0xBA, 0
-setup_stagebar_username db 0xBA, ' welcome > username                                                         ', 0xBA, 0
-setup_stagebar_password db 0xBA, ' welcome > username > password                                              ', 0xBA, 0
-setup_stagebar_timezone db 0xBA, ' welcome > username > password > timezone                                   ', 0xBA, 0
-setup_stagebar_theme    db 0xBA, ' welcome > username > password > timezone > theme                           ', 0xBA, 0
-setup_stagebar_prompt   db 0xBA, ' welcome > username > password > timezone > theme > prompt                  ', 0xBA, 0
-setup_stagebar_programs db 0xBA, ' welcome > username > password > timezone > theme > prompt > programs       ', 0xBA, 0
-setup_stagebar_end      db 0xBA, ' welcome > username > password > timezone > theme > prompt > programs > end ', 0xBA, 0
+setup_stagebar_disk     db 0xBA, ' welcome > disk                                                             ', 0xBA, 0
+setup_stagebar_username db 0xBA, ' welcome > disk > username                                                  ', 0xBA, 0
+setup_stagebar_password db 0xBA, ' welcome > disk > username > password                                       ', 0xBA, 0
+setup_stagebar_timezone db 0xBA, ' welcome > disk > username > password > timezone                            ', 0xBA, 0
+setup_stagebar_theme    db 0xBA, ' welcome > disk > username > password > timezone > theme                    ', 0xBA, 0
+setup_stagebar_prompt   db 0xBA, ' welcome > disk > username > password > timezone > theme > prompt           ', 0xBA, 0
+setup_stagebar_programs db 0xBA, ' welcome > disk > username > password > timezone > theme > prompt > prgs    ', 0xBA, 0
+setup_stagebar_end      db 0xBA, ' all stages complete                                                        ', 0xBA, 0

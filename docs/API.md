@@ -370,6 +370,12 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
   when the offset wraps past 0xFFFF. Creates the directory entry first, then allocates clusters, builds the FAT chain,
   and writes data sectors. The 32-bit file size is stored in the directory entry (bytes 28-31).
 
+### Function 0x14: Get current drive letter
+
+- **Description**: When called, saves the current drive letter into the AL register.
+- **Input**: `AH` = 0x14
+- **Output**: `AL` = current drive letter
+
 ---
 
 ## Usage Notes

@@ -1,3 +1,23 @@
+; ==================================================================
+; x16-PRos -- SETUP. First-boot configuration wizard for x16-PRos
+; Copyright (C) 2025 PRoX2011
+;
+; Walks the user through the initial system configuration: chooses
+; an install target disk (and clones the system to it if requested),
+; then collects username, password, timezone, color theme, command
+; prompt style and the bundled programs package.
+;
+; Files created:
+;   CONF.DIR/USER.CFG      -- plain username
+;   CONF.DIR/PASSWORD.CFG  -- encrypted password
+;   CONF.DIR/TIMEZONE.CFG  -- UTC offset string
+;   CONF.DIR/THEME.CFG     -- selected color theme palette
+;   CONF.DIR/PROMPT.CFG    -- selected command prompt template
+;   CONF.DIR/FIRST_B.CFG   -- '0' marker meaning setup has completed
+;
+; Made by PRoX-dev
+; ==================================================================
+
 [BITS 16]
 [ORG 0x8000]
 
@@ -20,23 +40,7 @@ setup:
     mov al, 0x01
     call set_background_color
 
-    ; Show welcome message
-    mov ah, 0x01
-    mov si, setup_welcome_msg
-    int 0x21
-
-    mov ah, 0x05
-    int 0x21
-    mov ah, 0x05
-    int 0x21
-
-    mov dh, 28
-    mov dl, 0
-    call string_move_cursor
-
-    mov ah, 0x01
-    mov si, setup_bottom_msg
-    int 0x21
+    call draw_top_and_bottom_lines
 
     mov al, SETUP_STAGE_WELCOME
     call setup_draw_stage_ui
@@ -52,6 +56,16 @@ setup:
     ; Wait for key press
     mov ah, 0
     int 16h
+
+    ; ========== DISK INSTALL ==========
+    call install_run
+
+    mov ah, 0x06
+    int 0x21
+    mov al, 0x01
+    call set_background_color
+
+    call draw_top_and_bottom_lines
 
     ; ========== USERNAME SETUP ==========
     mov al, SETUP_STAGE_USERNAME
@@ -647,10 +661,32 @@ setup_draw_stage_bar:
 %endif
     ret
 
+draw_top_and_bottom_lines:
+    ; Show welcome message
+    mov ah, 0x01
+    mov si, setup_welcome_msg
+    int 0x21
+
+    mov ah, 0x05
+    int 0x21
+    mov ah, 0x05
+    int 0x21
+
+    mov dh, 28
+    mov dl, 0
+    call string_move_cursor
+
+    mov ah, 0x01
+    mov si, setup_bottom_msg
+    int 0x21
+
+    ret
+
 ; ========== INCLUDES ==========
 %INCLUDE "src/kernel/features/encrypt.asm"
 %INCLUDE "programs/setup/setup_messages.asm"
 %INCLUDE "programs/setup/helper_functions.asm"
+%INCLUDE "programs/setup/install.asm"
 
 ; ========== DATA SECTION ==========
 
