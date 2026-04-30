@@ -2,604 +2,409 @@
 ; x16-PRos -- TETRIS
 ; Original design by Alexey Pajitnov
 ;
-; Made by Dexoron and PRoX-dev
+; Made by DrunkFly( Nickolay Zapolnov)
+; source https://github.com/drunkfly/8086tetris/blob/master/TETRIS.ASM
+; Conversion for x16-PRos by  Alex Pricker  (Aleksey Shilo)
+; https://github.com/chiefexb
+; See more on https://github.com/GeeksLore
 ; ==================================================================
 
-[BITS 16]
-[ORG 0x8000]
+;  NASM
+ [BITS 16]
+ [ORG 0x8000]
 
-%define BOARD_WIDTH  10
-%define BOARD_HEIGHT 20
-%define ATTR_GREEN   0x0A ; Light green on black
+FIELD_X equ 10
+FIELD_Y equ 1
+FIELD_WIDTH equ 10
+FIELD_HEIGHT equ 20
 
-start:
-    call init_video
-    call clear_board
-    mov word [score], 0
-    mov word [lines_cleared], 0
-    mov word [level], 1
-    call get_random_type
-    mov [next_type], al
+FIGURE_WIDTH equ 4
+FIGURE_HEIGHT equ 4
 
-game_loop:
-    ; Clear keyboard buffer to prevent "input lag" from previous piece
-.flush_kbd:
-    mov ah, 0x01
-    int 0x16
-    jz .spawn
-    mov ah, 0x00
-    int 0x16
-    jmp .flush_kbd
+SCREEN_SKIP_CHAR equ 2
+SCREEN_SKIP_ROW equ 160
 
-.spawn:
-    call spawn_piece
+BLACK equ 00h
+WHITE equ 0fh
 
-.piece_loop:
-    call draw_ui
-    call draw_board
-    call draw_piece
+CHAR_SPACE equ 20h
+CHAR_FULL_BLOCK equ 0dbh
+CHAR_BOTTOM_LEFT_CORNER equ 0c0h
+CHAR_BOTTOM_RIGHT_CORNER equ 0d9h
+CHAR_HORIZ_LINE equ 0c4h
+CHAR_VERTICAL_LINE equ 0b3h
 
-    ; Delay (Adjusted by Level)
-    mov cx, 0x0004
-    mov dx, 0x93E0
-    mov ax, [level]
-    dec ax
-    jz .do_delay
-    mov bx, 0x1000
-    mul bx
-    sub dx, ax
-.do_delay:
-    mov ah, 0x86
-    int 0x15
+KEY_ESC equ 011bh
+KEY_LEFT equ 04b00h
+KEY_RIGHT equ 04d00h
+KEY_UP equ 04800h
 
-    call handle_input
 
-    call move_down
-    jc .lock_piece      ; If bottom or obstacle hit
-    jmp .piece_loop
 
-.lock_piece:
-    call lock_to_board
-    ; Add score for placing a piece (1 point per block = 4)
-    add word [score], 4
-    call clear_lines
-    call check_game_over
-    jc game_over
-    jmp game_loop
+start:          mov     ax, 0003h       ; AH=0 - set video mode, AL=3 80x25 text mode
+                int     10h
 
-; --- SUBROUTINES ---
+@@spawnFigure:  mov     ax, (0*256)+(FIELD_WIDTH/2)
+                mov     word  [cur_x], ax
 
-init_video:
-    mov ax, 0x0003      ; Text mode 80x25
-    int 0x10
-    mov ah, 0x01
-    mov cx, 0x2607
-    int 0x10
-    ret
+                mov     al, byte  [next_figure]
+                inc     al
+                cmp     al, 7
+                jb      @@okFigure
+                xor     al, al
+@@okFigure:     mov     byte  [next_figure], al
 
-clear_board:
-    mov di, board_data
-    mov cx, BOARD_WIDTH * BOARD_HEIGHT
-    xor al, al
-    rep stosb
-    ret
+                mov     ah, 0
+                shl     ax, 1
+                mov     si, ax
 
-get_random_type:
-    xor ax, ax
-    int 0x1A            ; CX:DX = clock ticks
-    mov ax, dx
-    xor dx, dx
-    mov cx, 7
-    div cx              ; DL = piece type (0-6)
-    mov al, dl
-    ret
+                mov si, figure_list
+                add si, ax          ; ax содержит смещение
+                mov si, [si]        ; взять слово по адресу
+                mov     di,  fig_width
+                mov     ax, ds
+                mov     es, ax
+                mov     cx, FIGURE_WIDTH*FIGURE_HEIGHT+2
+                rep     movsb
 
-spawn_piece:
-    mov al, [next_type]
-    mov [current_type], al
-    call get_random_type
-    mov [next_type], al
+                mov     si,  cur_figure
+                call    CheckCollides
+                jc      @@exit
 
-    mov byte [current_x], 4
-    mov byte [current_y], 0
-    mov byte [current_rotation], 0
-    ret
+@@fallLoop:     call    DrawField
+                call    DrawFigure
 
-draw_ui:
-    ; Draw glass boundaries (Centered)
-    mov dh, 2
-.frame_loop:
-    mov dl, 30
-    call set_cursor
-    mov si, frame_left
-    call print_string
+                mov     ah, 86h         ; wait
+                mov     dx, 04240h      ; 0f4240h == 1 000 000 microseconds
+                mov     cx, 0000fh
+                int     15h
 
-    add dl, 22
-    call set_cursor
-    mov si, frame_right
-    call print_string
+@@keyLoop:      mov     ah, 01h         ; check key press
+                int     16h
+                jz      @@noKey
+                mov     ah, 00h         ; read key press
+                int     16h
+                cmp     ax, KEY_ESC
+                je      @@exit
+                cmp     ax, KEY_UP
+                je      @@rotate
+                cmp     ax, KEY_LEFT
+                je      @@moveLeft
+                cmp     ax, KEY_RIGHT
+                je      @@moveRight
+                jmp     @@keyLoop
 
-    inc dh
-    cmp dh, 23
-    jne .frame_loop
+@@noKey:        mov     al, byte  [cur_y]
+                inc     al
+                mov     byte  [cur_y], al
+                mov     si,  cur_figure
+                call    CheckCollides
+                jnc     @@fallLoop
+                dec     byte  [cur_y]
+                call    FixateFigure
 
-    ; Bottom line
-    mov dh, 22
-    mov dl, 32
-    mov cx, BOARD_WIDTH
-.bottom_loop:
-    call set_cursor
-    push cx
-    mov si, block_bottom
-    call print_string
-    pop cx
-    add dl, 2
-    loop .bottom_loop
+                call    RemoveLines
 
-    ; Stats Panel - MOVED TO LEFT SIDE (Col 5)
-    mov dh, 2
-    mov dl, 5
-    call set_cursor
-    mov si, msg_lines
-    call print_string
-    mov ax, [lines_cleared]
-    call print_number
+                jmp     @@spawnFigure
 
-    mov dh, 3
-    mov dl, 5
-    call set_cursor
-    mov si, msg_level
-    call print_string
-    mov ax, [level]
-    call print_number
+@@exit:         ret
 
-    mov dh, 4
-    mov dl, 5
-    call set_cursor
-    mov si, msg_score
-    call print_string
-    mov ax, [score]
-    call print_number
 
-    ; Next Piece - Just draw the preview
-    call draw_next_piece_ui
-    ret
+@@rotate:       call    RotateFigure
+                jmp     @@keyLoop
 
-draw_next_piece_ui:
-    ; Clear next piece area (Larger area to handle I-piece)
-    mov dh, 9
-.clr_y:
-    mov dl, 20
-    call set_cursor
-    mov si, clr_next
-    call print_string
-    inc dh
-    cmp dh, 14          ; Increased height for clearing
-    jne .clr_y
+@@moveLeft:     mov     al, byte  [cur_x]
+                or      al, al
+                jz      @@keyLoop
+                dec     al
+                mov     byte  [cur_x], al
+                mov     si,  cur_figure
+                call    CheckCollides
+                jnc     @@keyLoop
+                inc     byte  [cur_x]
+                jmp     @@keyLoop
 
-    ; Draw next piece blocks
-    movzx ax, byte [next_type]
-    imul ax, 32
-    mov si, pieces_data
-    add si, ax
+@@moveRight:    mov     al, byte  [cur_x]
+                inc     al
+                mov     byte  [cur_x], al
+                mov     si,  cur_figure
+                call    CheckCollides
+                jnc     @@keyLoop
+                dec     byte  [cur_x]
+                jmp     @@keyLoop
 
-    mov cx, 4
-.next_loop:
-    lodsb               ; rel X
-    mov dl, al
-    shl dl, 1           ; Double width for []
-    add dl, 22          ; Positioned right next to board wall (wall is at 30)
-    lodsb               ; rel Y
-    mov dh, al
-    add dh, 10          ; Vertically centered relative to board
-    push si
-    push cx
-    call set_cursor
-    mov si, block_char
-    call print_string
-    pop cx
-    pop si
-    loop .next_loop
-    ret
+DrawField:      mov     bx, FIELD_HEIGHT
+                mov     si,  field; DS:SI -> field
+                mov     ax, 0b800h
+                mov     es, ax          ; ES:DI -> video ram
+                mov     di, FIELD_Y*SCREEN_SKIP_ROW+FIELD_X*SCREEN_SKIP_CHAR
+@@row:          mov     ax, (WHITE*256)+CHAR_VERTICAL_LINE
+                stosw                   ; AX -> ES:DI
+                mov     cx, FIELD_WIDTH
+@@col:          lodsb                   ; read byte from field into AL
+                or      al, al
+                jz      @@empty
+@@full:         mov     ah, al
+                mov     al, CHAR_FULL_BLOCK
+                stosw                   ; AX -> ES:DI
+                stosw
+                loop    @@col
+                jmp     @@end
+@@empty:        mov     ax, (BLACK*256)+CHAR_SPACE
+                stosw
+                stosw
+                loop    @@col
+@@end:          mov     ax, (WHITE*256)+CHAR_VERTICAL_LINE
+                stosw
+                add     di, SCREEN_SKIP_ROW-((2+FIELD_WIDTH*2)*SCREEN_SKIP_CHAR)
+                dec     bx
+                jnz     @@row
+                ; draw bottom border
+                mov     ax, (WHITE*256)+CHAR_BOTTOM_LEFT_CORNER
+                stosw
+                mov     al, CHAR_HORIZ_LINE
+                mov     cx, FIELD_WIDTH*2
+                rep     stosw
+                mov     al, CHAR_BOTTOM_RIGHT_CORNER
+                stosw
+                ret
 
-handle_input:
-    mov ah, 0x01
-    int 0x16
-    jz .no_key
-    mov ah, 0x00
-    int 0x16
+DrawFigure:     mov     bx, word  [cur_x]    ; BL = cur_x, BH = cur_y
+                ; cur_y * 160
+                mov     al, bh
+                add     al, FIELD_Y
+                mov     ah, SCREEN_SKIP_ROW
+                mul     ah
+                ; += (cur_x * 2 + 1) * 2
+                mov     bh, 0
+                shl     bx, 1
+                add     bx, FIELD_X+1
+                shl     bx, 1                   ; SCREEN_SKIP_CHAR
+                add     ax, bx                  ; AX = cur_y * 160 + (cur_x * 2 + 1) * 2
+                ;
+                mov     di, ax
+                mov     ax, 0b800h
+                mov     es, ax                  ; ES:DI -> video ram
 
-    cmp al, 'a'
-    je .move_left
-    cmp al, 'A'
-    je .move_left
-    cmp al, 'd'
-    je .move_right
-    cmp al, 'D'
-    je .move_right
-    cmp al, 'e'
-    je .rot_cw
-    cmp al, 'E'
-    je .rot_cw
-    cmp al, 'q'
-    je .rot_ccw
-    cmp al, 'Q'
-    je .rot_ccw
-    cmp al, 's'
-    je .move_down_fast
-    cmp al, 'S'
-    je .move_down_fast
-    cmp al, 0x1B
-    je .exit
-    ret
+                mov     si,  cur_figure
+                mov     bx, FIGURE_HEIGHT
+@@rowF:         mov     cx, FIGURE_WIDTH
+@@colF:         lodsb
+                or      al, al
+                jz      @@skipF
+                mov     ah, al
+                mov     al, CHAR_FULL_BLOCK
+                stosw
+                stosw
+                loop    @@colF
+                jmp     @@endF
+@@skipF:        add     di, SCREEN_SKIP_CHAR*2
+                loop    @@colF
+@@endF:         add     di, SCREEN_SKIP_ROW-(FIGURE_WIDTH*SCREEN_SKIP_CHAR*2)
+                dec     bx
+                jnz     @@rowF
+                ret
 
-.exit:
-    int 0x20
+CheckCollides:  mov     bx, word  [cur_x]    ; BL = cur_x, BH = cur_y
+                ; cur_y * FIELD_WIDTH
+                mov     al, bh
+                mov     ah, FIELD_WIDTH
+                mul     ah
+                ; += cur_x
+                mov     ch, 0
+                mov     cl, bl
+                add     ax, cx
+                add     ax,  field
+                mov     di, ax
+                ;
+                mov     dx, FIGURE_HEIGHT
+@@rowC:         mov     cx, FIGURE_WIDTH
+@@colC:         lodsb
+                or      al, al
+                jz      @@skipC
+                cmp     bl, FIELD_WIDTH
+                jae     @@collides
+                cmp     bh, FIELD_HEIGHT
+                jae     @@collides
+                mov     al, byte  [di]
+                or      al, al
+                jnz     @@collides
+@@skipC:        inc     bl
+                inc     di
+                loop    @@colC
+                add     di, FIELD_WIDTH-FIGURE_WIDTH
+                sub     bl, FIGURE_WIDTH
+                inc     bh
+                dec     dx
+                jnz     @@rowC
+                clc
+                ret
+@@collides:     stc
+                ret
 
-.move_down_fast:
-    call move_down
-    ret
+FixateFigure:   mov     bx, word  [cur_x]    ; BL = cur_x, BH = cur_y
+                ; cur_y * FIELD_WIDTH
+                mov     al, bh
+                mov     ah, FIELD_WIDTH
+                mul     ah
+                ; += cur_x
+                mov     bh, 0
+                add     ax, bx
+                add     ax,  field
+                mov     di, ax
+                ;
+                mov     si,  cur_figure
+                ;
+                mov     dx, FIGURE_HEIGHT
+@@rowX:         mov     cx, FIGURE_WIDTH
+@@colX:         lodsb
+                or      al, al
+                jz      @@skipX
+                mov     byte  [di], al
+@@skipX:        inc     di
+                loop    @@colX
+                add     di, FIELD_WIDTH-FIGURE_WIDTH
+                dec     dx
+                jnz     @@rowX
+                ret
 
-.move_left:
-    dec byte [current_x]
-    call check_total_collision
-    jz .ok_l
-    inc byte [current_x]
-.ok_l: ret
+RemoveLines:    std
+                mov     si,  field+(FIELD_WIDTH*FIELD_HEIGHT)-1
+@@removeLoop:   mov     dl, 1
+                mov     cx, FIELD_WIDTH
+                mov     di, si
+@@scanLine:     lodsb
+                or      al, al
+                jnz     @@continue
+                xor     dl, dl
+@@continue:     loop    @@scanLine
+                or      dl, dl
+                jz      @@nextLine
+                mov     ax, ds
+                mov     es, ax
+                push    di
+                mov     cx, si
+                sub     cx,  field
+                inc     cx
+                rep     movsb
+                mov     cx, FIELD_WIDTH
+                xor     al, al
+                rep     stosb
+                pop     si
+@@nextLine:     cmp     si,  field-1
+                jne     @@removeLoop
+                cld
+                ret
 
-.move_right:
-    inc byte [current_x]
-    call check_total_collision
-    jz .ok_r
-    dec byte [current_x]
-.ok_r: ret
+RotateFigure:   mov     bx, word  [fig_width]
+                mov     ax, ds
+                mov     es, ax
+                mov     si,  cur_figure
+                mov     di,  rotated_figure
+                mov     cx, FIGURE_WIDTH*FIGURE_HEIGHT
+                xor     al, al
+                rep     stosb
+                mov     di,  rotated_figure
+                ; BP = FIGURE_WIDTH - fig_width
+                mov     al, FIGURE_WIDTH
+                sub     al, bl
+                xor     ah, ah
+                mov     bp, ax
+                ; DX = (FIGURE_HEIGHT - fig_height) * FIGURE_WIDTH
+                ;mov     al, FIGURE_HEIGHT
+                ;sub     al, bh
+                ;xor     ah, ah
+                ;mov     dx, FIGURE_WIDTH
+                ;mul     dx
+                ;mov     dx, ax
+                ;sub     dx, FIGURE_WIDTH*FIGURE_HEIGHT
+                ;
+@@rotateRow:    mov     cl, bl
+                xor     ch, ch
+                push    di
+@@rotateCol:    lodsb
+                stosb
+                add     di, FIGURE_WIDTH-1
+                loop    @@rotateCol
+                add     si, bp
+                pop     di
+                inc     di
+                dec     bh
+                jnz     @@rotateRow
 
-.rot_cw:
-    mov al, [current_rotation]
-    push ax
-    inc al
-    and al, 3
-    mov [current_rotation], al
-    call check_total_collision
-    jz .rot_done
-    pop ax
-    mov [current_rotation], al
-    ret
-.rot_ccw:
-    mov al, [current_rotation]
-    push ax
-    dec al
-    and al, 3
-    mov [current_rotation], al
-    call check_total_collision
-    jz .rot_done
-    pop ax
-    mov [current_rotation], al
-    ret
-.rot_done:
-    pop ax
-    ret
-.no_key:
-    ret
+                mov     si,  rotated_figure
+                call    CheckCollides
+                jc      @@cantRotate
 
-check_total_collision:
-    mov cx, 4
-    movzx ax, byte [current_type]
-    imul ax, 32
-    movzx bx, byte [current_rotation]
-    shl bx, 3
-    add ax, bx
-    mov si, pieces_data
-    add si, ax
-.c_loop:
-    lodsb
-    add al, [current_x]
-    mov bl, al
-    lodsb
-    add al, [current_y]
-    mov bh, al
+                mov     si,  rotated_figure
+                mov     di,  cur_figure
+                mov     cx, FIGURE_WIDTH*FIGURE_HEIGHT
+                rep     movsb
+                mov     ax, word  (fig_width)
+                xchg    al, ah
 
-    cmp bl, 0
-    jl .fail
-    cmp bl, BOARD_WIDTH - 1
-    jg .fail
-    cmp bh, BOARD_HEIGHT - 1
-    jg .fail
+                mov [fig_width], ax
 
-    push dx
-    movzx ax, bh
-    mov dl, BOARD_WIDTH
-    mul dl
-    movzx dx, bl
-    add ax, dx
-    mov di, ax
-    add di, board_data
-    mov al, [di]
-    pop dx
-    or al, al
-    jnz .fail
-    loop .c_loop
-    xor ax, ax          ; Z=1 (No collision)
-    ret
-.fail:
-    or ax, 1            ; Z=0 (Collision)
-    ret
+@@cantRotate:   ret
+field times (FIELD_WIDTH*FIELD_HEIGHT) db 0
 
-draw_board:
-    mov dh, 2
-    xor ch, ch
-.y_loop:
-    mov dl, 32
-    xor cl, cl
-.x_loop:
-    call set_cursor
-    push dx
-    push cx
-    movzx ax, ch
-    mov bl, BOARD_WIDTH
-    mul bl
-    movzx bx, cl
-    add ax, bx
-    mov si, ax
-    add si, board_data
-    mov al, [si]
-    or al, al
-    jnz .draw_solid
-    mov si, empty_char
-    jmp .do_print
-.draw_solid:
-    mov si, block_char
-.do_print:
-    call print_string
-    pop cx
-    pop dx
-    inc cl
-    add dl, 2
-    cmp cl, BOARD_WIDTH
-    jne .x_loop
-    inc ch
-    inc dh
-    cmp ch, BOARD_HEIGHT
-    jne .y_loop
-    ret
 
-draw_piece:
-    movzx ax, byte [current_type]
-    imul ax, 32
-    movzx bx, byte [current_rotation]
-    shl bx, 3
-    add ax, bx
-    mov si, pieces_data
-    add si, ax
-    mov cx, 4
-.draw_loop:
-    lodsb
-    add al, [current_x]
-    mov dl, al
-    shl dl, 1
-    add dl, 32
-    lodsb
-    add al, [current_y]
-    mov dh, al
-    add dh, 2
-    push si
-    push cx
-    call set_cursor
-    mov si, block_char
-    call print_string
-    pop cx
-    pop si
-    loop .draw_loop
-    ret
+fig_width       db      0
+fig_height      db      0
+cur_figure  times       FIGURE_WIDTH*FIGURE_HEIGHT db  0
+rotated_figure times    FIGURE_WIDTH*FIGURE_HEIGHT db 0
 
-move_down:
-    inc byte [current_y]
-    call check_total_collision
-    jz .ok
-    dec byte [current_y]
-    stc
-    ret
-.ok:
-    clc
-    ret
+cur_x           db      0
+cur_y           db      0
 
-lock_to_board:
-    mov cx, 4
-    movzx ax, byte [current_type]
-    imul ax, 32
-    movzx bx, byte [current_rotation]
-    shl bx, 3
-    add ax, bx
-    mov si, pieces_data
-    add si, ax
-.lock_loop:
-    lodsb
-    add al, [current_x]
-    mov bl, al
-    lodsb
-    add al, [current_y]
-    mov bh, al
-    movzx ax, bh
-    mov dl, BOARD_WIDTH
-    mul dl
-    movzx dx, bl
-    add ax, dx
-    mov di, ax
-    add di, board_data
-    mov byte [di], 1
-    loop .lock_loop
-    ret
+figure_list     dw       square
+                dw       line
+                dw       s_figure
+                dw       t_figure
+                dw       z_figure
+                dw       l_figure
+                dw       reverse_l
 
-clear_lines:
-    mov ch, BOARD_HEIGHT - 1
-.row_loop:
-    mov cl, 0
-.col_loop:
-    movzx ax, ch
-    mov bl, BOARD_WIDTH
-    mul bl
-    movzx bx, cl
-    add ax, bx
-    mov si, ax
-    add si, board_data
-    cmp byte [si], 0
-    je .next_row
-    inc cl
-    cmp cl, BOARD_WIDTH
-    jne .col_loop
-    call remove_line
+next_figure     db      0
 
-    ; Update stats
-    add word [lines_cleared], 1
-    add word [score], 100
+square          db      2,2
+                db      3,3,0,0
+                db      3,3,0,0
+                db      0,0,0,0
+                db      0,0,0,0
 
-    ; Check Level Up (Every 10 lines)
-    mov ax, [lines_cleared]
-    xor dx, dx
-    mov bx, 10
-    div bx
-    or dx, dx
-    jnz .no_level_up
-    inc word [level]
-.no_level_up:
-    jmp .row_loop
-.next_row:
-    dec ch
-    cmp ch, 0xFF
-    jne .row_loop
-    ret
+line            db      1,4
+                db      5,0,0,0
+                db      5,0,0,0
+                db      5,0,0,0
+                db      5,0,0,0
 
-remove_line:
-    pusha
-.shift_down:
-    cmp ch, 0
-    je .top_row
-    mov cl, 0
-.shift_cols:
-    movzx ax, ch
-    dec al
-    mov bl, BOARD_WIDTH
-    mul bl
-    movzx bx, cl
-    add ax, bx
-    mov si, ax
-    add si, board_data
-    mov al, [si]
-    movzx dx, ch
-    mov bl, BOARD_WIDTH
-    imul dx, bx
-    movzx bx, cl
-    add dx, bx
-    mov di, dx
-    add di, board_data
-    mov [di], al
-    inc cl
-    cmp cl, BOARD_WIDTH
-    jne .shift_cols
-    dec ch
-    jmp .shift_down
-.top_row:
-    mov di, board_data
-    mov cx, BOARD_WIDTH
-    xor al, al
-    rep stosb
-    popa
-    ret
+s_figure        db      2,3
+                db      6,0,0,0
+                db      6,6,0,0
+                db      0,6,0,0
+                db      0,0,0,0
 
-check_game_over:
-    mov di, board_data
-    mov cx, BOARD_WIDTH
-.check_loop:
-    cmp byte [di], 0
-    jne .over
-    inc di
-    loop .check_loop
-    clc
-    ret
-.over:
-    stc
-    ret
+z_figure        db      2,3
+                db      0,7,0,0
+                db      7,7,0,0
+                db      7,0,0,0
+                db      0,0,0,0
 
-set_cursor:
-    mov ah, 0x02
-    mov bh, 0
-    int 0x10
-    ret
+t_figure        db      3,2
+                db      0,9,0,0
+                db      9,9,9,0
+                db      0,0,0,0
+                db      0,0,0,0
 
-print_string:
-    mov ah, 0x01
-    mov bl, ATTR_GREEN
-    int 0x21
-    ret
+l_figure        db      2,3
+                db      4,0,0,0
+                db      4,0,0,0
+                db      4,4,0,0
+                db      0,0,0,0
 
-print_number:
-    pusha
-    mov bx, 10
-    xor cx, cx
-.push_digits:
-    xor dx, dx
-    div bx
-    push dx
-    inc cx
-    or ax, ax
-    jnz .push_digits
-.pop_digits:
-    pop dx
-    add dl, '0'
-    mov [char_buf], dl
-    mov si, char_buf
-    call print_string
-    loop .pop_digits
-    popa
-    ret
-
-game_over:
-    mov dh, 12
-    mov dl, 35
-    call set_cursor
-    mov si, msg_game_over
-    call print_string
-    jmp $
-
-; --- DATA ---
-
-board_data:   times BOARD_WIDTH * BOARD_HEIGHT db 0
-current_x:    db 0
-current_y:    db 0
-current_type: db 0
-current_rotation: db 0
-next_type:    db 0
-score:        dw 0
-lines_cleared: dw 0
-level:        dw 1
-char_buf:     db 0, 0
-
-pieces_data:
-    ; I-piece (Type 0)
-    db 0,1, 1,1, 2,1, 3,1,  1,0, 1,1, 1,2, 1,3,  0,1, 1,1, 2,1, 3,1,  1,0, 1,1, 1,2, 1,3
-    ; J-piece (Type 1)
-    db 0,0, 0,1, 1,1, 2,1,  1,0, 2,0, 1,1, 1,2,  0,1, 1,1, 2,1, 2,2,  1,0, 1,1, 0,2, 1,2
-    ; L-piece (Type 2)
-    db 2,0, 0,1, 1,1, 2,1,  1,0, 1,1, 1,2, 2,2,  0,1, 1,1, 2,1, 0,2,  0,0, 1,0, 1,1, 1,2
-    ; O-piece (Type 3)
-    db 0,0, 1,0, 0,1, 1,1,  0,0, 1,0, 0,1, 1,1,  0,0, 1,0, 0,1, 1,1,  0,0, 1,0, 0,1, 1,1
-    ; S-piece (Type 4)
-    db 1,0, 2,0, 0,1, 1,1,  1,0, 1,1, 2,1, 2,2,  1,0, 2,0, 0,1, 1,1,  1,0, 1,1, 2,1, 2,2
-    ; T-piece (Type 5)
-    db 1,0, 0,1, 1,1, 2,1,  1,0, 1,1, 2,1, 1,2,  0,1, 1,1, 2,1, 1,2,  1,0, 0,1, 1,1, 1,2
-    ; Z-piece (Type 6)
-    db 0,0, 1,0, 1,1, 2,1,  2,0, 1,1, 2,1, 1,2,  0,0, 1,0, 1,1, 2,1,  2,0, 1,1, 2,1, 1,2
-
-msg_lines:     db "LINES: ", 0
-msg_level:     db "LEVEL: ", 0
-msg_score:     db "SCORE: ", 0
-msg_next:      db "NEXT:", 0
-clr_next:      db "          ", 0 ;
-msg_game_over: db "GAME OVER", 0
-frame_left:    db "<|", 0
-frame_right:   db "|>", 0
-footer_start:  db "  ", 0
-frame_footer_char: db "\/", 0
-block_char:    db "[]", 0
-empty_char:    db " .", 0
-block_bottom:  db "==", 0
+reverse_l       db      2,3
+                db      0,2,0,0
+                db      0,2,0,0
+                db      2,2,0,0
+                db      0,0,0,0
