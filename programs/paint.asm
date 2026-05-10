@@ -225,14 +225,27 @@ plot_brush:
 ; =======================
 draw_status:
     pusha
+
     mov al, 0x07
     mov ch, 29
     call font_fill_row
+
     mov si, status_text
     mov cl, 0
     mov ch, 29
     mov bl, 0x70
     call font_print_string
+
+    mov si, mode_free_str
+    cmp byte [DrawMode], 1
+    jne .show
+    mov si, mode_line_str
+.show:
+    mov cl, MODE_COL
+    mov ch, 29
+    mov bl, 0x4F
+    call font_print_string
+
     popa
     ret
 
@@ -250,7 +263,10 @@ welcome_msg db '        - PRos Paint -  Ctrl+S Save  ESC Exit',13,10,0
 
 status_text db ' Mode: PAINT  TAB switch  Ctrl+S Save  ESC Exit',0
 
-save_prompt db 'Save as (e.g. PAINT.BMP):',0
+status_text    db ' Mode: XXXX  TAB toggle mode  Ctrl+S Save  ESC Exit', 0
+mode_free_str  db 'FREE', 0
+mode_line_str  db 'LINE', 0
+
 save_filename_buf times 17 db 0
 
 %include "programs/lib/font.inc"
