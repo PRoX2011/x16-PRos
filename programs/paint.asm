@@ -121,7 +121,9 @@ exit_paint:
     cmp ax, 0
     jne .do_exit
 
+    mov byte [exit_after_save], 1
     call save_image
+
 
 .do_exit:
     mov ax, 0x12
@@ -197,7 +199,14 @@ save_image:
 
 .done:
     call EnableMouse
+    cmp byte [exit_after_save], 1
+    je .return_to_exit
     jmp main_loop
+
+.return_to_exit:
+    mov byte [exit_after_save], 0
+    ret
+
 
 ; =======================
 ; Brush plotting
@@ -263,6 +272,8 @@ welcome_msg db '        - PRos Paint -  1-9 buttons - Change color  W,S - Change
 status_text    db ' Mode: XXXX  TAB toggle mode  Ctrl+S Save  ESC Exit', 0
 mode_free_str  db 'FREE', 0
 mode_line_str  db 'LINE', 0
+
+exit_after_save db 0
 
 save_prompt db 'Save as (e.g. PAINT.BMP):', 0
 
