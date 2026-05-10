@@ -1,0 +1,102 @@
+----------------------- Key changes x16-PRos v0.9 ----------------------
+
+For me, this update was one of the most interesting and at the same
+time difficult. I hope you appreciate my efforts
+                                        -- PRoX
+
+=======================================================================================
+
+1. MZ EXE program support
+1) New EXE loader (src/kernel/features/exe/exe.asm)
+   - Full MZ header parsing: signature, header size, relocations, CS:IP, SS:SP
+   - Relocation table support: applies segment fixups for multi-segment EXE files
+2) MZ header include file (programs/EXE/mz.inc) for building EXE programs
+
+=======================================================================================
+
+2. Write Huge File system call (fs_write_huge_file)
+1) New kernel function for writing large files from arbitrary segment:offset
+   - Supports files larger than 64 KB
+2) INT 0x22 AH=0x13 API call
+   - SI = filename, CX = source offset, DX = source segment
+   - BX = file size low word, DI = file size high word
+   - CF set on error
+
+=======================================================================================
+
+3. PLE (PRos Large Executable) program format
+1) New native executable format, designed as a hybrid of .COM and MZ EXE
+   - Multi-segment, supports files larger than 64 KB (up to ~448 KB)
+   - Built-in metadata: description, author
+   - Built-in 64x64 logo shown on a splash screen before the program runs
+2) PLE loader (src/kernel/features/ple/ple.asm)
+   - Single-shot file load directly to base segment, no per-segment copy
+   - Validates magic, version, segment alignment
+3) PLE header include file (programs/PLE/ple.inc) for building PLE programs
+   - PLE_HEADER, PLE_LOGO, PLE_CODE, PLE_DATA, PLE_END macros
+4) Sample program: programs/PLE/src/hello.asm
+5) New build-time tool: scripts/img2pleimg.py
+   - Converts any image (PNG/JPG/etc.) to a 4096-byte PLE logo
+   - Snaps colors to the EGA 16-color palette
+
+=======================================================================================
+
+4. New API system calls
+1) INT 0x21 AH=0x0C: Clear Screen with Theme
+   - Clears the screen and reapplies the user's current theme
+   - Use this when a program wants the screen to look consistent with the OS
+2) INT 0x21 AH=0x06: Clear Screen (default VGA)
+
+=======================================================================================
+
+5. SETUP - install x16-PRos to any disk
+1) Disk selection screen in SETUP
+   - User picks the target drive (floppy / HDD / SSD); selected disk is
+     formatted and all system files are copied to it
+2) Partition size is no longer limited to 1.44 MB
+   - HDD/SSD installs can use much larger partitions, leaving more space
+     for user files and programs
+
+=======================================================================================
+
+6. Improved HDD/multi-disk handling
+
+=======================================================================================
+
+7. New terminal themes
+1) Seven new themes added, selectable via the THEME TUI
+   - Includes the long-promised pink "picmi" theme
+
+=======================================================================================
+
+8. New programs
+1) CALENDAR.BIN - calendar viewer
+2) CPU command separated from the kernel into a stand-alone CPU.BIN
+3) SETTINGS.BIN - x16-PRos system settings (username, timezone and etc.)
+
+=======================================================================================
+
+9. Shell and UX improvements
+1) Mouse text selection in the terminal (bare-bones yet)
+2) Default prompt config fix
+
+=======================================================================================
+
+10. Kernel internals
+1) .BIN program and CFG buffers moved out of the kernel segment
+   - Now live at segment 0x1000 instead of 0x2000, leaving more room for
+     the kernel itself
+
+=======================================================================================
+
+11. Update paint 
+1) Add saving to file feature
+2) Add drawing modes (free and line)
+
+=======================================================================================
+
+12. Improved mouse driver
+
+=======================================================================================
+
+Copyright (C) 2024-2026 PRoX2011

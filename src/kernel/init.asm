@@ -22,6 +22,10 @@ init_segments:
     mov ds, ax
     mov es, ax
 
+    ; Install the 1-byte retf thunk in PROGRAM_LOAD_SEG so that BIN
+    ; programs can be entered via far jmp and exit via plain `ret`.
+    call install_program_thunk
+
     mov si, segment_init_msg
     call log_okay
 
@@ -113,7 +117,11 @@ init_autoexec:
 
 check_first_boot:
     call load_first_boot_cfg
-    mov al, [program_load_addr]
+    push ds
+    mov ax, CFG_SCRATCH_SEG
+    mov ds, ax
+    mov al, [CFG_SCRATCH_OFF]
+    pop ds
     cmp al, '1'
     je .first_boot
     call load_user_from_config
@@ -137,18 +145,8 @@ run_setup_wizard:
 
     call log_okay
 
-    xor ax, ax
-    xor bx, bx
-    xor cx, cx
-    xor dx, dx
     mov word si, [param_list]
-    xor di, di
-    call program_load_addr
-
-    ; BIN programs may leave data segments changed.
-    mov ax, 0x2000
-    mov ds, ax
-    mov es, ax
+    call launch_bin_program
     ret
 
 .setup_failed:
@@ -165,14 +163,18 @@ load_user_from_config:
     call log_okay
     pop bx
 
-    mov si, program_load_addr
-    mov di, user
     mov cx, bx
     cmp cx, 31
     jbe .copy
     mov cx, 31
 .copy:
+    push ds
+    mov ax, CFG_SCRATCH_SEG
+    mov ds, ax
+    mov si, CFG_SCRATCH_OFF
+    mov di, user
     rep movsb
+    pop ds
     mov byte [di], 0
     ret
 
@@ -194,10 +196,14 @@ load_prompt_from_config:
     jbe .copy
     mov bx, 63
 .copy:
-    mov si, program_load_addr
-    mov di, temp_prompt
     mov cx, bx
+    push ds
+    mov ax, CFG_SCRATCH_SEG
+    mov ds, ax
+    mov si, CFG_SCRATCH_OFF
+    mov di, temp_prompt
     rep movsb
+    pop ds
     mov byte [di], 0
 
     mov si, temp_prompt
@@ -250,13 +256,26 @@ handle_password_check:
     ret
 
 decrypt_and_verify_password:
-    mov si, program_load_addr
-    mov di, decrypted_pass
     cmp bx, 31
     jbe .len_ok
     mov bx, 31
 .len_ok:
     mov cx, bx
+    push ds
+    push es
+    mov ax, KERNEL_DATA_SEG
+    mov es, ax
+    mov ax, CFG_SCRATCH_SEG
+    mov ds, ax
+    mov si, CFG_SCRATCH_OFF
+    mov di, encrypted_pass
+    push cx
+    rep movsb
+    pop cx
+    pop es
+    pop ds
+    mov si, encrypted_pass
+    mov di, decrypted_pass
     call decrypt_string
 
     cmp byte [decrypted_pass], 0
@@ -370,27 +389,13 @@ execute_autoexec_if_exists:
     call print_newline
 
     mov ax, autoexec_file
-    xor bx, bx
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, PROGRAM_LOAD_OFF
+    mov dx, PROGRAM_LOAD_SEG
+    call fs_load_huge_file
     jc .skip
 
-    xor ax, ax
-    xor bx, bx
-    xor cx, cx
-    xor dx, dx
     mov word si, [param_list]
-    xor di, di
-
-    call DisableMouse
-    call program_load_addr
-
-    ; Restore kernel data segments after BIN return.
-    mov ax, 0x2000
-    mov ds, ax
-    mov es, ax
-
-    call EnableMouse
+    call launch_bin_program
     ret
 
 .skip:
@@ -411,13 +416,18 @@ load_system_cfg:
     call string_string_copy
 
     mov ax, system_cfg_file
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, CFG_SCRATCH_OFF
+    mov dx, CFG_SCRATCH_SEG
+    call fs_load_huge_file
     jc .done
 
-    mov si, program_load_addr
-    mov cx, bx
+    mov cx, ax
+    push ds
+    mov ax, CFG_SCRATCH_SEG
+    mov ds, ax
+    mov si, CFG_SCRATCH_OFF
     call parse_system_cfg_data
+    pop ds
 
 .done:
     popa
@@ -547,14 +557,14 @@ parse_system_cfg_data:
 .logo_val_done_pop:
     pop si
 .logo_val_done:
-    mov byte [di], 0
-    mov byte [cfg_logo_enabled], 1
+    mov byte [cs:di], 0
+    mov byte [cs:cfg_logo_enabled], 1
     jmp .scan_loop
 
 .set_logo_false:
     add si, 5
     sub cx, 5
-    mov byte [cfg_logo_enabled], 0
+    mov byte [cs:cfg_logo_enabled], 0
 .skip_logo_line:
     cmp cx, 0
     jle .finish_parse
@@ -595,15 +605,15 @@ parse_system_cfg_data:
     cmp al, 't'
     je .set_stretch_true
 
-    mov byte [cfg_logo_stretch], 0
+    mov byte [cs:cfg_logo_stretch], 0
     jmp .skip_stretch_line
 
 .set_stretch_false:
-    mov byte [cfg_logo_stretch], 0
+    mov byte [cs:cfg_logo_stretch], 0
     jmp .skip_stretch_line
 
 .set_stretch_true:
-    mov byte [cfg_logo_stretch], 1
+    mov byte [cs:cfg_logo_stretch], 1
 
 .skip_stretch_line:
     cmp cx, 0
@@ -644,15 +654,15 @@ parse_system_cfg_data:
     cmp al, 't'
     je .set_sound_true
 
-    mov byte [cfg_sound_enabled], 1
+    mov byte [cs:cfg_sound_enabled], 1
     jmp .skip_sound_line
 
 .set_sound_false:
-    mov byte [cfg_sound_enabled], 0
+    mov byte [cs:cfg_sound_enabled], 0
     jmp .skip_sound_line
 
 .set_sound_true:
-    mov byte [cfg_sound_enabled], 1
+    mov byte [cs:cfg_sound_enabled], 1
 
 .skip_sound_line:
     cmp cx, 0
@@ -673,7 +683,7 @@ parse_system_cfg_data:
     push si
     push di
 .kw_loop:
-    mov al, [di]
+    mov al, [cs:di]
     cmp al, 0
     je .kw_match
     mov ah, [si]
@@ -817,8 +827,9 @@ load_first_boot_cfg:
     jc .fresh_install
 
     mov ax, first_boot_file
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, CFG_SCRATCH_OFF
+    mov dx, CFG_SCRATCH_SEG
+    call fs_load_huge_file
     jc .file_missing
 
     call fs_parent_directory
@@ -829,8 +840,12 @@ load_first_boot_cfg:
     call fs_parent_directory
 
 .fresh_install:
-    mov byte [program_load_addr], '1'
-    mov byte [program_load_addr + 1], 0
+    push es
+    mov ax, CFG_SCRATCH_SEG
+    mov es, ax
+    mov byte [es:CFG_SCRATCH_OFF], '1'
+    mov byte [es:CFG_SCRATCH_OFF + 1], 0
+    pop es
     popa
     ret
 
@@ -838,9 +853,9 @@ load_first_boot_cfg:
 load_setup_bin:
     pusha
     mov ax, setup_bin_file
-    xor bx, bx
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, PROGRAM_LOAD_OFF
+    mov dx, PROGRAM_LOAD_SEG
+    call fs_load_huge_file
     jnc .done
     mov si, error_message
     call print_string_red
@@ -865,9 +880,16 @@ load_user_cfg:
     jc .fail_load
 
     mov ax, user_cfg_file
-    mov cx, program_load_addr
-    call fs_load_file
-    mov [user_cfg_size], bx
+    mov cx, CFG_SCRATCH_OFF
+    mov dx, CFG_SCRATCH_SEG
+    call fs_load_huge_file
+    jc .load_failed
+    mov [user_cfg_size], ax
+    clc
+    jmp .after_load
+.load_failed:
+    stc
+.after_load:
 
     pushf
 
@@ -895,9 +917,16 @@ load_prompt_cfg:
     jc .fail
 
     mov ax, prompt_cfg_file
-    mov cx, program_load_addr
-    call fs_load_file
-    mov [prompt_cfg_size], bx
+    mov cx, CFG_SCRATCH_OFF
+    mov dx, CFG_SCRATCH_SEG
+    call fs_load_huge_file
+    jc .load_failed
+    mov [prompt_cfg_size], ax
+    clc
+    jmp .after_load
+.load_failed:
+    stc
+.after_load:
 
     pushf
     call fs_parent_directory
@@ -922,9 +951,16 @@ load_password_cfg:
     jc .fail
 
     mov ax, password_cfg_file
-    mov cx, program_load_addr
-    call fs_load_file
-    mov [password_cfg_size], bx
+    mov cx, CFG_SCRATCH_OFF
+    mov dx, CFG_SCRATCH_SEG
+    call fs_load_huge_file
+    jc .load_failed
+    mov [password_cfg_size], ax
+    clc
+    jmp .after_load
+.load_failed:
+    stc
+.after_load:
 
     pushf
     call fs_parent_directory

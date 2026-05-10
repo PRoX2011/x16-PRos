@@ -48,7 +48,7 @@ start:
     jmp exit
 
 clear_screen:
-    mov ah, 0x06
+    mov ah, 0x0C
     int 0x21
     ret
 

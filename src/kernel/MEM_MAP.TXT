@@ -25,13 +25,28 @@ physical address = segment * 16 + offset
 
 
 ================================================================
-  Segment 1000h  (font buffer)    FONT_SEG = 0x1000
+  Segment 1000h  (font + BIN programs)
 ================================================================
 
-  Physical: 0x10000 - 0x10FFF (4 KiB)
-  Holds the active 8x16 cp866 font (256 chars * 16 bytes).
-  INT 43h vector points here when a custom font is loaded.
-  Located outside the kernel segment to avoid BSS overflow.
+  Physical: 0x10000 - 0x1FFFF (64 KiB)
+  This segment holds both the cp866 font (low offsets) and BIN
+  programs (high offsets). The two regions never overlap:
+
+  Offset range           Size    Name / Description
+  ---------------------------------------------------------------
+  0000 - 0FFF             4 KiB     cp866 font (8x16 * 256 chars)
+                                    INT 43h vector points here when a
+                                    custom font is loaded.
+  1000 - 7EFF            ~28 KiB    CFG_SCRATCH_OFF: scratch buffer for
+                                    .CFG files
+  7F00 - 7FEF             240 B     PROGRAM_PARAMS_OFF: command-line
+                                    parameters copied by kernel before
+                                    launching a BIN program.
+  7FF0 - 7FF0               1 B     PROGRAM_THUNK_OFF: 1-byte 0xCB
+                                    (retf).
+  8000 - FFFF            32 KiB     PROGRAM_LOAD_OFF: BIN program code,
+                                    data, and stack. Programs run with
+                                    CS = DS = ES = SS = 0x1000.
 
 
 ================================================================
@@ -43,14 +58,13 @@ physical address = segment * 16 + offset
 
   Offset range           Size    Name / Description
   ---------------------------------------------------------------
-  0000 - kernel_end-1    ~27 KiB    Kernel image (.text / .data / .bss)
-  8000 - A7FF            10 KiB     program_load_addr
+  0000 - kernel_end-1    <42 KiB    Kernel image (.text / .data / .bss)
   A800 - CFFF            10 KiB     dirlist
   D000 - DFFF             4 KiB     command_history
   E000 - FBFF             7 KiB     disk_buffer (DISK_BUFFER_SIZE = 0x1C00)
   FC00                     ---      KERNEL_WORK_END_OFF
 
-  Build guard: kernel_end must be < 0x8000 (32 KiB max for kernel).
+  kernel_end must be < 0xA800 (42 KiB max for kernel image).
 
 
 ================================================================

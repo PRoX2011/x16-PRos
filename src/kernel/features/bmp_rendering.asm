@@ -27,6 +27,7 @@ bmp_src_seg         dw 0
 bmp_src_off         dw 0
 bmp_pixel_seg       dw 0
 bmp_pixel_off       dw 0
+bmp_row_seg         dw KERNEL_DATA_SEG
 
 ; ===================== BMP Viewing Command with Options =====================
 
@@ -233,7 +234,7 @@ view_bmp:
 
 bmp_copy_row:
     push es
-    mov si, KERNEL_DATA_SEG
+    mov si, [bmp_row_seg]
     mov es, si
 
     mov si, [bmp_src_off]
@@ -294,6 +295,8 @@ bmp_calc_padding:
 
 display_bmp:
     pusha
+
+    mov word [bmp_row_seg], KERNEL_DATA_SEG
 
     ; Read header from BMP segment
     mov ax, [bmp_src_seg]
@@ -373,6 +376,8 @@ display_bmp:
 
 display_bmp_upscaled:
     pusha
+
+    mov word [bmp_row_seg], KERNEL_DATA_SEG
 
     ; Read header from BMP segment
     mov ax, [bmp_src_seg]
@@ -504,11 +509,12 @@ display_bmp_stretched:
     mov [bmp_pixel_off], ax
     mov ax, [bmp_src_seg]
     mov [bmp_pixel_seg], ax
-
+    mov word [bmp_row_seg], KERNEL_DATA_SEG
     mov ax, _bmpSingleLine
     cmp word [bmp_width], BMP_MAX_WIDTH
     jbe .buf_ok
-    mov ax, program_load_addr
+    mov word [bmp_row_seg], PROGRAM_LOAD_SEG
+    mov ax, PROGRAM_LOAD_OFF
 .buf_ok:
     mov [.row_buffer], ax
 
@@ -559,14 +565,18 @@ display_bmp_stretched:
     mul bx
     mov di, ax
 
+    push ds
+    mov ax, [bmp_row_seg]
+    mov ds, ax
+
     xor bx, bx
 .draw_pixel:
     mov ax, bx
-    mul word [bmp_width]
+    mul word [cs:bmp_width]
     mov cx, VGA_WIDTH
     div cx
 
-    mov si, [.row_buffer]
+    mov si, [cs:.row_buffer]
     add si, ax
     mov al, [si]
     stosb
@@ -574,6 +584,8 @@ display_bmp_stretched:
     inc bx
     cmp bx, VGA_WIDTH
     jl .draw_pixel
+
+    pop ds
 
     inc word [.screen_y]
     cmp word [.screen_y], VGA_HEIGHT

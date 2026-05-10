@@ -41,20 +41,27 @@ font_load_from_cfg:
     jc .cfg_fail
 
     mov ax, fnt_cfg_name
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, CFG_SCRATCH_OFF
+    mov dx, CFG_SCRATCH_SEG
+    call fs_load_huge_file
     jc .cfg_fail
 
-    test bx, bx
+    test ax, ax
+    jne .nonempty
+    test dx, dx
     je .cfg_fail
+.nonempty:
+    mov bx, ax
 
-    ; Null-terminate at file size
-    mov si, program_load_addr
+    push ds
+    mov ax, CFG_SCRATCH_SEG
+    mov ds, ax
+
+    mov si, CFG_SCRATCH_OFF
     add si, bx
     mov byte [si], 0
 
-    ; Strip CR/LF/spaces, copy to fnt_cfg_buf
-    mov si, program_load_addr
+    mov si, CFG_SCRATCH_OFF
     mov di, fnt_cfg_buf
     mov cx, 15
 .copy_cfg:
@@ -69,7 +76,8 @@ font_load_from_cfg:
     dec cx
     jnz .copy_cfg
 .copy_done:
-    mov byte [di], 0
+    mov byte [es:di], 0
+    pop ds
 
     cmp byte [fnt_cfg_buf], 0
     je .cfg_fail

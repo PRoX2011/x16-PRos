@@ -99,6 +99,22 @@ setup_help_msg7       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, '  [4] Ocean Deep (blue aqua theme)     ', 0xBA, 10, 13
                       db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 10, 13, 0
 
+setup_help_msg8       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
+                      db 0xBA, ' Before you start                      ', 0xBA, 10, 13
+                      db 0xBA, ' Familiarize yourself with the layout: ', 0xBA, 10, 13
+                      db 0xBA, 39 dup(0xC4), 0xBA, 10, 13
+                      db 0xBA, ' BIN.DIR/    - basic .BIN programs     ', 0xBA, 10, 13
+                      db 0xBA, ' COM.DIR/    - MS-DOS .COM programs    ', 0xBA, 10, 13
+                      db 0xBA, ' EXE.DIR/    - MS-DOS .EXE programs    ', 0xBA, 10, 13
+                      db 0xBA, ' PLE.DIR/    - PRos Large Executables  ', 0xBA, 10, 13
+                      db 0xBA, ' CONF.DIR/   - system config files     ', 0xBA, 10, 13
+                      db 0xBA, ' DOCS.DIR/   - documentation (.TXT)    ', 0xBA, 10, 13
+                      db 0xBA, ' BMP.DIR/    - bitmap images (.BMP)    ', 0xBA, 10, 13
+                      db 0xBA, ' FONTS.DIR/  - bitmap fonts (.FNT)     ', 0xBA, 10, 13
+                      db 0xBA, ' THEMES.DIR/ - color themes (.THM)     ', 0xBA, 10, 13
+                      db 0xBA, ' MUSIC.DIR/  - music (.IMF, .WAV)      ', 0xBA, 10, 13
+                      db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 10, 13, 0
+
 setup_program_prompt  db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, ' Enter your choice (1-3):              ', 0xBA, 10, 13
                       db 0xBA, '    _______________________________    ', 0xBA, 10, 13
@@ -111,10 +127,11 @@ setup_stagebar_top      db 0xC9, 76 dup(0xCD), 0xBB, 0
 setup_stagebar_bottom   db 0xC8, 76 dup(0xCD), 0xBC, 0
 
 setup_stagebar_welcome  db 0xBA, ' welcome                                                                    ', 0xBA, 0
-setup_stagebar_username db 0xBA, ' welcome > username                                                         ', 0xBA, 0
-setup_stagebar_password db 0xBA, ' welcome > username > password                                              ', 0xBA, 0
-setup_stagebar_timezone db 0xBA, ' welcome > username > password > timezone                                   ', 0xBA, 0
-setup_stagebar_theme    db 0xBA, ' welcome > username > password > timezone > theme                           ', 0xBA, 0
-setup_stagebar_prompt   db 0xBA, ' welcome > username > password > timezone > theme > prompt                  ', 0xBA, 0
-setup_stagebar_programs db 0xBA, ' welcome > username > password > timezone > theme > prompt > programs       ', 0xBA, 0
-setup_stagebar_end      db 0xBA, ' welcome > username > password > timezone > theme > prompt > programs > end ', 0xBA, 0
+setup_stagebar_disk     db 0xBA, ' welcome > disk                                                             ', 0xBA, 0
+setup_stagebar_username db 0xBA, ' welcome > disk > username                                                  ', 0xBA, 0
+setup_stagebar_password db 0xBA, ' welcome > disk > username > password                                       ', 0xBA, 0
+setup_stagebar_timezone db 0xBA, ' welcome > disk > username > password > timezone                            ', 0xBA, 0
+setup_stagebar_theme    db 0xBA, ' welcome > disk > username > password > timezone > theme                    ', 0xBA, 0
+setup_stagebar_prompt   db 0xBA, ' welcome > disk > username > password > timezone > theme > prompt           ', 0xBA, 0
+setup_stagebar_programs db 0xBA, ' welcome > disk > username > password > timezone > theme > prompt > prgs    ', 0xBA, 0
+setup_stagebar_end      db 0xBA, ' all stages complete                                                        ', 0xBA, 0

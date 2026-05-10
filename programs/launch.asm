@@ -652,7 +652,8 @@ launch_common:
     ret
 
 trampoline_code:
-    mov ax, 0x2000
+    push cs
+    pop ax
     mov ds, ax
     mov es, ax
 
@@ -685,7 +686,8 @@ trampoline_code:
     xor di, di
     call ax
 
-    mov ax, 0x2000
+    push cs
+    pop ax
     mov ds, ax
     mov es, ax
 

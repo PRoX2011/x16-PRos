@@ -18,29 +18,42 @@ load_and_apply_theme:
 
     ; Load THEME.CFG file
     mov ax, theme_cfg_file
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, CFG_SCRATCH_OFF
+    mov dx, CFG_SCRATCH_SEG
+    call fs_load_huge_file
     jc .error
 
     ; Check if file is empty
-    test bx, bx
+    test ax, ax
+    jne .nonempty
+    test dx, dx
     je .error
+.nonempty:
 
     ; Parse and apply theme
-    mov si, program_load_addr
-    mov word [.line_count], 0
+    push ds
+    mov ax, CFG_SCRATCH_SEG
+    mov ds, ax
+    mov si, CFG_SCRATCH_OFF
+    mov word [cs:.line_count], 0
 
 .parse_loop:
-    cmp word [.line_count], 16
-    jge .done
+    cmp word [cs:.line_count], 16
+    jge .parse_ok
 
     ; Parse line: "index, r, g, b"
     call .parse_color_line
-    jc .error
+    jc .parse_failed
 
-    inc word [.line_count]
+    inc word [cs:.line_count]
     jmp .parse_loop
 
+.parse_failed:
+    pop ds
+    jmp .error
+
+.parse_ok:
+    pop ds
 .done:
     clc
     popa
@@ -62,48 +75,48 @@ load_and_apply_theme:
 
     call .parse_number
     jc .parse_error
-    mov [.color_index], al
+    mov [cs:.color_index], al
 
     call .skip_comma_and_space
     jc .parse_error
 
     call .parse_number
     jc .parse_error
-    mov [.red], al
+    mov [cs:.red], al
 
     call .skip_comma_and_space
     jc .parse_error
 
     call .parse_number
     jc .parse_error
-    mov [.green], al
+    mov [cs:.green], al
 
     call .skip_comma_and_space
     jc .parse_error
 
     call .parse_number
     jc .parse_error
-    mov [.blue], al
+    mov [cs:.blue], al
 
     call .skip_to_newline
 
-    mov [.next_si], si
+    mov [cs:.next_si], si
 
     ; Translate color index to actual DAC register for VGA mode 0x12.
     ; In mode 0x12 the ATC remaps: colors 8-15 -> DAC 56-63, color 6 -> DAC 20.
     xor bx, bx
-    mov bl, [.color_index]
-    mov bl, [.atc_to_dac + bx]
+    mov bl, [cs:.color_index]
+    mov bl, [cs:.atc_to_dac + bx]
 
     mov ax, 1010h
     mov bh, 0
-    mov dh, [.red]
-    mov ch, [.green]
-    mov cl, [.blue]
+    mov dh, [cs:.red]
+    mov ch, [cs:.green]
+    mov cl, [cs:.blue]
     int 10h
 
     popa
-    mov si, [.next_si]
+    mov si, [cs:.next_si]
     clc
     ret
 

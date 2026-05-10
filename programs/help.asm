@@ -9,7 +9,7 @@
 [ORG 0x8000]
 
 start:
-    mov ah, 0x06
+    mov ah, 0x0C
     int 0x21
 
     call string_get_cursor_pos

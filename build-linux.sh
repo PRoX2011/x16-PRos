@@ -15,8 +15,8 @@ FLAG_NO_LOGO_DISPLAY=0
 FLAG_NO_SETUP=0
 FLAG_DTM=0  # DTM - Dev Tesing Mode
 
-MAX_KERNEL_LOADER_BYTES=32768
-KERNEL_SIZE_WARN_BYTES=30720
+MAX_KERNEL_LOADER_BYTES=43008   # 0xA800 - kernel image must end before dirlist
+KERNEL_SIZE_WARN_BYTES=40960    # 0xA000 - warn 2 KiB before the ceiling
 
 for arg in $@; do
     if [ $arg == "-quiet" ]; then FLAG_QUIET_MODE=1; continue; fi
@@ -154,6 +154,20 @@ mkfs.vfat disk_img/x16pros.img -n "x16-PROS"
 check_error "Disk formatting failed"
 print_ok "Disk image formatted successfully"
 
+# ==================================================================
+# This section of the script creates the FLOPPY2.IMG disk image. 
+# It connects to the emulator launched with run-linux.sh and is simply 
+# used to demonstrate the system's ability to operate with multiple 
+# disks and to store additional files. 
+# Removing it won't cause any serious problems.
+# ==================================================================
+dd if=/dev/zero of=disk_img/FLOPPY2.img bs=512 count=2880 conv=notrunc status=none
+check_error "FLOPPY2.img creation failed"
+
+mkfs.vfat disk_img/FLOPPY2.img -n "x16-PROS"
+check_error "FLOPPY2.img formatting failed"
+# ==================================================================
+
 # Write bootloader
 print_info "Writing bootloader to disk..."
 dd status=none if=bin/BOOT.BIN of=disk_img/x16pros.img conv=notrunc
@@ -179,6 +193,20 @@ print_info "Creating COM directory..."
 mmd -i disk_img/x16pros.img ::/COM.DIR
 check_error "Failed to create COM directory"
 print_ok "COM directory created successfully"
+
+# Create EXE directory
+print_splitline "Creating EXE directory..."
+print_info "Creating EXE directory..."
+mmd -i disk_img/x16pros.img ::/EXE.DIR
+check_error "Failed to create EXE directory"
+print_ok "EXE directory created successfully"
+
+# Create PLE directory
+print_splitline "Creating PLE directory..."
+print_info "Creating PLE directory..."
+mmd -i disk_img/x16pros.img ::/PLE.DIR
+check_error "Failed to create PLE directory"
+print_ok "PLE directory created successfully"
 
 # Create BMP directory
 print_splitline "Creating BMP directory..."
@@ -244,30 +272,14 @@ check_error "ITALIC.FNT copy failed"
 print_ok "ITALIC.FNT copied successfully"
 
 # Copy themes
-print_info "Copying DEFAULT.THM to disk..."
-mcopy -i disk_img/x16pros.img assets/themes/DEFAULT.THM ::/THEMES.DIR/
-check_error "DEFAULT.THM copy failed"
-print_ok "DEFAULT.THM copied successfully"
-
-print_info "Copying VGA.THM to disk..."
-mcopy -i disk_img/x16pros.img assets/themes/VGA.THM ::/THEMES.DIR/
-check_error "VGA.THM copy failed"
-print_ok "VGA.THM copied successfully"
-
-print_info "Copying UBUNTU.THM to disk..."
-mcopy -i disk_img/x16pros.img assets/themes/UBUNTU.THM ::/THEMES.DIR/
-check_error "UBUNTU.THM copy failed"
-print_ok "UBUNTU.THM copied successfully"
-
-print_info "Copying OCEAN.THM to disk..."
-mcopy -i disk_img/x16pros.img assets/themes/OCEAN.THM ::/THEMES.DIR/
-check_error "OCEAN.THM copy failed"
-print_ok "OCEAN.THM copied successfully"
-
-print_info "Copying MONO.THM to disk..."
-mcopy -i disk_img/x16pros.img assets/themes/MONO.THM ::/THEMES.DIR/
-check_error "MONO.THM copy failed"
-print_ok "MONO.THM copied successfully"
+print_splitline "Copying themes..."
+for thm in assets/themes/*.THM; do
+    fname=$(basename "$thm")
+    print_info "Copying $fname to disk..."
+    mcopy -i disk_img/x16pros.img "$thm" ::/THEMES.DIR/
+    check_error "$fname copy failed"
+    print_ok "$fname copied successfully"
+done
 
 echo -e "$NC"
 
@@ -334,6 +346,7 @@ programs=(
     "programs/grep.asm GREP.BIN"
     "programs/head.asm HEAD.BIN"
     "programs/tail.asm TAIL.BIN"
+    "programs/cpu.asm CPU.BIN"
     "programs/dlist.asm DLIST.BIN"
     "programs/theme.asm THEME.BIN"
     "programs/fetch.asm FETCH.BIN"
@@ -357,6 +370,7 @@ programs=(
     "programs/clock.asm CLOCK.BIN"
     "programs/mandel.asm MANDEL.BIN"
     "programs/tetris.asm TETRIS.BIN"
+    "programs/tetris-df.asm TETRIS2.BIN"
     "programs/chars.asm CHARS.BIN"
     "programs/eye.asm EYE.BIN"
     "programs/ed.asm ED.BIN"
@@ -364,6 +378,9 @@ programs=(
     "programs/launch.asm LAUNCH.BIN"
     "programs/font.asm FONT.BIN"
     "programs/tree.asm TREE.BIN"
+    "programs/print.asm PRINT.BIN"
+    "programs/calendar.asm CALENDAR.BIN"
+    "programs/settings.asm SETTINGS.BIN"
 )
 
 for prog in "${programs[@]}"; do
@@ -403,6 +420,48 @@ for prog in "${programs_com[@]}"; do
     
     print_info "Copying $bin_name to disk..."
     mcopy -i disk_img/x16pros.img bin/$bin_name ::/COM.DIR/
+    check_error "Copy of $bin_name failed"
+    print_ok "$bin_name copied successfully"
+done
+
+programs_exe=(
+    "programs/EXE/hello.asm HELLO.EXE"
+)
+
+for prog in "${programs_exe[@]}"; do
+    src=$(echo $prog | cut -d' ' -f1)
+    bin_name=$(echo $prog | cut -d' ' -f2)
+
+    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+        print_info "Compiling $src => bin/$bin_name..."
+        nasm -f bin -I programs/EXE/ $src -o bin/$bin_name
+        check_error "Compilation of $src failed"
+        print_ok "$bin_name compiled successfully"
+    fi
+
+    print_info "Copying $bin_name to disk..."
+    mcopy -i disk_img/x16pros.img bin/$bin_name ::/EXE.DIR/
+    check_error "Copy of $bin_name failed"
+    print_ok "$bin_name copied successfully"
+done
+
+programs_ple=(
+    "programs/PLE/src/hello.asm HELLO.PLE"
+)
+
+for prog in "${programs_ple[@]}"; do
+    src=$(echo $prog | cut -d' ' -f1)
+    bin_name=$(echo $prog | cut -d' ' -f2)
+
+    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+        print_info "Compiling $src => bin/$bin_name..."
+        nasm -f bin -I programs/PLE/ $src -o bin/$bin_name
+        check_error "Compilation of $src failed"
+        print_ok "$bin_name compiled successfully"
+    fi
+
+    print_info "Copying $bin_name to disk..."
+    mcopy -i disk_img/x16pros.img bin/$bin_name ::/PLE.DIR/
     check_error "Copy of $bin_name failed"
     print_ok "$bin_name copied successfully"
 done

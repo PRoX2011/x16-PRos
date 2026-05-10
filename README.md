@@ -5,7 +5,7 @@
 <h1>x16-PRos Operating System</h1>
 
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE.TXT)
-[![Version](https://img.shields.io/badge/version-0.8-blue?style=for-the-badge)](docs/changes/v0.8.txt)
+[![Version](https://img.shields.io/badge/version-0.9-blue?style=for-the-badge)](docs/changes/v0.9.txt)
 [![Assembler](https://img.shields.io/badge/assembler-NASM-1f425f?style=for-the-badge)](https://nasm.us/)
 [![Boot Mode](https://img.shields.io/badge/boot-BIOS%20Legacy-orange?style=for-the-badge)](#running-x16-pros)
 
@@ -63,7 +63,7 @@ Thanks to everyone who supported me financially. All your nicknames will appear 
 
 ## Key Features
 
-- **MS-DOS Compatibility**: Native support for running standard MS-DOS `.COM` executables.
+- **MS-DOS Compatibility**: Native support for running standard MS-DOS `.COM` and `.EXE` executables.
 - **Encrypted Password System**: XOR-based password encryption with custom key
 - **User Authentication**: Login system with configurable user account
 - **Password Protection**: Encrypted PASSWORD.CFG prevents plaintext password storage
@@ -84,6 +84,7 @@ Thanks to everyone who supported me financially. All your nicknames will appear 
 - **Multiple disk support**: detect/list available drives and switch drives in the terminal
 - **cp866 fonts support**: change system font using config or TUI application
 - **Timezones support**: change your time zone via TIMEZONE.CFG
+- **AND MUCH MORE FEATURES**
 
 ---
 
@@ -265,7 +266,7 @@ x16-PRos includes a comprehensive collection of built-in applications:
 <td width="33%" align="center">
     <br>
     <b>And more...</b><br>
-    SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, HEAD, TAIL, THEME.BIN, CHARS.BIN, WAVPLAY.BIN, FDISK.BIN, ED.BIN, HELLO.COM, FRACTAL.COM
+    SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, HEAD, TAIL, THEME.BIN, CHARS.BIN, WAVPLAY.BIN, FDISK.BIN, ED.BIN, HELLO.COM, FRACTAL.COM, CALENDAR.BIN
   </td>
 </tr>
 </table>

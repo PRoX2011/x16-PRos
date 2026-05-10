@@ -5,8 +5,10 @@
 ; Function codes in AH:
 ;   0x00: Re-Initialize file system
 ;   0x01: Get file list (SI = buffer for 18-byte entries, returns BX = size low, CX = size high, DX = file count)
-;   0x02: Load file (SI = filename, CX = load position, returns BX = file size)
-;   0x03: Write file (SI = filename, BX = buffer, CX = size)
+;         NOTE: writes to caller's DS:SI buffer.
+;   0x02: Load file (SI = filename, CX = load position, returns BX = file size).
+;         File contents are loaded into caller's segment at offset CX.
+;   0x03: Write file (SI = filename, BX = buffer in caller seg, CX = size)
 ;   0x04: Check if file exists (SI = filename)
 ;   0x05: Create empty file (SI = filename)
 ;   0x06: Remove file (SI = filename)
@@ -19,9 +21,11 @@
 ;   0x0D: Check if directory (SI = name, returns CF flag)
 ;   0x0E: Save current directory
 ;   0x0F: Restore current directory
-;   0x10: Load huge file (SI = filename, CX = load offset (position), DX = load segment address)
+;   0x10: Load huge file (SI = filename, CX = load offset, DX = load segment)
 ;   0x11: List drives
 ;   0x12: Change drive (SI = Drive letter pointer)
+;   0x13: Write huge file (SI = filename, CX = source offset, DX = source segment, BX = size low, DI = size high)
+;   0x14: Get current drive letter (returns AL = drive letter)
 ; ==================================================================
 
 [BITS 16]
@@ -46,6 +50,8 @@ int22_handler:
     push ds
     push es
 
+    mov [cs:caller_ds_save_22], ds
+
     mov bp, cs
     mov ds, bp
     mov es, bp
@@ -53,6 +59,25 @@ int22_handler:
 
     mov al, ah
 
+    ; ---- Pre-process string arguments for functions that take them ----
+    cmp al, 0x02
+    jb .no_si_str
+    cmp al, 0x0D
+    jbe .copy_si_str
+    cmp al, 0x10
+    je .copy_si_str
+    cmp al, 0x12
+    je .copy_si_str
+    cmp al, 0x13
+    je .copy_si_str
+    jmp .no_si_str
+.copy_si_str:
+    call copy_caller_string_si
+.no_si_str:
+    cmp al, 0x07
+    jne .no_di_str
+    call copy_caller_string_di
+.no_di_str:
     cmp al, 0x00
     je .init
     cmp al, 0x01
@@ -91,6 +116,10 @@ int22_handler:
     je .list_drives
     cmp al, 0x12
     je .change_drive
+    cmp al, 0x13
+    je .write_huge_file
+    cmp al, 0x14
+    je .get_current_drive
     stc
     jmp .done
 
@@ -100,6 +129,10 @@ int22_handler:
     jmp .done
 
 .get_file_list:
+    mov ax, [cs:caller_ds_save_22]
+    cmp ax, KERNEL_DATA_SEG
+    jne .gfl_cross_seg
+
     mov ax, si
     call fs_get_file_list
     jc .done
@@ -116,18 +149,56 @@ int22_handler:
     mov [bp+14], dx
     jmp .done
 
+.gfl_cross_seg:
+    push si
+    mov ax, dirlist
+    call fs_get_file_list
+    pop di
+    jc .done
+
+    mov [.saved_bx], bx
+    mov [.saved_cx], cx
+    mov [.saved_dx], dx
+
+    push es
+    mov ax, dx
+    mov bx, 18
+    mul bx
+    inc ax
+    mov cx, ax
+    mov si, dirlist
+    mov ax, [cs:caller_ds_save_22]
+    mov es, ax
+    rep movsb
+    pop es
+
+    mov bp, sp
+    mov bx, [.saved_bx]
+    mov [bp+12], bx
+    mov cx, [.saved_cx]
+    mov [bp+16], cx
+    mov dx, [.saved_dx]
+    mov [bp+14], dx
+    jmp .done
+
 .load_file:
     mov ax, si
-    call fs_load_file
+    mov dx, [cs:caller_ds_save_22]
+    call fs_load_huge_file
     jc .done
 
     mov bp, sp
-    mov [bp+12], bx
+    mov [bp+12], ax
     jmp .done
 
 .write_file:
     mov ax, si
-    call fs_write_file
+    push cx
+    mov cx, bx
+    mov dx, [cs:caller_ds_save_22]
+    pop bx
+    xor di, di
+    call fs_write_huge_file
     jmp .done
 
 .file_exists:
@@ -200,10 +271,21 @@ int22_handler:
     jmp .done
 
 .change_drive:
-    mov al, [si]               
+    mov al, [si]
     call fs_change_drive_letter
     jmp .done
-    
+
+.write_huge_file:
+    mov ax, si
+    call fs_write_huge_file
+    jmp .done
+
+.get_current_drive:
+    mov al, [current_drive_char]
+    mov bp, sp
+    mov [bp+18], al
+    jmp .done
+
 .done:
     jc .set_cf
     push bp
@@ -222,6 +304,75 @@ int22_handler:
     popa
     iret
 
-.saved_bx dw 0
-.saved_cx dw 0
-.saved_dx dw 0
+; ==================================================================
+; copy_caller_string_si -- copy NUL-terminated string from
+;     [caller_ds_save_22:SI] into kernel scratch and update SI.
+; OUT: SI = offset of scratch (in kernel DS).
+; Preserves: AX, BX, CX, DX, DI.
+; ==================================================================
+copy_caller_string_si:
+    push ax
+    push di
+    push es
+    push ds
+
+    push cs
+    pop es
+    mov di, .si_scratch
+
+    mov ax, [cs:caller_ds_save_22]
+    mov ds, ax
+.cl:
+    lodsb
+    stosb
+    test al, al
+    jnz .cl
+
+    pop ds
+    pop es
+    pop di
+    pop ax
+    mov si, .si_scratch
+    ret
+
+.si_scratch times 64 db 0
+
+; ==================================================================
+; copy_caller_string_di -- like copy_caller_string_si but for DI.
+; OUT: DI = offset of scratch.
+; Preserves: AX, BX, CX, DX, SI.
+; ==================================================================
+copy_caller_string_di:
+    push ax
+    push si
+    push es
+    push ds
+
+    mov si, di
+
+    push cs
+    pop es
+    mov di, .di_scratch
+
+    mov ax, [cs:caller_ds_save_22]
+    mov ds, ax
+.cl:
+    lodsb
+    stosb
+    test al, al
+    jnz .cl
+
+    pop ds
+    pop es
+    pop si
+    pop ax
+    mov di, .di_scratch
+    ret
+
+.di_scratch times 64 db 0
+
+caller_ds_save_22 dw 0
+
+int22_handler.saved_bx dw 0
+int22_handler.saved_cx dw 0
+int22_handler.saved_dx dw 0

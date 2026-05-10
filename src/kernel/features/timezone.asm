@@ -24,16 +24,25 @@ load_timezone_cfg:
     jc .restore_done
 
     mov ax, timezone_cfg_file
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, CFG_SCRATCH_OFF
+    mov dx, CFG_SCRATCH_SEG
+    call fs_load_huge_file
     jc .restore_dir
 
-    mov si, program_load_addr
+    push ds
+    push es
+    mov bx, ax                  ; size in BX
+    mov ax, CFG_SCRATCH_SEG
+    mov ds, ax
+    mov es, ax
+    mov si, CFG_SCRATCH_OFF
     add si, bx
     mov byte [si], 0
 
-    mov si, program_load_addr
+    mov si, CFG_SCRATCH_OFF
     call timezone_parse_offset
+    pop es
+    pop ds
     jc .restore_dir
 
     mov [timezone_offset], ax

@@ -48,7 +48,14 @@ COM_ENTRY_OFFSET     equ 0x0100
 KERNEL_DATA_SEG      equ 0x2000
 FONT_SEG             equ 0x1000
 
+PROGRAM_LOAD_SEG     equ 0x1000
 PROGRAM_LOAD_OFF     equ 0x8000
+PROGRAM_THUNK_OFF    equ 0x7FF0
+PROGRAM_PARAMS_OFF   equ 0x7F00
+
+CFG_SCRATCH_SEG      equ FONT_SEG
+CFG_SCRATCH_OFF      equ 0x1000
+
 DIRLIST_OFF          equ 0xA800
 COMMAND_HISTORY_OFF  equ 0xD000
 DISK_BUFFER_OFF      equ 0xE000
@@ -56,7 +63,6 @@ DISK_BUFFER_SIZE     equ 0x1C00
 KERNEL_WORK_END_OFF  equ DISK_BUFFER_OFF + DISK_BUFFER_SIZE  ; 0xFC00
 
 disk_buffer          equ DISK_BUFFER_OFF
-program_load_addr    equ PROGRAM_LOAD_OFF
 dirlist              equ DIRLIST_OFF
 command_history      equ COMMAND_HISTORY_OFF
 program_seg          equ 0x2FC0
@@ -307,31 +313,15 @@ print_help:
     jc .restore_and_builtin
 
     mov ax, .help_bin_file
-    xor bx, bx
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, PROGRAM_LOAD_OFF
+    mov dx, PROGRAM_LOAD_SEG
+    call fs_load_huge_file
     jc .restore_and_builtin
 
     call restore_current_dir
 
-    xor ax, ax
-    xor bx, bx
-    xor cx, cx
-    xor dx, dx
     mov word si, [param_list]
-    xor di, di
-
-    call DisableMouse
-    call program_load_addr
-
-    mov ax, KERNEL_DATA_SEG
-    mov ds, ax
-    mov es, ax
-
-    call fs_reset_floppy
-    call EnableMouse
-    call font_reinstall
-    call load_and_apply_theme
+    call launch_bin_program
 
     popa
     jmp get_cmd
@@ -551,10 +541,6 @@ get_cmd:
     call string_string_compare
     jc near do_reboot
 
-    mov di, cpu_string
-    call string_string_compare
-    jc near do_CPUinfo
-
     mov di, touch_string
     call string_string_compare
     jc near touch_file
@@ -578,6 +564,10 @@ get_cmd:
     mov di, cd_string
     call string_string_compare
     jc near cd_command
+
+    mov di, terry_string
+    call string_string_compare
+    jc near rip_terry
 
     mov si, command
     mov di, kernel_file
@@ -610,6 +600,28 @@ get_cmd:
     call string_string_compare
     jc .load_bin_program
 
+.check_exe_extension:
+    ; Check if command ends with .EXE
+    mov ax, command
+    call string_string_length
+    mov si, command
+    add si, ax
+    sub si, 4
+    mov di, exe_extension
+    call string_string_compare
+    jc .load_exe_program
+
+.check_ple_extension:
+    ; Check if command ends with .PLE
+    mov ax, command
+    call string_string_length
+    mov si, command
+    add si, ax
+    sub si, 4
+    mov di, ple_extension
+    call string_string_compare
+    jc .load_ple_program
+
     ; ============ Auto-append Extensions ============
 
     ; No extension found, try .COM first
@@ -628,7 +640,41 @@ get_cmd:
     call fs_file_exists
     jnc .load_com_program
 
-    ; .COM not found, try .BIN
+    ; .COM not found, try .EXE
+    mov ax, command
+    call string_string_length
+    mov si, command
+    add si, ax
+    sub si, 4
+    mov byte [si], '.'
+    mov byte [si+1], 'E'
+    mov byte [si+2], 'X'
+    mov byte [si+3], 'E'
+    mov byte [si+4], 0
+
+    ; Check if .EXE file exists
+    mov ax, command
+    call fs_file_exists
+    jnc .load_exe_program
+
+    ; .EXE not found, try .PLE
+    mov ax, command
+    call string_string_length
+    mov si, command
+    add si, ax
+    sub si, 4
+    mov byte [si], '.'
+    mov byte [si+1], 'P'
+    mov byte [si+2], 'L'
+    mov byte [si+3], 'E'
+    mov byte [si+4], 0
+
+    ; Check if .PLE file exists
+    mov ax, command
+    call fs_file_exists
+    jnc .load_ple_program
+
+    ; .PLE not found, try .BIN
     mov ax, command
     call string_string_length
     mov si, command
@@ -648,9 +694,9 @@ get_cmd:
 
     ; Try to load from current directory
     mov ax, command
-    xor bx, bx
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, PROGRAM_LOAD_OFF
+    mov dx, PROGRAM_LOAD_SEG
+    call fs_load_huge_file
     jnc execute_bin
 
     ; If not found, try /BIN.DIR on current drive first
@@ -663,9 +709,9 @@ get_cmd:
     jc .restore_and_try_a_bin
 
     mov ax, command
-    xor bx, bx
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, PROGRAM_LOAD_OFF
+    mov dx, PROGRAM_LOAD_SEG
+    call fs_load_huge_file
     jc .restore_and_try_a_bin
 
     call restore_current_dir
@@ -687,9 +733,9 @@ get_cmd:
     jc .restore_and_fail_a_bin
 
     mov ax, command
-    xor bx, bx
-    mov cx, program_load_addr
-    call fs_load_file
+    mov cx, PROGRAM_LOAD_OFF
+    mov dx, PROGRAM_LOAD_SEG
+    call fs_load_huge_file
     jc .restore_and_fail_a_bin
 
     call restore_current_dir
@@ -753,6 +799,98 @@ get_cmd:
     call restore_current_dir
     jmp total_fail
 
+.load_exe_program:
+    ; Try to load EXE from current directory
+    mov ax, command
+    call exe_execute
+    jnc get_cmd
+
+    ; If not found, try /BIN.DIR on current drive
+    call save_current_dir
+    mov byte [current_directory], 0
+    mov word [current_dir_cluster], 0
+
+    mov ax, bin_dir_name
+    call fs_change_directory
+    jc .restore_and_try_a_exe
+
+    mov ax, command
+    call exe_execute
+    jnc .restore_and_done_exe
+
+.restore_and_try_a_exe:
+    call restore_current_dir
+    cmp byte [current_drive_char], 'A'
+    je total_fail
+
+    ; Try A:/BIN.DIR
+    call save_current_dir
+    mov al, 'A'
+    call fs_change_drive_letter
+    jc .restore_and_fail_a_exe
+
+    mov ax, bin_dir_name
+    call fs_change_directory
+    jc .restore_and_fail_a_exe
+
+    mov ax, command
+    call exe_execute
+    jnc .restore_and_done_exe
+
+.restore_and_fail_a_exe:
+    call restore_current_dir
+    jmp total_fail
+
+.restore_and_done_exe:
+    call restore_current_dir
+    jmp get_cmd
+
+.load_ple_program:
+    ; Try to load PLE from current directory
+    mov ax, command
+    call ple_execute
+    jnc get_cmd
+
+    ; If not found, try /BIN.DIR on current drive
+    call save_current_dir
+    mov byte [current_directory], 0
+    mov word [current_dir_cluster], 0
+
+    mov ax, bin_dir_name
+    call fs_change_directory
+    jc .restore_and_try_a_ple
+
+    mov ax, command
+    call ple_execute
+    jnc .restore_and_done_ple
+
+.restore_and_try_a_ple:
+    call restore_current_dir
+    cmp byte [current_drive_char], 'A'
+    je total_fail
+
+    ; Try A:/BIN.DIR
+    call save_current_dir
+    mov al, 'A'
+    call fs_change_drive_letter
+    jc .restore_and_fail_a_ple
+
+    mov ax, bin_dir_name
+    call fs_change_directory
+    jc .restore_and_fail_a_ple
+
+    mov ax, command
+    call ple_execute
+    jnc .restore_and_done_ple
+
+.restore_and_fail_a_ple:
+    call restore_current_dir
+    jmp total_fail
+
+.restore_and_done_ple:
+    call restore_current_dir
+    jmp get_cmd
+
 .success_disk_change_msg db 'Disk changed', 0
 
 ; ============ Execute BIN Program ============
@@ -764,32 +902,103 @@ execute_bin:
     xor dx, dx
 
     mov ax, [param_list]
-    test ax, ax
-    je .no_params
     mov si, ax
-    jmp .continue
 
-.no_params:
-    xor si, si
+    call launch_bin_program
 
-.continue:
-    xor di, di
+    jmp get_cmd
 
-    ; Save kernel stack in case BIN modifies SS:SP.
+; ==================================================================
+; install_program_thunk -- writes the 1-byte "retf" stub to
+;                          PROGRAM_LOAD_SEG:PROGRAM_THUNK_OFF.
+; The thunk turns a program's terminal `ret` (near) into a far return
+; to the kernel. See launch_bin_program for the exact mechanism.
+; Called once during init.
+; ==================================================================
+install_program_thunk:
+    push ax
+    push es
+    push di
+    mov ax, PROGRAM_LOAD_SEG
+    mov es, ax
+    mov di, PROGRAM_THUNK_OFF
+    mov al, 0xCB                  ; opcode: retf
+    stosb
+    pop di
+    pop es
+    pop ax
+    ret
+
+; ==================================================================
+; launch_bin_program -- runs a BIN program already loaded at
+;                       PROGRAM_LOAD_SEG:PROGRAM_LOAD_OFF.
+;
+; IN:  SI = pointer to NUL-terminated param string in kernel DS,
+;           or 0 for no params. Other regs preserved into program.
+;
+; OUT: DS = ES = KERNEL_DATA_SEG, SS:SP restored, mouse/floppy/font
+;      and theme reinstalled. Caller resumes with kernel state intact.
+;
+; Stack layout when exec:
+;   [SP+0] = PROGRAM_THUNK_OFF   ; what program's near ret will pop
+;   [SP+2] = .program_done       ; IP for thunk's retf
+;   [SP+4] = kernel CS           ; CS for thunk's retf
+; ==================================================================
+launch_bin_program:
+    ; ---- Copy param string from kernel DS:SI to program seg ----
+    push ax
+    push si
+    push di
+    push es
+
+    test si, si
+    jz .no_params_copy
+
+    mov ax, PROGRAM_LOAD_SEG
+    mov es, ax
+    mov di, PROGRAM_PARAMS_OFF
+.copy_param:
+    lodsb
+    stosb
+    test al, al
+    jnz .copy_param
+
+.no_params_copy:
+    pop es
+    pop di
+    pop si
+    pop ax
+
+    ; ---- Save kernel stack in case BIN messes with SS:SP ----
     mov [bin_stack_save], sp
     mov [bin_ss_save], ss
 
     call DisableMouse
-    call program_load_addr
 
+    ; ---- Build trampoline frame on the (still kernel) stack ----
+    push cs                       ; -> [SP+4] for retf
+    push word .program_done       ; -> [SP+2] for retf
+    push word PROGRAM_THUNK_OFF   ; -> [SP+0] for program's near ret
+
+    ; ---- Set up program entry registers ----
+    test si, si
+    jz .si_zero
+    mov si, PROGRAM_PARAMS_OFF
+.si_zero:
+
+    mov ax, PROGRAM_LOAD_SEG
+    mov ds, ax
+    mov es, ax
+
+    jmp far PROGRAM_LOAD_SEG:PROGRAM_LOAD_OFF
+
+.program_done:
     cli
-    mov ax, [bin_ss_save]
-    mov ss, ax
-    mov sp, [bin_stack_save]
-
     mov ax, KERNEL_DATA_SEG
     mov ds, ax
     mov es, ax
+    mov ss, [bin_ss_save]
+    mov sp, [bin_stack_save]
     sti
 
     call fs_reset_floppy
@@ -797,7 +1006,7 @@ execute_bin:
     call font_reinstall
     call load_and_apply_theme
 
-    jmp get_cmd
+    ret
 
 ; ============ Execute COM Program ============
 
@@ -864,218 +1073,6 @@ print_ver:
 
 exit:
     jmp reboot_system
-
-; ===================== CPU Info Functions =====================
-
-print_edx:
-    mov ah, 0eh
-    mov bx, 4
-.loop4r:
-    mov al, dl
-    int 10h
-    ror edx, 8
-    dec bx
-    jnz .loop4r
-    ret
-
-print_full_name_part:
-    cpuid
-    push edx
-    push ecx
-    push ebx
-    push eax
-    mov cx, 4
-.loop4n:
-    pop edx
-    call print_edx
-    loop .loop4n
-    ret
-
-print_cores:
-    mov si, cores
-    call print_string
-    mov eax, 1
-    cpuid
-    ror ebx, 16
-    mov al, bl
-    call print_al
-    ret
-
-print_cache_line:
-    mov si, cache_line
-    call print_string
-    mov eax, 1
-    cpuid
-    ror ebx, 8
-    mov al, bl
-    mov bl, 8
-    mul bl
-    call print_al
-    ret
-
-print_stepping:
-    mov si, stepping
-    call print_string
-    mov eax, 1
-    cpuid
-    and al, 15
-    call print_al
-    ret
-
-print_al:
-    mov ah, 0
-    mov dl, 10
-    div dl
-    add ax, '00'
-    mov dx, ax
-
-    mov bl, COLOR_WHITE
-    mov al, dl
-    cmp dl, '0'
-    jz skip_fn
-    call print_char
-skip_fn:
-    mov al, dh
-    call print_char
-    ret
-
-; -----------------------------
-; Prints CPU information
-; IN  : Nothing
-do_CPUinfo:
-    call print_newline
-
-    pusha
-
-    ; Print FLAGS register
-    mov si, flags_str
-    call print_string
-    xor ax, ax
-    lahf
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Control Register (CR0)
-    mov si, control_reg
-    call print_string
-    mov eax, cr0
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Code Segment (CS)
-    mov si, code_segment
-    call print_string
-    mov ax, cs
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Data Segment (DS)
-    mov si, data_segment
-    call print_string
-    mov ax, ds
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Extra Segment (ES)
-    mov si, extra_segment
-    call print_string
-    mov ax, es
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Stack Segment (SS)
-    mov si, stack_segment
-    call print_string
-    mov ax, ss
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Base Pointer (BP)
-    mov si, base_pointer
-    call print_string
-    mov ax, bp
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    ; Print Stack Pointer (SP)
-    mov si, stack_pointer
-    call print_string
-    mov ax, sp
-    call print_decimal
-    mov si, mt
-    call print_string
-
-    call print_newline
-
-    popa
-
-    pusha
-
-    ; Print CPU Family name
-    mov si, family_str
-    call print_string
-    mov eax, 1
-    cpuid
-    mov ebx, eax
-    shr eax, 8
-    and eax, 0x0F
-    mov ecx, ebx
-    shr ecx, 20
-    and ecx, 0xFF
-    add eax, ecx
-
-    mov si, family_table
-.lookup_loop:
-    cmp word [si], 0
-    je .unknown_family
-    cmp ax, word [si]
-    je .found_family
-    add si, 4
-    jmp .lookup_loop
-
-.found_family:
-    mov si, word [si + 2]
-    call print_string_cyan
-    jmp .family_done
-
-.unknown_family:
-    mov si, unknown_family_str
-    call print_string_cyan
-
-.family_done:
-    mov si, mt
-    call print_string
-
-    ; Print CPU name
-    mov si, cpu_name
-    call print_string
-    mov eax, 80000002h
-    call print_full_name_part
-    mov eax, 80000003h
-    call print_full_name_part
-    mov eax, 80000004h
-    call print_full_name_part
-    mov si, mt
-    call print_string
-    call print_cores
-    mov si, mt
-    call print_string
-    call print_cache_line
-    mov si, mt
-    call print_string
-    call print_stepping
-    mov si, mt
-    call print_string
-    popa
-    call print_newline
-    jmp get_cmd
 
 ; ===================== Date and Time Functions =====================
 
@@ -1371,8 +1368,8 @@ cat_file:
     pop ax
     jc .not_found
 
-    mov cx, program_load_addr
-    mov dx, ds
+    mov cx, PROGRAM_LOAD_OFF
+    mov dx, PROGRAM_LOAD_SEG
 
     call fs_load_huge_file
     jc .load_fail
@@ -1384,8 +1381,8 @@ cat_file:
     or cx, dx
     jz .empty_file
 
-    mov word [.curr_seg], ds
-    mov word [.curr_off], program_load_addr
+    mov word [.curr_seg], PROGRAM_LOAD_SEG
+    mov word [.curr_off], PROGRAM_LOAD_OFF
     mov word [.line_count], 0
 
 .print_loop:
@@ -1569,14 +1566,17 @@ copy_file:
     call fs_file_exists
     jnc .already_exists
     mov ax, dx
-    mov cx, program_load_addr
-    mov dx, KERNEL_DATA_SEG
+    mov cx, PROGRAM_LOAD_OFF
+    mov dx, PROGRAM_LOAD_SEG
     call fs_load_huge_file
     jc .load_fail
-    mov cx, bx
-    mov bx, program_load_addr
+    ; DX:AX = file size
+    mov bx, ax                  ; size_low
+    mov di, dx                  ; size_high
+    mov cx, PROGRAM_LOAD_OFF
+    mov dx, PROGRAM_LOAD_SEG
     mov word ax, [.tmp]
-    call fs_write_file
+    call fs_write_huge_file
     jc .write_fail
     mov si, .success_msg
     call print_string_green
@@ -2208,6 +2208,19 @@ cd_command:
 .already_root_msg   db 'Already in root directory', 0
 .failure_msg        db 'Directory not found or invalid', 0
 
+rip_terry:
+    mov si, .rip_terry
+    call print_string
+
+    mov si, risen
+    call play_melody
+    
+    call print_newline
+
+    jmp get_cmd
+
+.rip_terry db "Rest in peace Terry A. Devis (1969 - 2018)", 0
+
 %INCLUDE "src/kernel/init.asm"                      ; x16-PRos initialisation
 %INCLUDE "src/kernel/log.asm"                       ; Log functions
 %INCLUDE "src/kernel/features/fs.asm"               ; FAT12 filesystem functions
@@ -2218,6 +2231,8 @@ cd_command:
 %INCLUDE "src/kernel/features/themes.asm"           ; Themes
 %INCLUDE "src/kernel/features/encrypt.asm"          ; Encryption
 %INCLUDE "src/kernel/features/com/com.asm"          ; COM
+%INCLUDE "src/kernel/features/exe/exe.asm"          ; MZ EXE
+%INCLUDE "src/kernel/features/ple/ple.asm"          ; PLE
 %INCLUDE "src/kernel/features/cp866.asm"            ; .FNT font loading
 
 ; ====== DRIVERS ======
@@ -2232,7 +2247,7 @@ cd_command:
 ; ===================== Data Section =====================
 section .data
 ; ------ Header ------
-header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v0.8', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
+header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v0.9', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
 
 ; ------ Help ------
 kshell_comands db 'HELP               - get list of commands', 10, 13
@@ -2243,7 +2258,6 @@ kshell_comands db 'HELP               - get list of commands', 10, 13
                db 'REBOOT             - restart', 10, 13
                db 'DATE               - current date (DD/MM/YY)', 10, 13
                db 'TIME               - current time (HH:MM:SS)', 10, 13
-               db 'CPU                - CPU info', 10, 13
                db 'DIR                - list files', 10, 13
                db 'SIZE   <f>         - file size', 10, 13
                db 'CAT    <f>         - show file', 10, 13
@@ -2268,7 +2282,7 @@ info db 10, 13
      db '  Support project:  DALink (https://dalink.to/PRoXdev)', 10, 13
      db '  Source code:      GitHub (https://github.com/PRoX2011/x16-PRos)', 10, 13
      db '  License:          MIT', 10, 13
-     db '  OS version:       0.8', 10, 13
+     db '  OS version:       0.9', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.3', 10, 13, 0
@@ -2289,19 +2303,19 @@ ren_string     db 'REN', 0
 size_string    db 'SIZE', 0
 shut_string    db 'SHUT', 0
 reboot_string  db 'REBOOT', 0
-cpu_string     db 'CPU', 0
 touch_string   db 'TOUCH', 0
 write_string   db 'WRITE', 0
 view_string    db 'VIEW', 0
 mkdir_string   db 'MKDIR', 0
 deldir_string  db 'DELDIR', 0
 cd_string      db 'CD', 0
+terry_string   db 'TERRY', 0
 
 autocomplete_cmd_table:
     dw exit_string, help_string, info_string, cls_string
     dw dir_string, cd_string, ver_string, time_string, date_string
     dw cat_string, del_string, copy_string, ren_string
-    dw size_string, shut_string, reboot_string, cpu_string
+    dw size_string, shut_string, reboot_string
     dw touch_string, write_string, view_string, mkdir_string
     dw deldir_string
     dw 0
@@ -2317,35 +2331,6 @@ kern_warn2_msg    db 'Cannot delete kernel file!', 0
 notext_msg        db 'No text provided for writing', 0
 APM_error_msg     db "APM error or APM not available",0
 bad_drive_msg     db 'Drive not ready or does not exist!', 0
-
-; ------ CPU info ------
-flags_str          db '  FLAGS: ', 0
-control_reg        db '  Control Reg   (CR) : ', 0
-stack_segment      db '  Stack Seg     (SS) : ', 0
-code_segment       db '  Code Seg      (CS) : ', 0
-data_segment       db '  Data Seg      (DS) : ', 0
-extra_segment      db '  Extra Seg     (ES) : ', 0
-base_pointer       db '  Base Pointer  (BP) : ', 0
-stack_pointer      db '  Stack Pointer (SP) : ', 0
-
-family_str         db '  CPU Family         : ', 0
-unknown_family_str db 'Unknown', 0
-intel_core_str     db 'Intel', 0
-intel_pentium_str  db 'Intel Pentium', 0
-amd_ryzen_str      db 'AMD Ryzen', 0
-amd_athlon_str     db 'AMD Athlon', 0
-
-family_table:
-    dw 6, intel_core_str
-    dw 5, intel_pentium_str
-    dw 15, amd_athlon_str
-    dw 21, amd_ryzen_str
-    dw 0, 0
-
-cpu_name           db '  CPU name           : ', 0
-cores              db '  CPU cores          : ', 0
-stepping           db '  Stepping ID        : ', 0
-cache_line         db '  Cache line         : ', 0
 
 time_msg  db 'Current time: ', 0
 date_msg  db 'Current date: ', 0
@@ -2366,6 +2351,125 @@ shut_melody:
     dw 2637, 150
     dw 3136, 150
     dw 4186, 300
+    dw 0, 0
+
+risen:
+    dw 0x0F8B, 250
+    dw 1, 5
+    dw 0x0E1C, 250
+    dw 1, 5
+    dw 0x0D59, 500
+    dw 1, 5
+    dw 0x0D59, 500
+    dw 1, 5
+    dw 0x0E1C, 165
+    dw 1, 5
+    dw 0x0E1C, 170
+    dw 1, 5
+    dw 0x0D59, 165
+    dw 1, 5
+    dw 0x0F8B, 500
+    dw 1, 5
+    dw 0x11A1, 250
+    dw 1, 5
+    dw 0x0F8B, 250
+    dw 1, 5
+    dw 0x0F8B, 250
+    dw 1, 5
+    dw 0x0E1C, 250
+    dw 1, 5
+    dw 0x11A1, 165
+    dw 1, 5
+    dw 0x0BEF, 170
+    dw 1, 5
+    dw 0x0D59, 165
+    dw 1, 5
+    dw 0x0F8B, 250
+    dw 1, 5
+    dw 0x0E1C, 250
+    dw 1, 5
+    dw 0x0D59, 500
+    dw 1, 5
+    dw 0x0D59, 500
+    dw 1, 5
+    dw 0x0E1C, 165
+    dw 1, 5
+    dw 0x0E1C, 170
+    dw 1, 5
+    dw 0x0D59, 165
+    dw 1, 5
+    dw 0x0F8B, 500
+    dw 1, 5
+    dw 0x11A1, 250
+    dw 1, 5
+    dw 0x0F8B, 250
+    dw 1, 5
+    dw 0x0F8B, 250
+    dw 1, 5
+    dw 0x0E1C, 250
+    dw 1, 5
+    dw 0x11A1, 165
+    dw 1, 5
+    dw 0x0BEF, 170
+    dw 1, 5
+    dw 0x0D59, 165
+    dw 1, 5
+    dw 0x1537, 250
+    dw 1, 5
+    dw 0x1537, 250
+    dw 1, 5
+    dw 0x0E1C, 165
+    dw 1, 5
+    dw 0x0E1C, 170
+    dw 1, 5
+    dw 0x0D59, 165
+    dw 1, 5
+    dw 0x0E1C, 165
+    dw 1, 5
+    dw 0x0F8B, 170
+    dw 1, 5
+    dw 0x0BEF, 165
+    dw 1, 5
+    dw 0x12E9, 165
+    dw 1, 5
+    dw 0x0F8B, 170
+    dw 1, 5
+    dw 0x11A1, 165
+    dw 1, 5
+    dw 0x0D59, 500
+    dw 1, 5
+    dw 0x0F8B, 250
+    dw 1, 5
+    dw 0x11A1, 250
+    dw 1, 5
+    dw 0x0F8B, 500
+    dw 1, 5
+    dw 0x0E1C, 500
+    dw 1, 5
+    dw 0x1537, 250
+    dw 1, 5
+    dw 0x1537, 250
+    dw 1, 5
+    dw 0x0E1C, 165
+    dw 1, 5
+    dw 0x0E1C, 170
+    dw 1, 5
+    dw 0x0D59, 165
+    dw 1, 5
+    dw 0x0E1C, 165
+    dw 1, 5
+    dw 0x0F8B, 170
+    dw 1, 5
+    dw 0x0BEF, 165
+    dw 1, 5
+    dw 0x12E9, 165
+    dw 1, 5
+    dw 0x0F8B, 170
+    dw 1, 5
+    dw 0x11A1, 165
+    dw 1, 5
+    dw 0x0D59, 500
+    dw 1, 5
     dw 0, 0
 
 file_size            dw 0
@@ -2440,6 +2544,7 @@ tmp_string         resb 15
 command            resb 32
 user               resb 32
 password           resb 32
+encrypted_pass     resb 32
 decrypted_pass     resb 32
 timezone           resb 32
 saved_directory    resb 32
@@ -2453,4 +2558,4 @@ temp_saved_cluster resw 1
 first_boot_buf     resb 8
 
 kernel_end:
-; kernel_end MUST stay below PROGRAM_LOAD_OFF (0x8000 = 32 KiB).
+; kernel_end MUST stay below DIRLIST_OFF (0xA800)

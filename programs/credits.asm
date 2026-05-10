@@ -13,7 +13,7 @@ ROLE_OFFSET  equ 22
 START_ROW    equ 5
 
 start:
-    mov ah, 0x06
+    mov ah, 0x0C
     int 0x21
 
     mov dh, 0
@@ -135,9 +135,9 @@ name_yaroslav      db 'Yaroslav', 0
 name_greenbushy    db 'Green_Bushy', 0
 name_tanushqn      db 'tanushqn', 0
 name_g4sasha       db 'G4 Sasha', 0
-
+name_klasterk      db 'KlasterK', 0
+name_petruchiorus  db 'PetruCHIOrus', 0 
 name_sdkam         db 'sdkam', 0
-name_petruchiorus  db 'PetruCHIOrus', 0
 name_kraniov       db 'kraniov', 0
 
 entries:
@@ -156,6 +156,7 @@ entries:
     dw name_sdkam,        role_sponsor
     dw name_petruchiorus, role_sponsor
     dw name_kraniov,      role_sponsor
+    dw name_klasterk,     role_sponsor
 entries_end:
 
 entries_count equ (entries_end - entries) / ENTRY_SIZE
