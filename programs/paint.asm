@@ -674,7 +674,6 @@ ColorTable db 0x00, 0x0F, 0x01, 0x03, 0x02, 0x04, 0x05, 0x0E, 0x07, 0x08
 
 welcome_msg    db '                             - PRos Paint v0.2 -', 13, 10,
                db '         Use 1-9 buttons to change colors and W, S to change brush size', 13, 10,
-               db '              Ctrl+S to save as BMP, ESC to exit program', 0
 
 ; ==================================================================
 ; BMP file/info header template (54 bytes)
