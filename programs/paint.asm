@@ -261,8 +261,6 @@ ColorTable db 0x00,0x0F,0x01,0x03,0x02,0x04,0x05,0x0E,0x07,0x08
 
 welcome_msg db '        - PRos Paint -  1-9 buttons - Change color  W,S - Change size of brush',13,10,0
 
-status_text db ' Mode: PAINT  TAB switch  Ctrl+S Save  ESC Exit',0
-
 status_text    db ' Mode: XXXX  TAB toggle mode  Ctrl+S Save  ESC Exit', 0
 mode_free_str  db 'FREE', 0
 mode_line_str  db 'LINE', 0
