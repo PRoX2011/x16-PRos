@@ -177,7 +177,6 @@ draw_frame:
 ; Save image (Save As)
 ; =======================
 save_image:
-    call clear_preview
     call DisableMouse
     call HideCursor
 
@@ -264,6 +263,8 @@ welcome_msg db '        - PRos Paint -  1-9 buttons - Change color  W,S - Change
 status_text    db ' Mode: XXXX  TAB toggle mode  Ctrl+S Save  ESC Exit', 0
 mode_free_str  db 'FREE', 0
 mode_line_str  db 'LINE', 0
+
+save_prompt db 'Save as (e.g. PAINT.BMP):', 0
 
 save_filename_buf times 17 db 0
 
