@@ -6,12 +6,12 @@
 ; =========================================================
 
 com_3Ch:
-    ; копіюємо шлях з caller у kernel‑буфер
+    ; coping a path from caller to kernel‑buffer
     call com_copy_path_from_caller
     mov si, ax                      ; DS:SI = filename (kernel)
 
-    ; виклик PRos FS: Create Empty File
-    ; Припущення: AH=0x05 — Create Empty File (INT 0x22)
+    ; calling PRos FS: Create Empty File
+    ; Assumption: AH=0x05 — Create Empty File (INT 0x22)
     mov ah, 0x05
     int 0x22
     jc .error
