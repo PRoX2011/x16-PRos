@@ -259,6 +259,10 @@ int21_dos_handler:
     je com_3Ah
     cmp ah, 0x3B
     je com_3Bh
+    cmp ah, 0x3C
+    je com_3Ch
+    cmp ah, 0x3D
+    je com_3Dh
     cmp ah, 0x41
     je com_41h
     cmp ah, 0x4C
@@ -270,7 +274,7 @@ int21_dos_handler:
     iret
 
 
-saved_interrupt_table times 1024 db 0
+saved_interrupt_table resb 1024
 dta_offset            dw 0x0080
 dta_segment           dw 0
 verify_flag           db 0
@@ -278,7 +282,7 @@ last_return_code      db 0
 last_return_type      db 0
 com_tmp_drive         db 0
 com_path_buffer       times 128 db 0
-com_path_buffer2      times 128 db 0
+com_path_buffer2       times 128 db 0
 
 ; Copy ASCIIZ from caller DS:DX to kernel com_path_buffer.
 ; Truncates to 127 chars and always null-terminates.
@@ -411,6 +415,8 @@ bcd_to_bin_time:
 %include "src/kernel/features/com/39h.asm"
 %include "src/kernel/features/com/3Ah.asm"
 %include "src/kernel/features/com/3Bh.asm"
+%include "src/kernel/features/com/3Ch.asm"
+%include "src/kernel/features/com/3Dh.asm"
 %include "src/kernel/features/com/41h.asm"
 %include "src/kernel/features/com/4Ch.asm"
 %include "src/kernel/features/com/4Dh.asm"
