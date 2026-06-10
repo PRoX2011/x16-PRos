@@ -6,6 +6,11 @@
 
 bin/
 
+# ignoring all linux executables
+*
+!*/
+!*.*
+
 # CLion
 .idea/
 
