@@ -498,8 +498,8 @@ GetSelection:
 
 section .data
 
-MOUSEFAIL   db "An unexpected error happened!", 0
-MOUSEINITOK db "Mouse initialized!", 0x0F, 0
+MOUSEFAIL   db "[ps-2 mouse] An unexpected error happened!", 0
+MOUSEINITOK db "[ps2-mouse] Mouse initialized!", 0x0F, 0
 
 ButtonStatus dw 0
 MouseX       dw 0
