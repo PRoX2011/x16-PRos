@@ -1039,8 +1039,58 @@ string_input_string:
 ; =======================================================================
 string_clear_screen:
     pusha
-    call set_video_mode
+    mov al, 0x00
+    push es
+    and al, 0x0F
+    mov bl, al
+    mov dx, 0x3CE
+    mov al, 0
+    out dx, al
+    inc dx
+    mov al, bl
+    out dx, al
+    mov dx, 0x3CE
+    mov al, 1
+    out dx, al
+    inc dx
+    mov al, 0x0F
+    out dx, al
+    mov dx, 0x3CE
+    mov al, 3
+    out dx, al
+    inc dx
+    xor al, al
+    out dx, al
+    mov dx, 0x3CE
+    mov al, 8
+    out dx, al
+    inc dx
+    mov al, 0xFF
+    out dx, al
+    mov dx, 0x3C4
+    mov al, 2
+    out dx, al
+    inc dx
+    mov al, 0x0F
+    out dx, al
+    mov ax, 0xA000
+    mov es, ax
+    xor di, di
+    mov cx, 19200
+    xor ax, ax
+    cld
+    rep stosw
+    mov dx, 0x3CE
+    mov al, 1
+    out dx, al
+    inc dx
+    xor al, al
+    out dx, al
+    pop es
     popa
+    mov dl, 0x00
+    mov dh, 0x00
+    call string_move_cursor
     call load_and_apply_theme
     ret
 
