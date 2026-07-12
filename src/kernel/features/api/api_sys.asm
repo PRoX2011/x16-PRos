@@ -31,6 +31,7 @@
 ;   0x23: Mouse show cursor
 ;   0x24: Mouse enable (AL = 1 enable, 0 disable)
 ;   0x25: Mouse drag-select (AL = 1 enable, 0 disable)
+;   0x26: Set cursor shape (AL = 0 arrow, 1 resize)
 ; ==================================================================
 
 [BITS 16]
@@ -101,6 +102,8 @@ int23_handler:
     je .mouse_enable
     cmp ah, 0x25
     je .mouse_drag_select
+    cmp ah, 0x26
+    je .mouse_set_cursor
     cmp ah, 0x30
     je .win_set
     cmp ah, 0x31
@@ -312,6 +315,22 @@ int23_handler:
 .mouse_drag_off:
     mov byte [SelEnabled], 0
 .mouse_drag_ok:
+    clc
+    jmp .done
+
+.mouse_set_cursor:
+    test al, al
+    jz .cursor_arrow
+    mov word [CursorPtr], resizebmp
+    jmp .cursor_apply
+.cursor_arrow:
+    mov word [CursorPtr], mousebmp
+.cursor_apply:
+    cmp byte [CursorVisible], 0
+    je .cursor_done
+    call HideCursor
+    call ShowCursor
+.cursor_done:
     clc
     jmp .done
 
