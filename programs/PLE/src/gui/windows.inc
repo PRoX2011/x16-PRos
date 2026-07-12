@@ -150,7 +150,6 @@ draw_desktop_bg:
     cld
     mov ax, 0xA000
     mov es, ax
-
     mov dx, 0x3CE
     mov al, 0x01
     out dx, al
@@ -182,6 +181,11 @@ draw_desktop_bg:
     mov al, 0x0F
     out dx, al
 
+    xor bh, bh
+    mov bl, [bg_style]
+    shl bx, 3
+    mov [.tbl], bx
+
     mov bp, MENUBAR_H
 .row:
     cmp bp, 480
@@ -190,26 +194,28 @@ draw_desktop_bg:
     mov bx, 80
     mul bx
     mov di, ax
-    test bp, 1
-    jnz .black
-    mov al, 0x88
-    test bp, 2
-    jz .pat
-    mov al, 0x22
-.pat:
+
+    mov bx, bp
+    and bx, 7
+    add bx, [.tbl]
+    mov al, [bg_patterns + bx]
     mov cx, 80
     rep stosb
-    jmp .next
-.black:
-    xor al, al
-    mov cx, 80
-    rep stosb
-.next:
+
     inc bp
     jmp .row
 .done:
     pop es
     popa
+    ret
+.tbl dw 0
+
+cycle_wallpaper:
+    inc byte [bg_style]
+    cmp byte [bg_style], BG_STYLE_COUNT
+    jb .done
+    mov byte [bg_style], 0
+.done:
     ret
 
 draw_outline:

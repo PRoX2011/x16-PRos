@@ -45,8 +45,17 @@ PLE_LOGO          "logo/hello.raw"
 %define MENU_Y     MENUBAR_H
 %define MENU_IW    128
 %define MENU_IH    16
-%define MENU_N     3
+%define MENU_N     4
 %define MENU_H     (MENU_N * MENU_IH)
+
+%define WPMENU_N   8
+%define WPMENU_IW  110
+%define WPMENU_IH  16
+%define WPMENU_X   (MENU_X + MENU_IW)
+%define WPMENU_Y   (MENU_Y + 3*MENU_IH)
+%define WPMENU_H   (WPMENU_N * WPMENU_IH)
+
+%define BG_STYLE_COUNT 4
 
 start:
     push cs

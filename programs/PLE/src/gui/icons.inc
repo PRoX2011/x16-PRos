@@ -350,13 +350,13 @@ draw_icon_name:
     add ax, LOGO_PX + NAME_GAP
     mov [.y], ax
 
-    ; black bg for labels
-    ; mov cx, [.x]
-    ; mov dx, [.y]
-    ; mov si, [.w]
-    ; mov di, 16
-    ; xor al, al
-    ; call gfx_fill_rect
+    mov si, [.sptr]
+    mov cx, [.x]
+    mov dx, [.y]
+    mov al, 0x0F
+    call draw_name_outlined
+    popa
+    ret
 
     mov si, [.sptr]
     mov cx, [.x]
@@ -369,6 +369,54 @@ draw_icon_name:
 .w    dw 0
 .x    dw 0
 .y    dw 0
+
+draw_name_outlined:
+    pusha
+    mov [.color], al
+    mov [.penx0], cx
+    mov [.peny0], dx
+    mov [.sptr0], si
+
+    mov si, [.sptr0]
+    mov cx, [.penx0]
+    dec cx
+    mov dx, [.peny0]
+    mov al, 0
+    call draw_name_px
+
+    mov si, [.sptr0]
+    mov cx, [.penx0]
+    inc cx
+    mov dx, [.peny0]
+    mov al, 0
+    call draw_name_px
+
+    mov si, [.sptr0]
+    mov cx, [.penx0]
+    mov dx, [.peny0]
+    dec dx
+    mov al, 0
+    call draw_name_px
+
+    mov si, [.sptr0]
+    mov cx, [.penx0]
+    mov dx, [.peny0]
+    inc dx
+    mov al, 0
+    call draw_name_px
+
+    mov si, [.sptr0]
+    mov cx, [.penx0]
+    mov dx, [.peny0]
+    mov al, [.color]
+    call draw_name_px
+
+    popa
+    ret
+.color  db 0
+.penx0  dw 0
+.peny0  dw 0
+.sptr0  dw 0
 
 draw_name_px:
     pusha
