@@ -51,10 +51,6 @@ Designed for simplicity and educational value, x16-PRos provides a platform for 
 
 ---
 
-[![Stargazers over time](https://starchart.cc/PRoX2011/x16-PRos.svg?variant=adaptive)](https://starchart.cc/PRoX2011/x16-PRos)
-
----
-
 Developing this project requires a lot of time and effort. The project is completely open source. Everything is being done out of pure passion, so if you like it, I'd like to ask you to support me (PRoX2011) financially using this link: [support me](https://dalink.to/proxdev)
 
 Thanks to everyone who supported me financially. All your nicknames will appear in the project's sponsors list.
