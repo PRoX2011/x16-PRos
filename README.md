@@ -22,6 +22,7 @@
   <img src="docs/screenshots/terminal.png" width=45%>
   <img src="docs/screenshots/gui.png" width=45%>
 </div>
+
 ---
 
 </div>
