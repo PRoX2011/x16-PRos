@@ -448,4 +448,347 @@ surf_font_seg   dw 0
 surf_font_off   dw 0
 surf_font_ready db 0
 
+SURF_MENU_IH    equ 16
+
+; ========================================================================
+; surf_input - sample the mouse into surface-relative state, once per frame
+; IN:  nothing
+; OUT: [surf_mx]/[surf_my]  = cursor in surface-relative pixels
+;      [surf_mb]            = 1 while the left button is held
+;      [surf_mpress]        = 1 on the frame the button goes down
+;      [surf_mrelease]      = 1 on the frame the button goes up
+; ========================================================================
+surf_input:
+    pusha
+    mov ah, 0x20
+    int 0x23
+    sub ax, [surf_ox]
+    mov [surf_mx], ax
+    sub bx, [surf_oy]
+    mov [surf_my], bx
+    and cl, 1
+    mov [surf_mb], cl
+    mov byte [surf_mpress], 0
+    mov byte [surf_mrelease], 0
+    mov al, [surf_mb]
+    cmp al, [surf_mb_prev]
+    je .same
+    test al, al
+    jz .rel
+    mov byte [surf_mpress], 1
+    jmp .upd
+.rel:
+    mov byte [surf_mrelease], 1
+.upd:
+    mov al, [surf_mb]
+    mov [surf_mb_prev], al
+.same:
+    popa
+    ret
+
+; ========================================================================
+; surf_in_rect - test the last sampled cursor against a rectangle
+; IN:  CX = x, DX = y, SI = width, DI = height (surface-relative)
+; OUT: CF = 1 if [surf_mx],[surf_my] lie inside the rectangle
+; ========================================================================
+surf_in_rect:
+    push ax
+    push bx
+    mov ax, [surf_mx]
+    cmp ax, cx
+    jb .no
+    mov bx, cx
+    add bx, si
+    cmp ax, bx
+    jae .no
+    mov ax, [surf_my]
+    cmp ax, dx
+    jb .no
+    mov bx, dx
+    add bx, di
+    cmp ax, bx
+    jae .no
+    pop bx
+    pop ax
+    stc
+    ret
+.no:
+    pop bx
+    pop ax
+    clc
+    ret
+
+; ========================================================================
+; surf_text_w - pixel width of a NUL-terminated string in the 8x16 font
+; IN:  SI = string pointer
+; OUT: AX = width in pixels (length * 8)
+; ========================================================================
+surf_text_w:
+    push si
+    push cx
+    xor cx, cx
+.l:
+    cmp byte [si], 0
+    je .d
+    inc si
+    inc cx
+    jmp .l
+.d:
+    mov ax, cx
+    shl ax, 3
+    pop cx
+    pop si
+    ret
+
+; ========================================================================
+; surf_rect - 1px rectangle outline, surface-relative, clipped
+; IN:  CX = x, DX = y, SI = width, DI = height, AL = colour (0..15)
+; ========================================================================
+surf_rect:
+    pusha
+    mov [.x], cx
+    mov [.y], dx
+    mov [.w], si
+    mov [.h], di
+    mov [.col], al
+    mov cx, [.x]
+    mov dx, [.y]
+    mov si, [.w]
+    mov di, 1
+    mov al, [.col]
+    call surf_fill_rect
+    mov cx, [.x]
+    mov dx, [.y]
+    add dx, [.h]
+    dec dx
+    mov si, [.w]
+    mov di, 1
+    mov al, [.col]
+    call surf_fill_rect
+    mov cx, [.x]
+    mov dx, [.y]
+    mov si, 1
+    mov di, [.h]
+    mov al, [.col]
+    call surf_fill_rect
+    mov cx, [.x]
+    add cx, [.w]
+    dec cx
+    mov dx, [.y]
+    mov si, 1
+    mov di, [.h]
+    mov al, [.col]
+    call surf_fill_rect
+    popa
+    ret
+.x   dw 0
+.y   dw 0
+.w   dw 0
+.h   dw 0
+.col db 0
+
+; ========================================================================
+; surf_button - draw a labelled push button with a centred caption
+; IN:  CX = x, DX = y, SI = width, DI = height
+;      BX = caption pointer, AL = pressed (0 = normal, 1 = held)
+; OUT: nothing (all registers preserved)
+; ========================================================================
+surf_button:
+    pusha
+    mov [.x], cx
+    mov [.y], dx
+    mov [.w], si
+    mov [.h], di
+    mov [.lbl], bx
+    test al, al
+    jz .normal
+    mov byte [.bg], 0
+    mov byte [.fg], 15
+    jmp .draw
+.normal:
+    mov byte [.bg], 15
+    mov byte [.fg], 0
+.draw:
+    mov cx, [.x]
+    mov dx, [.y]
+    mov si, [.w]
+    mov di, [.h]
+    mov al, [.bg]
+    call surf_fill_rect
+    mov cx, [.x]
+    mov dx, [.y]
+    mov si, [.w]
+    mov di, [.h]
+    xor al, al
+    call surf_rect
+    mov cx, [.x]
+    mov dx, [.y]
+    mov al, [.bg]
+    call surf_pixel
+    mov cx, [.x]
+    add cx, [.w]
+    dec cx
+    mov dx, [.y]
+    mov al, [.bg]
+    call surf_pixel
+    mov cx, [.x]
+    mov dx, [.y]
+    add dx, [.h]
+    dec dx
+    mov al, [.bg]
+    call surf_pixel
+    mov cx, [.x]
+    add cx, [.w]
+    dec cx
+    mov dx, [.y]
+    add dx, [.h]
+    dec dx
+    mov al, [.bg]
+    call surf_pixel
+    mov si, [.lbl]
+    call surf_text_w
+    mov cx, [.w]
+    sub cx, ax
+    sar cx, 1
+    add cx, [.x]
+    mov ax, [.h]
+    sub ax, 16
+    sar ax, 1
+    add ax, [.y]
+    mov dx, ax
+    mov si, [.lbl]
+    mov al, [.fg]
+    call surf_print
+    popa
+    ret
+.x   dw 0
+.y   dw 0
+.w   dw 0
+.h   dw 0
+.lbl dw 0
+.bg  db 0
+.fg  db 0
+
+; ========================================================================
+; surf_menu - draw a vertical pop-up menu (white box, black frame)
+; IN:  CX = x, DX = y (top-left), SI = width, DI = item count
+;      BX = pointer to an array of string pointers, AL = highlight index
+;           (0xFF for none)
+; OUT: nothing (all registers preserved)
+; ========================================================================
+surf_menu:
+    pusha
+    mov [.x], cx
+    mov [.y], dx
+    mov [.w], si
+    mov [.n], di
+    mov [.items], bx
+    mov [.hl], al
+    mov ax, di
+    mov bx, SURF_MENU_IH
+    mul bx
+    mov [.ph], ax
+    mov cx, [.x]
+    mov dx, [.y]
+    mov si, [.w]
+    mov di, [.ph]
+    mov al, 15
+    call surf_fill_rect
+    mov word [.i], 0
+.item:
+    mov ax, [.i]
+    cmp ax, [.n]
+    jae .frame
+    mov bx, SURF_MENU_IH
+    mul bx
+    add ax, [.y]
+    mov [.iy], ax
+    mov al, [.i]
+    cmp al, [.hl]
+    jne .normal
+    mov cx, [.x]
+    mov dx, [.iy]
+    mov si, [.w]
+    mov di, SURF_MENU_IH
+    xor al, al
+    call surf_fill_rect
+    mov byte [.tc], 15
+    jmp .text
+.normal:
+    mov byte [.tc], 0
+.text:
+    mov ax, [.i]
+    add ax, ax
+    mov bx, [.items]
+    add bx, ax
+    mov si, [bx]
+    mov cx, [.x]
+    add cx, 6
+    mov dx, [.iy]
+    mov al, [.tc]
+    call surf_print
+    inc word [.i]
+    jmp .item
+.frame:
+    mov cx, [.x]
+    mov dx, [.y]
+    mov si, [.w]
+    mov di, [.ph]
+    xor al, al
+    call surf_rect
+    popa
+    ret
+.x     dw 0
+.y     dw 0
+.w     dw 0
+.n     dw 0
+.items dw 0
+.ph    dw 0
+.iy    dw 0
+.i     dw 0
+.hl    db 0
+.tc    db 0
+
+; ========================================================================
+; surf_menu_hit - which menu row is under the cursor
+; IN:  CX = x, DX = y, SI = width, DI = item count (same as surf_menu)
+; OUT: AL = row index under [surf_mx],[surf_my], or 0xFF if outside
+; ========================================================================
+surf_menu_hit:
+    push bx
+    push cx
+    push dx
+    mov ax, [surf_mx]
+    cmp ax, cx
+    jb .out
+    add cx, si
+    cmp ax, cx
+    jae .out
+    mov ax, [surf_my]
+    cmp ax, dx
+    jb .out
+    sub ax, dx
+    xor dx, dx
+    mov bx, SURF_MENU_IH
+    div bx
+    cmp ax, di
+    jae .out
+    pop dx
+    pop cx
+    pop bx
+    ret
+.out:
+    mov al, 0xFF
+    pop dx
+    pop cx
+    pop bx
+    ret
+
+surf_mx       dw 0
+surf_my       dw 0
+surf_mb       db 0
+surf_mb_prev  db 0
+surf_mpress   db 0
+surf_mrelease db 0
+
 %endif ; SURF_INC

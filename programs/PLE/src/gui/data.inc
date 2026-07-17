@@ -13,8 +13,14 @@ dragdx          dw 0
 dragdy          dw 0
 dragx           dw 0
 dragy           dw 0
+dragw           dw 0
+dragh           dw 0
+drag_resize     db 0
+cur_shape       db 0
 ntmpx           dw 0
 ntmpy           dw 0
+ntmpw           dw 0
+ntmph           dw 0
 
 ; icon layout scratch
 ico_x           dw 0
@@ -46,8 +52,8 @@ w_rx            times MAX_WIN dw 0
 w_ry            times MAX_WIN dw 0
 w_rw            times MAX_WIN dw 0
 w_rh            times MAX_WIN dw 0
-wtile_x         dw 30, 260, 30, 260
-wtile_y         dw 30, 30, 240, 240
+wtile_x         dw 30, 260, 30, 260, 145
+wtile_y         dw 30, 30, 240, 240, 135
 
 menu_str        db 'x16-PRos GUI v0.1', 0
 pledir_name     db 'PLE.DIR', 0

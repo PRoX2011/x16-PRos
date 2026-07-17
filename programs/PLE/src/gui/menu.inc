@@ -83,6 +83,12 @@ draw_menu:
     mov dx, [.iy]
     mov al, [.tc]
     call draw_name_px
+    cmp byte [.i], FONT_ITEM
+    jne .noarrow
+    mov al, [.tc]
+    mov dx, [.iy]
+    call draw_menu_arrow
+.noarrow:
     inc byte [.i]
     jmp .item
 .frame:
@@ -101,38 +107,98 @@ draw_menu:
 .iy dw 0
 .tc db 0
 
-menu_handle_press:
-    cmp byte [menu_open], 0
-    jne .open
+draw_menu_arrow:
+    pusha
+    mov [.col], al
+    add dx, 4
+    mov [.top], dx
+    mov word [.r], 0
+.row:
+    cmp word [.r], 7
+    jae .done
+    mov ax, [.r]
+    sub ax, 3
+    jns .pos
+    neg ax
+.pos:
+    mov bx, 3
+    sub bx, ax
+    mov cx, MENU_X + MENU_IW - 9
+    mov ax, cx
+    add ax, bx
+    mov dx, [.top]
+    add dx, [.r]
+    mov bx, ax
+    mov al, [.col]
+    call gfx_hline
+    inc word [.r]
+    jmp .row
+.done:
+    popa
+    ret
+.col db 0
+.top dw 0
+.r   dw 0
 
-    call hit_dot
-    jnc .pass
-    mov byte [menu_open], 1
-    call menu_hit
-    mov [menu_sel], al
-    call draw_menu
-    stc
+open_font_submenu:
+    call load_font_list
+    mov byte [font_menu_open], 1
+    mov byte [font_sel], 0xFF
+    call draw_font_menu
     ret
 
-.open:
-    call hit_dot
-    jnc .open_body
+menu_handle_press:
+    cmp byte [menu_open], 0
+    je .closed
+
+    cmp byte [font_menu_open], 0
+    je .main_click
+    call font_menu_hit
+    cmp al, 0xFF
+    je .main_click
+    mov byte [font_menu_open], 0
     mov byte [menu_open], 0
+    call apply_font_idx
     call full_repaint
     stc
     ret
-.open_body:
+
+.main_click:
+    call hit_dot
+    jc .dismiss
     call menu_hit
     cmp al, 0xFF
-    je .close
+    je .dismiss
+    cmp al, FONT_ITEM
+    je .on_parent
+    mov byte [font_menu_open], 0
     mov byte [menu_open], 0
     call do_menu_action
     call full_repaint
     stc
     ret
-.close:
+.on_parent:
+    cmp byte [font_menu_open], 0
+    jne .keep
+    call open_font_submenu
+.keep:
+    stc
+    ret
+.dismiss:
+    mov byte [font_menu_open], 0
     mov byte [menu_open], 0
     call full_repaint
+    stc
+    ret
+
+.closed:
+    call hit_dot
+    jnc .pass
+    mov byte [menu_open], 1
+    mov byte [font_menu_open], 0
+    call menu_hit
+    mov [menu_sel], al
+    call draw_menu
     stc
     ret
 .pass:
@@ -142,11 +208,39 @@ menu_handle_press:
 menu_tick:
     cmp byte [menu_open], 0
     je .ret
+
+    cmp byte [font_menu_open], 0
+    je .hover_main
+
+    call font_menu_hit
+    cmp al, 0xFF
+    je .sub_outside
+    cmp al, [font_sel]
+    je .ret
+    mov [font_sel], al
+    call draw_font_menu
+    ret
+.sub_outside:
+    call menu_hit
+    cmp al, FONT_ITEM
+    je .ret
+    cmp al, 0xFF
+    je .ret
+    mov byte [font_menu_open], 0
+    mov [menu_sel], al
+    call full_repaint
+    call draw_menu
+    ret
+
+.hover_main:
     call menu_hit
     cmp al, [menu_sel]
     je .ret
     mov [menu_sel], al
     call draw_menu
+    cmp al, FONT_ITEM
+    jne .ret
+    call open_font_submenu
 .ret:
     ret
 
@@ -189,7 +283,8 @@ do_shutdown:
 menu_open   db 0
 menu_sel    db 0xFF
 want_quit   db 0
-menu_items  dw mi_exit, mi_reboot, mi_shutdown
+menu_items  dw mi_exit, mi_reboot, mi_shutdown, mi_fonts
 mi_exit     db 'Exit GUI', 0
 mi_reboot   db 'Reboot', 0
 mi_shutdown db 'Shut down', 0
+mi_fonts    db 'Fonts', 0

@@ -84,6 +84,40 @@ close_window:
     popa
     ret
 
+reap_dead_windows:
+    pusha
+    mov byte [.changed], 0
+    mov word [.i], 0
+.rl:
+    mov bx, [.i]
+    cmp bx, MAX_WIN
+    jae .fin
+    cmp byte [w_open + bx], 0
+    je .next
+    mov bl, [w_task + bx]
+    xor bh, bh
+    mov ah, 0x17
+    int 0x23
+    jc .dead
+    test al, al
+    jnz .next
+.dead:
+    mov bx, [.i]
+    mov byte [w_open + bx], 0
+    mov byte [.changed], 1
+.next:
+    inc word [.i]
+    jmp .rl
+.fin:
+    cmp byte [.changed], 0
+    je .ret
+    call full_repaint
+.ret:
+    popa
+    ret
+.changed db 0
+.i       dw 0
+
 toggle_maximize:
     pusha
     xor ah, ah
