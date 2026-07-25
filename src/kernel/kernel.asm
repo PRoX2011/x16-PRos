@@ -2171,6 +2171,7 @@ rip_terry:
 ; ====== API ======
 %INCLUDE "src/kernel/features/api/api_output.asm"
 %INCLUDE "src/kernel/features/api/api_fs.asm"
+%INCLUDE "src/kernel/features/api/api_random.asm"
 ; =================
 
 ; ===================== Data Section =====================

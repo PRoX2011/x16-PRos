@@ -267,6 +267,13 @@ int21_dos_handler:
     je com_4Dh
     cmp ah, 0x54
     je com_54h
+    cmp ah, 0x80
+    je com_80h
+    iret
+
+com_80h:
+    call api_random_generate
+    clc
     iret
 
 

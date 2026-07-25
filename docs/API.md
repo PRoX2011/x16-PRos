@@ -159,6 +159,20 @@ mode (640x480, 16 colors).
 - **Error Handling**: No errors reported
 - **Notes**: Internally calls `set_video_mode` followed by `load_and_apply_theme`. If the theme file is missing or unreadable, the screen falls back to default VGA colors.
 
+### Function 0x80: Generate Random Bytes
+
+- **Description**: Generates a cryptographically secure sequence of random bytes using the ChaCha12 stream cipher.
+- **Input**:
+    - `AH` = 0x80
+    - `ES` = Segment of the destination buffer
+    - `DI` = Offset of the destination buffer
+    - `CX` = Number of bytes to generate
+- **Output**:
+    - The destination buffer at `ES:DI` is filled with `CX` random bytes.
+- **Preserves**: All registers (including `ES` and `DI`).
+- **Error Handling**: No errors reported.
+- **Notes**: Uses a 12-round ChaCha stream cipher. The state is seeded at boot time from the CMOS Real-Time Clock, BIOS timer ticks, and CPU `RDTSC` cycle counter. Implements forward secrecy by overwriting the key block after generation.
+
 ## Color Palette
 
 The following table lists the valid color codes for VGA mode 0x12 (16 colors):

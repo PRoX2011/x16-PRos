@@ -76,6 +76,8 @@ int21_handler:
     je .get_date
     cmp ah, 0x0C
     je .clear_screen_themed
+    cmp ah, 0x80
+    je .random_bytes
     jmp .done
 
 .init:
@@ -168,6 +170,14 @@ int21_handler:
     mov dh, [timezone_local_month]
     mov dl, [timezone_local_day]
     mov [bp+14], dx
+    jmp .done
+
+.random_bytes:
+    mov bp, sp
+    mov es, [bp + 0]     ; Load caller's ES from stack (pushed by 'push es')
+    mov di, [bp + 4]     ; Load caller's DI from stack (pushed by 'pusha')
+    mov cx, [bp + 16]    ; Load caller's CX from stack (pushed by 'pusha')
+    call api_random_generate
     jmp .done
 
 .done:

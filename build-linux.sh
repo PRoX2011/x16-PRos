@@ -381,6 +381,8 @@ programs=(
     "programs/print.asm PRINT.BIN"
     "programs/calendar.asm CALENDAR.BIN"
     "programs/settings.asm SETTINGS.BIN"
+    "programs/testrand.asm TESTRAND.BIN"
+    "programs/guess.asm GUESS.BIN"
 )
 
 for prog in "${programs[@]}"; do
