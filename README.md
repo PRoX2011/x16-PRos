@@ -18,7 +18,10 @@
 
 [Website](https://x16-pros.prosdev.org/) • [API Documentation](docs/API.md) • [Configs Documentation](docs/CONFIGURATION.md)
 
-<img src="docs/screenshots/terminal.png" width=75%>
+<div style="display: flex; flex-direction: row; gap: 20px">
+  <img src="docs/screenshots/terminal.png" width=45%>
+  <img src="docs/screenshots/gui.png" width=45%>
+</div>
 
 ---
 
@@ -51,10 +54,6 @@ Also it`s a platform for low-level programming enthusiasts to explore developmen
 
 ---
 
-[![Stargazers over time](https://starchart.cc/PRoX2011/x16-PRos.svg?variant=adaptive)](https://starchart.cc/PRoX2011/x16-PRos)
-
----
-
 Developing this project requires a lot of time and effort. The project is completely open source. Everything is being done out of pure passion, so if you like it, I'd like to ask you to support me (PRoX2011) financially using this link: [support me](https://dalink.to/proxdev)
 
 Thanks to everyone who supported me financially. All your nicknames will appear in the project's sponsors list.
@@ -65,6 +64,8 @@ Thanks to everyone who supported me financially. All your nicknames will appear 
 
 - **MS-DOS Compatibility**: Native support for running standard MS-DOS `.COM` and `.EXE` executables
 - **Multitasking**: Cooperative multitasking support for `.PLE` programs
+- **GUI**: Customizable graphical user interface for windowed `.PLE` programs
+- **Native assembler**: Intel syntax assembler with which you can create programs directly in the operating system  
 - **Encrypted Password System**: XOR-based password encryption with custom key
 - **User Authentication**: Login system with configurable user account
 - **Password Protection**: Encrypted PASSWORD.CFG prevents plaintext password storage

@@ -7,6 +7,7 @@
 %define WIN_CLOSE_W  10
 %define WIN_BTN_GAP  4
 %define WIN_MAX_OFF  (WIN_CLOSE_X + WIN_CLOSE_W + WIN_BTN_GAP + WIN_CLOSE_W)
+%define WIN_GRIP     12    ; bottom-right resize grip zone (px)
 
 win_x    dw 0
 win_y    dw 0
@@ -587,6 +588,42 @@ win_hit_max:
     cmp bx, cx
     jl .no
     add cx, WIN_CLOSE_W
+    dec cx
+    cmp bx, cx
+    jg .no
+    pop cx
+    stc
+    ret
+.no:
+    pop cx
+    clc
+    ret
+
+; ========================================================================
+; win_hit_resize - is (mouse X / mouse Y) inside the bottom-right corner?
+; IN:  AX = mouse x
+;      BX = mouse y
+; OUT: CF = 1 if inside, else 0
+; ========================================================================
+win_hit_resize:
+    push cx
+    mov cx, [win_x]
+    add cx, [win_w]
+    sub cx, WIN_GRIP
+    cmp ax, cx
+    jl .no
+    mov cx, [win_x]
+    add cx, [win_w]
+    dec cx
+    cmp ax, cx
+    jg .no
+    mov cx, [win_y]
+    add cx, [win_h]
+    sub cx, WIN_GRIP
+    cmp bx, cx
+    jl .no
+    mov cx, [win_y]
+    add cx, [win_h]
     dec cx
     cmp bx, cx
     jg .no

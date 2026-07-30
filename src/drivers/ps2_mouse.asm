@@ -487,7 +487,7 @@ DrawCursor:
     inc dx
     mov al, bl
     out dx, al
-    mov si, mousebmp
+    mov si, [CursorPtr]
     push di
     mov cx, HCURSOR
 .draw_row:
@@ -573,8 +573,9 @@ MouseY       dw 0
 MouseCol     dw 0
 MouseRow     dw 0
 
-PrevLMB      db 0
+PrevLMB       db 0
 CursorVisible db 1
+CursorPtr     dw mousebmp
 
 SelStartRow  dw 0
 SelStartCol  dw 0
@@ -598,6 +599,19 @@ mousebmp:
     db 0b11011100
     db 0b10001110
     db 0b00000110
+
+resizebmp:
+    db 0b00000011
+    db 0b00000011
+    db 0b00000011
+    db 0b00000011
+    db 0b00000011
+    db 0b00000011
+    db 0b00000011
+    db 0b11111111
+    db 0b11111111
+    db 0b00000000
+    db 0b00000000
 
 section .bss
 BackgroundBuffer resb 88

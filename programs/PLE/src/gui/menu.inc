@@ -83,6 +83,12 @@ draw_menu:
     mov dx, [.iy]
     mov al, [.tc]
     call draw_name_px
+    cmp byte [.i], FONT_ITEM
+    jne .noarrow
+    mov al, [.tc]
+    mov dx, [.iy]
+    call draw_menu_arrow
+.noarrow:
     inc byte [.i]
     jmp .item
 .frame:
@@ -187,84 +193,180 @@ draw_wp_menu:
 .iy dw 0
 .tc db 0
 
+draw_menu_arrow:
+    pusha
+    mov [.col], al
+    add dx, 4
+    mov [.top], dx
+    mov word [.r], 0
+.row:
+    cmp word [.r], 7
+    jae .done
+    mov ax, [.r]
+    sub ax, 3
+    jns .pos
+    neg ax
+.pos:
+    mov bx, 3
+    sub bx, ax
+    mov cx, MENU_X + MENU_IW - 9
+    mov ax, cx
+    add ax, bx
+    mov dx, [.top]
+    add dx, [.r]
+    mov bx, ax
+    mov al, [.col]
+    call gfx_hline
+    inc word [.r]
+    jmp .row
+.done:
+    popa
+    ret
+.col db 0
+.top dw 0
+.r   dw 0
+
+open_font_submenu:
+    call load_font_list
+    mov byte [font_menu_open], 1
+    mov byte [font_sel], 0xFF
+    call draw_font_menu
+    ret
+
 menu_handle_press:
     cmp byte [menu_open], 0
     je .closed
-    cmp byte [menu_open], 1
-    je .main_open
-    jmp .sub_open
+    cmp byte [wp_menu_open], 0
+    jne .wp_open
+    cmp byte [font_menu_open], 0
+    jne .font_open
+    jmp .main_click
 
 .closed:
     call hit_dot
     jnc .pass
     mov byte [menu_open], 1
+    mov byte [font_menu_open], 0
+    mov byte [wp_menu_open], 0
     call menu_hit
     mov [menu_sel], al
     call draw_menu
     stc
     ret
 
-.main_open:
-    call hit_dot
-    jc .close_all
-    call menu_hit
+.wp_open:
+    call wp_hit
     cmp al, 0xFF
-    je .close_all
-    cmp al, 3
-    jne .do_action
-    mov byte [menu_open], 2
-    mov byte [wp_sel], 0xFF
-    call draw_wp_menu
+    je .dismiss
+    mov [bg_style], al
+    mov byte [wp_menu_open], 0
+    mov byte [menu_open], 0
+    call full_repaint
     stc
     ret
-.do_action:
+
+.font_open:
+    call font_menu_hit
+    cmp al, 0xFF
+    je .dismiss
+    mov byte [font_menu_open], 0
+    mov byte [menu_open], 0
+    call apply_font_idx
+    call full_repaint
+    stc
+    ret
+
+.main_click:
+    call hit_dot
+    jc .dismiss
+    call menu_hit
+    cmp al, 0xFF
+    je .dismiss
+    cmp al, WP_ITEM
+    je .open_wp
+    cmp al, FONT_ITEM
+    je .open_font
     mov byte [menu_open], 0
     call do_menu_action
     call full_repaint
     stc
     ret
-
-.sub_open:
-    call wp_hit
-    cmp al, 0xFF
-    je .close_all
-    mov [bg_style], al
+.open_wp:
+    mov byte [wp_menu_open], 1
+    mov byte [wp_sel], 0xFF
+    call draw_wp_menu
+    stc
+    ret
+.open_font:
+    call open_font_submenu
+    stc
+    ret
+.dismiss:
+    mov byte [font_menu_open], 0
+    mov byte [wp_menu_open], 0
     mov byte [menu_open], 0
     call full_repaint
     stc
     ret
-
-.close_all:
-    mov byte [menu_open], 0
-    call full_repaint
-    stc
-    ret
-
 .pass:
     clc
     ret
 
 menu_tick:
-    cmp byte [menu_open], 1
-    je .tick_main
-    cmp byte [menu_open], 2
-    je .tick_sub
+    cmp byte [menu_open], 0
+    je .ret
+    cmp byte [wp_menu_open], 0
+    jne .tick_wp
+    cmp byte [font_menu_open], 0
+    jne .tick_font
+    jmp .hover_main
+
+.tick_wp:
+    call wp_hit
+    cmp al, [wp_sel]
+    je .ret
+    mov [wp_sel], al
+    call draw_wp_menu
     ret
-.tick_main:
+
+.tick_font:
+    call font_menu_hit
+    cmp al, 0xFF
+    je .font_outside
+    cmp al, [font_sel]
+    je .ret
+    mov [font_sel], al
+    call draw_font_menu
+    ret
+.font_outside:
+    call menu_hit
+    cmp al, FONT_ITEM
+    je .ret
+    cmp al, 0xFF
+    je .ret
+    mov byte [font_menu_open], 0
+    mov [menu_sel], al
+    call full_repaint
+    call draw_menu
+    ret
+
+.hover_main:
     call menu_hit
     cmp al, [menu_sel]
     je .ret
     mov [menu_sel], al
     call draw_menu
-.ret:
+    cmp al, WP_ITEM
+    je .open_wp2
+    cmp al, FONT_ITEM
+    jne .ret
+    call open_font_submenu
     ret
-.tick_sub:
-    call wp_hit
-    cmp al, [wp_sel]
-    je .ret2
-    mov [wp_sel], al
+.open_wp2:
+    mov byte [wp_menu_open], 1
+    mov byte [wp_sel], 0xFF
     call draw_wp_menu
-.ret2:
+.ret:
     ret
 
 do_menu_action:
@@ -305,11 +407,13 @@ do_shutdown:
     int 0x15
     ret
 
-menu_open   db 0
-menu_sel    db 0xFF
-want_quit   db 0
-menu_items  dw mi_exit, mi_reboot, mi_shutdown, mi_wallpaper
-mi_exit     db 'Exit GUI', 0
-mi_reboot   db 'Reboot', 0
-mi_shutdown db 'Shut down', 0
-mi_wallpaper db 'Wallpaper', 0
+menu_open     db 0
+menu_sel      db 0xFF
+want_quit     db 0
+wp_menu_open  db 0
+menu_items    dw mi_exit, mi_reboot, mi_shutdown, mi_wallpaper, mi_fonts
+mi_exit       db 'Exit GUI', 0
+mi_reboot     db 'Reboot', 0
+mi_shutdown   db 'Shut down', 0
+mi_wallpaper  db 'Wallpaper', 0
+mi_fonts      db 'Fonts', 0

@@ -79,6 +79,15 @@ win_at:
     mov bx, [my]
     call win_hit_title
     jc .wa_title
+    xor bh, bh
+    mov bl, cl
+    cmp byte [w_max + bx], 0
+    jne .wa_body
+    mov ax, [mx]
+    mov bx, [my]
+    call win_hit_resize
+    jc .wa_resize
+.wa_body:
     mov ax, [mx]
     cmp ax, [win_x]
     jl .wa_loop
@@ -104,11 +113,34 @@ win_at:
     mov [hit_slot], cl
     mov byte [hit_kind], 4
     jmp .wa_done
+.wa_resize:
+    mov [hit_slot], cl
+    mov byte [hit_kind], 5
+    jmp .wa_done
 .wa_title:
     mov [hit_slot], cl
     mov byte [hit_kind], 2
 .wa_done:
     popa
+    ret
+
+update_cursor:
+    cmp byte [dragging], 0
+    jne .ret
+    cmp byte [menu_open], 0
+    jne .ret
+    call win_at
+    mov al, 0
+    cmp byte [hit_kind], 5
+    jne .have
+    mov al, 1
+.have:
+    cmp al, [cur_shape]
+    je .ret
+    mov [cur_shape], al
+    mov ah, 0x26
+    int 0x23
+.ret:
     ret
 
 full_repaint:
@@ -223,8 +255,8 @@ draw_outline:
     mov byte [gfx_xor], 1
     mov cx, [dragx]
     mov dx, [dragy]
-    mov si, WW
-    mov di, WH
+    mov si, [dragw]
+    mov di, [dragh]
     mov al, 15
     call gfx_rect
     mov byte [gfx_xor], 0
@@ -232,23 +264,31 @@ draw_outline:
     ret
 
 clamp_wx:
+    push bx
     cmp ax, 0
     jge .a
     xor ax, ax
 .a:
-    cmp ax, 640 - WW
+    mov bx, 640
+    sub bx, [dragw]
+    cmp ax, bx
     jle .b
-    mov ax, 640 - WW
+    mov ax, bx
 .b:
+    pop bx
     ret
 
 clamp_wy:
+    push bx
     cmp ax, MENUBAR_H
     jge .a
     mov ax, MENUBAR_H
 .a:
-    cmp ax, 480 - WH
+    mov bx, 480
+    sub bx, [dragh]
+    cmp ax, bx
     jle .b
-    mov ax, 480 - WH
+    mov ax, bx
 .b:
+    pop bx
     ret

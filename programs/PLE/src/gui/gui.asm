@@ -8,12 +8,14 @@
 %include "ple.inc"
 
 PLE_HEADER start, "x16-PRos GUI", "PRoX-dev"
-PLE_LOGO          "logo/hello.raw"
+PLE_LOGO          "logo/gui.raw"
 
 %define MENUBAR_H   18
 %define WIN_TBAR    18
 %define WW          200
 %define WH          150
+%define MIN_WW      140
+%define MIN_WH      80
 %define MAX_WIN     5
 %define IW          32
 %define IH          26
@@ -31,28 +33,34 @@ PLE_LOGO          "logo/hello.raw"
 %define ICON_ROUND      2  ; corner chamfer
 %define NAME_GAP        6  ; gap between icon and label
 
-%define STAR_X     4
-%define STAR_Y     3
-%define STAR_W     11
-%define STAR_H     11
-%define TILE_X     0
-%define TILE_Y     0
-%define TILE_W     18
-%define TILE_H     (MENUBAR_H - 1)
-%define TILE_COL   7
-%define DOT_ZONE_W 20
-%define MENU_X     2
-%define MENU_Y     MENUBAR_H
-%define MENU_IW    128
-%define MENU_IH    16
-%define MENU_N     4
-%define MENU_H     (MENU_N * MENU_IH)
+%define STAR_X        4
+%define STAR_Y        3
+%define STAR_W        11
+%define STAR_H        11
+%define TILE_X        0
+%define TILE_Y        0
+%define TILE_W        18
+%define TILE_H        (MENUBAR_H - 1)
+%define TILE_COL      7
+%define DOT_ZONE_W    20
+%define MENU_X        2
+%define MENU_Y        MENUBAR_H
+%define MENU_IW       128
+%define MENU_IH       16
+%define MENU_N        5
+%define MENU_H        (MENU_N * MENU_IH)
+%define WP_ITEM       3
+%define FONT_ITEM     4
+%define FONT_MENU_X   (MENU_X + MENU_IW + 2)
+%define FONT_MENU_Y   (MENU_Y + FONT_ITEM * MENU_IH)
+%define FONT_MENU_IW  110
+%define MAX_FONTS     12
 
 %define WPMENU_N   8
 %define WPMENU_IW  110
 %define WPMENU_IH  16
 %define WPMENU_X   (MENU_X + MENU_IW)
-%define WPMENU_Y   (MENU_Y + 3*MENU_IH)
+%define WPMENU_Y   (MENU_Y + WP_ITEM*MENU_IH)
 %define WPMENU_H   (WPMENU_N * WPMENU_IH)
 
 %define BG_STYLE_COUNT 4
@@ -124,6 +132,8 @@ start:
     je .press_title
     cmp byte [hit_kind], 4
     je .press_max
+    cmp byte [hit_kind], 5
+    je .press_resize
     jmp .after_edge
 
 .press_icons:
@@ -175,6 +185,7 @@ start:
     int 0x23
     call ctx_of_drag
     mov byte [dragging], 1
+    mov byte [drag_resize], 0
     mov ax, [mx]
     sub ax, [win_x]
     mov [dragdx], ax
@@ -185,6 +196,36 @@ start:
     mov [dragx], ax
     mov ax, [win_y]
     mov [dragy], ax
+    mov ax, [win_w]
+    mov [dragw], ax
+    mov ax, [win_h]
+    mov [dragh], ax
+    call draw_outline
+    jmp .after_edge
+.press_resize:
+    mov al, [hit_slot]
+    mov [drag_slot], al
+    mov ah, 0x22
+    int 0x23
+    call ctx_of_drag
+    mov byte [dragging], 1
+    mov byte [drag_resize], 1
+    mov ax, [win_x]
+    mov [dragx], ax
+    mov ax, [win_y]
+    mov [dragy], ax
+    mov ax, [win_w]
+    mov [dragw], ax
+    mov ax, [win_h]
+    mov [dragh], ax
+    mov ax, [win_x]
+    add ax, [win_w]
+    sub ax, [mx]
+    mov [dragdx], ax
+    mov ax, [win_y]
+    add ax, [win_h]
+    sub ax, [my]
+    mov [dragdy], ax
     call draw_outline
     jmp .after_edge
 .title_zoom:
@@ -220,8 +261,15 @@ start:
     cmp al, 27
     je gui_quit
 .delay:
+    cmp byte [menu_open], 0
+    jne .skip_reap
+    cmp byte [font_menu_open], 0
+    jne .skip_reap
+    call reap_dead_windows
+.skip_reap:
     call tick_clock
     call menu_tick
+    call update_cursor
     mov ah, 0x13
     int 0x23
     mov ah, 0x86
@@ -230,6 +278,8 @@ start:
     int 0x15
     jmp .loop
 .in_drag:
+    cmp byte [drag_resize], 0
+    jne .in_resize
     mov al, [lmb]
     test al, al
     jz .drag_release
@@ -255,9 +305,57 @@ start:
     mov [dragy], ax
     call draw_outline
     jmp .after_edge
+.in_resize:
+    mov al, [lmb]
+    test al, al
+    jz .drag_release
+    mov ax, [mx]
+    add ax, [dragdx]
+    sub ax, [dragx]
+    cmp ax, MIN_WW
+    jge .rw_min
+    mov ax, MIN_WW
+.rw_min:
+    mov bx, 640
+    sub bx, [dragx]
+    cmp ax, bx
+    jle .rw_max
+    mov ax, bx
+.rw_max:
+    mov [ntmpw], ax
+    mov ax, [my]
+    add ax, [dragdy]
+    sub ax, [dragy]
+    cmp ax, MIN_WH
+    jge .rh_min
+    mov ax, MIN_WH
+.rh_min:
+    mov bx, 480
+    sub bx, [dragy]
+    cmp ax, bx
+    jle .rh_max
+    mov ax, bx
+.rh_max:
+    mov [ntmph], ax
+    mov ax, [ntmpw]
+    cmp ax, [dragw]
+    jne .rmove
+    mov ax, [ntmph]
+    cmp ax, [dragh]
+    je .after_edge
+.rmove:
+    call draw_outline
+    mov ax, [ntmpw]
+    mov [dragw], ax
+    mov ax, [ntmph]
+    mov [dragh], ax
+    call draw_outline
+    jmp .after_edge
 .drag_release:
     call draw_outline
     mov byte [dragging], 0
+    cmp byte [drag_resize], 0
+    jne .dr_resized
     xor ah, ah
     mov al, [drag_slot]
     mov si, ax
@@ -273,6 +371,20 @@ start:
     mov [w_x + si], ax
     mov ax, [dragy]
     mov [w_y + si], ax
+    mov al, [drag_slot]
+    call publish_window
+    call full_repaint
+    jmp .after_edge
+.dr_resized:
+    mov byte [drag_resize], 0
+    xor ah, ah
+    mov al, [drag_slot]
+    mov si, ax
+    add si, si
+    mov ax, [dragw]
+    mov [w_w + si], ax
+    mov ax, [dragh]
+    mov [w_h + si], ax
     mov al, [drag_slot]
     call publish_window
     call full_repaint
@@ -298,6 +410,9 @@ gui_quit:
     inc bx
     jmp .qk
 .qk_done:
+    mov ah, 0x26
+    mov al, 0
+    int 0x23
     mov ah, 0x25
     mov al, 1
     int 0x23
@@ -310,6 +425,7 @@ gui_quit:
 %include "bar.inc"
 %include "icons.inc"
 %include "menu.inc"
+%include "fonts.inc"
 %include "data.inc"
 
 %include "grafx.inc"

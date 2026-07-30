@@ -256,6 +256,13 @@ mmd -i disk_img/x16pros.img ::/THEMES.DIR
 check_error "Failed to create THEMES directory"
 print_ok "THEMES directory created successfully"
 
+# Create ASM directory
+print_splitline "Creating ASM directory..."
+print_info "Creating ASM directory..."
+mmd -i disk_img/x16pros.img ::/ASM.DIR
+check_error "Failed to create ASM directory"
+print_ok "ASM directory created successfully"
+
 # Copy fonts
 print_info "Copying DEFAULT.FNT to disk..."
 mcopy -i disk_img/x16pros.img assets/fonts/DEFAULT.FNT ::/FONTS.DIR/
@@ -389,6 +396,7 @@ programs=(
     "programs/print.asm PRINT.BIN"
     "programs/calendar.asm CALENDAR.BIN"
     "programs/settings.asm SETTINGS.BIN"
+    "programs/prasm.asm PRASM.BIN"
 )
 
 for prog in "${programs[@]}"; do
@@ -482,6 +490,7 @@ programs_ple_gui=(
     "programs/PLE/src/windowed/eyes.asm EYES.PLE"
     "programs/PLE/src/windowed/clock.asm CLOCK.PLE"
     "programs/PLE/src/windowed/hello.asm HELLO.PLE"
+    "programs/PLE/src/windowed/calc.asm CALC.PLE"
 )
 
 for prog in "${programs_ple_gui[@]}"; do
@@ -501,7 +510,20 @@ for prog in "${programs_ple_gui[@]}"; do
     print_ok "$bin_name copied successfully"
 done
 
-# mcopy -i disk_img/x16pros.img bin/prasm.bin ::/BIN.DIR/
+# Copy ASM source code wich can be assembled using prasm
+print_splitline "Copying ASM files..."
+asm_files=(
+    "assets/ASM/HELLO.ASM"
+    "assets/ASM/TIME.ASM"
+    "assets/ASM/DATE.ASM"
+)
+
+for file in "${asm_files[@]}"; do
+    print_info "Copying $file..."
+    mcopy -i disk_img/x16pros.img $file ::/ASM.DIR/
+    check_error "Copy of $file failed"
+    print_ok "$file copied successfully"
+done
 
 # Copy text files
 if [ $FLAG_NO_TXT == 0 ]; then
@@ -531,6 +553,7 @@ if [ $FLAG_NO_TXT == 0 ]; then
         "QUICKST.TXT"
         "COMMANDS.TXT"
         "EDMAN.TXT"
+        "PRASM.TXT"
     )
 
     print_info "Creating DOCS.DIR/EN.DIR directory..."
