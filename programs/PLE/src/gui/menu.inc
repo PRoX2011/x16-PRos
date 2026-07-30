@@ -82,9 +82,12 @@ draw_menu:
     mov cx, MENU_X + 6
     mov dx, [.iy]
     mov al, [.tc]
-    call draw_name_px
+call draw_name_px
+    cmp byte [.i], WP_ITEM
+    je .arrow
     cmp byte [.i], FONT_ITEM
     jne .noarrow
+.arrow:
     mov al, [.tc]
     mov dx, [.iy]
     call draw_menu_arrow
