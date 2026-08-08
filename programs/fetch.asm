@@ -9,7 +9,10 @@
 [ORG 0x8000]
 
 start:
+<<<<<<< HEAD
 start:
+=======
+>>>>>>> 88a7da6 (Первый коммит)
     ; ------ Read USER config file to get user name ------
 
     ; Save current directory

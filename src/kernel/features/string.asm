@@ -10,7 +10,11 @@
 
 ; =======================================================================
 ; STRING_GET_CURSOR_POS - Gets current cursor position
+<<<<<<< HEAD
 ; IN  : —
+=======
+; IN  :  - 
+>>>>>>> 88a7da6 (Первый коммит)
 ; OUT : DL = column, DH = row
 ; =======================================================================
 string_get_cursor_pos:
@@ -32,7 +36,11 @@ string_get_cursor_pos:
 ; =======================================================================
 ; STRING_MOVE_CURSOR - Moves cursor to specified position
 ; IN  : DL = column, DH = row
+<<<<<<< HEAD
 ; OUT : —
+=======
+; OUT :  - 
+>>>>>>> 88a7da6 (Первый коммит)
 ; =======================================================================
 string_move_cursor:
     pusha

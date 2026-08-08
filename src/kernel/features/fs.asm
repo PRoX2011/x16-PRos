@@ -489,7 +489,32 @@ fs_load_file:
 ; FS_LOAD_HUGE_FILE - Loads a large file across segment boundaries
 ; IN : AX = file name, CX = load offset address, DX = load segment address
 ; OUT : DX:AX = file size (DX=High, AX=Low), CF = error flag
+<<<<<<< HEAD
 ; ========================================================================
+=======
+;
+; Destination guard: loads that would write into the kernel segment
+; (physical 0x20000..0x2FC00) or into VGA/ROM (>= 0xA0000) are rejected
+; with CF=1 instead of silently corrupting the running system.
+; ========================================================================
+%macro FS_CHECK_DEST 0
+    mov ax, [.huge_segment]
+    mov dx, 16
+    mul dx
+    add ax, [.huge_offset]
+    adc dx, 0
+    cmp dx, 0x0A
+    jae .error_exit          ; physical >= 0xA0000 (VGA/ROM)
+    cmp dx, 0x02
+    jb %%ok                  ; physical < 0x20000
+    jne %%ok                 ; physical >= 0x30000
+    cmp ax, 0xFC00
+    jae %%ok                 ; physical >= 0x2FC00 (COM region)
+    jmp .error_exit          ; physical in kernel range [0x20000, 0x2FC00)
+%%ok:
+%endmacro
+
+>>>>>>> 88a7da6 (Первый коммит)
 fs_load_huge_file:
     push bx
     push cx
@@ -662,6 +687,11 @@ fs_load_huge_file:
     mov word [.chain_idx], 0
 
 .load_chain_loop:
+<<<<<<< HEAD
+=======
+    FS_CHECK_DEST
+
+>>>>>>> 88a7da6 (Первый коммит)
     mov si, .chain_buf
     add si, [.chain_idx]
     mov ax, [si]
@@ -712,6 +742,10 @@ fs_load_huge_file:
     add word [.huge_segment], 0x1000
 
 .chain_no_wrap:
+<<<<<<< HEAD
+=======
+    FS_CHECK_DEST
+>>>>>>> 88a7da6 (Первый коммит)
     add word [.chain_idx], 2
     mov ax, [.chain_idx]
     shr ax, 1
@@ -745,6 +779,11 @@ fs_load_huge_file:
     mov [.huge_cluster], ax
 
 .direct_load_loop:
+<<<<<<< HEAD
+=======
+    FS_CHECK_DEST
+
+>>>>>>> 88a7da6 (Первый коммит)
     mov ax, word [.huge_cluster]
     add ax, 31
     call fs_convert_l2hts
@@ -792,6 +831,11 @@ fs_load_huge_file:
     add word [.huge_segment], 0x1000
 
 .direct_check_next:
+<<<<<<< HEAD
+=======
+    FS_CHECK_DEST
+
+>>>>>>> 88a7da6 (Первый коммит)
     mov ax, [.huge_cluster]
     call fs_fat12_cluster_offset
     mov si, disk_buffer
@@ -969,6 +1013,11 @@ fs_write_huge_file:
     jz .wh_free_odd
 .wh_next_even:
     inc bx
+<<<<<<< HEAD
+=======
+    cmp bx, 2847
+    jae .wh_error
+>>>>>>> 88a7da6 (Первый коммит)
     jmp .wh_find_free
 
 .wh_free_even:
@@ -1295,6 +1344,10 @@ fs_write_file:
     mov word [.location], bx
     mov word [.filename], ax
 
+<<<<<<< HEAD
+=======
+    mov ax, [.filename]
+>>>>>>> 88a7da6 (Первый коммит)
     call fs_file_exists
     jc .create_new_file
 
@@ -1355,8 +1408,18 @@ fs_write_file:
     jz .found_free_odd
 .more_even:
     inc bx
+<<<<<<< HEAD
     jmp .find_free_cluster
 
+=======
+    cmp bx, 2847
+    jae .disk_full
+    jmp .find_free_cluster
+
+.disk_full:
+    jmp .failure
+
+>>>>>>> 88a7da6 (Первый коммит)
 .found_free_even:
     push si
     mov si, .free_clusters
@@ -2482,6 +2545,11 @@ fs_create_directory:
     and ax, 0FFFh
     jz .found_free_cluster
     inc bx
+<<<<<<< HEAD
+=======
+    cmp bx, 2847
+    jae .failure
+>>>>>>> 88a7da6 (Первый коммит)
     jmp .find_free_cluster
 
 .found_free_cluster:

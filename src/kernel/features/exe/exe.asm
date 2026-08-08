@@ -26,6 +26,14 @@ MZ_OVERLAY_NUM      equ 0x1A
 ; EXE_EXECUTE - Loads and executes an MZ EXE file
 ; IN : AX = pointer to filename (ASCIIZ, in DS=KERNEL_DATA_SEG)
 ; OUT : CF = 1 on error
+<<<<<<< HEAD
+=======
+;
+; The MZ header is validated before execution: signature, overlay number,
+; header size, computed image size (page_count/last_page_bytes), relocation
+; table placement and every relocation target are bounded to the loaded
+; image, so a malformed EXE cannot write anywhere in the 1MB space.
+>>>>>>> 88a7da6 (Первый коммит)
 ; =======================================================================
 exe_execute:
     push ax
@@ -43,6 +51,11 @@ exe_execute:
     ret
 
 .loaded:
+<<<<<<< HEAD
+=======
+    mov word [exe_file_size_low], ax
+    mov word [exe_file_size_high], dx
+>>>>>>> 88a7da6 (Первый коммит)
     pop ax
 
     mov ax, EXE_LOAD_SEG
@@ -61,6 +74,39 @@ exe_execute:
     jnz .bad_sig
 
     mov ax, [es:MZ_HEADER_PARAS]
+<<<<<<< HEAD
+=======
+    cmp ax, 0x20
+    jb .bad_sig
+
+    ; image_size = (page_count - 1) * 512 + last_page_bytes
+    mov dx, [es:MZ_PAGE_COUNT]
+    test dx, dx
+    jz .bad_sig
+    mov bx, [es:MZ_LAST_PAGE_BYTES]
+    test bx, bx
+    jnz .last_page_ok
+    mov bx, 512
+.last_page_ok:
+    dec dx
+    mov cx, 512
+    mov ax, dx
+    mul cx
+    add ax, bx
+    adc dx, 0
+    cmp dx, 0
+    jne .bad_sig
+    cmp ax, 0xC000
+    ja .bad_sig
+    mov [exe_image_size], ax
+
+    mov dx, [es:MZ_HEADER_PARAS]
+    shl dx, 4
+    cmp ax, dx
+    jb .bad_sig
+
+    mov ax, [es:MZ_HEADER_PARAS]
+>>>>>>> 88a7da6 (Первый коммит)
     add ax, EXE_LOAD_SEG
     mov [exe_code_seg], ax
 
@@ -78,6 +124,19 @@ exe_execute:
     jz .reloc_done
 
     mov si, [es:MZ_RELOC_TABLE_OFF]
+<<<<<<< HEAD
+=======
+    cmp si, [exe_image_size]
+    jae .bad_sig
+
+    ; Bound reloc count by the space left in the image after the table.
+    mov ax, [exe_image_size]
+    sub ax, si
+    shr ax, 2
+    cmp cx, ax
+    ja .bad_sig
+
+>>>>>>> 88a7da6 (Первый коммит)
     mov bp, [exe_code_seg]
 
 .reloc_loop:
@@ -85,6 +144,24 @@ exe_execute:
     mov dx, [es:si+2]
     add si, 4
 
+<<<<<<< HEAD
+=======
+    ; Validate target: (dx*16 + bx) must be inside the loaded image.
+    push ax
+    push dx
+    mov ax, dx
+    mov cx, 16
+    mul cx
+    add ax, bx
+    adc dx, 0
+    cmp dx, 0
+    jne .reloc_oob
+    cmp ax, [exe_image_size]
+    jae .reloc_oob
+    pop dx
+    pop ax
+
+>>>>>>> 88a7da6 (Первый коммит)
     push es
     mov ax, bp
     add ax, dx
@@ -93,6 +170,15 @@ exe_execute:
     pop es
 
     loop .reloc_loop
+<<<<<<< HEAD
+=======
+    jmp .reloc_done
+
+.reloc_oob:
+    pop dx
+    pop ax
+    jmp .bad_sig
+>>>>>>> 88a7da6 (Первый коммит)
 
 .reloc_done:
     mov ax, KERNEL_DATA_SEG
@@ -105,6 +191,11 @@ exe_execute:
     mov [com_stack_save], sp
     mov [com_ss_save], ss
 
+<<<<<<< HEAD
+=======
+    mov byte [current_program_type], 2
+
+>>>>>>> 88a7da6 (Первый коммит)
     call api_dos_init
     call DisableMouse
 
@@ -198,4 +289,11 @@ exe_code_seg        dw 0
 exe_init_ss         dw 0
 exe_init_sp         dw 0
 exe_init_ip         dw 0
+<<<<<<< HEAD
 exe_init_cs         dw 0
+=======
+exe_init_cs         dw 0
+exe_file_size_low       dw 0
+exe_file_size_high      dw 0
+exe_image_size          dw 0
+>>>>>>> 88a7da6 (Первый коммит)

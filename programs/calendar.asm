@@ -170,6 +170,7 @@ zeller:
     xor ah, ah
     mov [.t], ax
 
+<<<<<<< HEAD
     mov ax, [.k]
     shr ax, 2
     add ax, [.t]
@@ -177,6 +178,27 @@ zeller:
     add ax, [.j]
     add ax, 5
 
+=======
+    ; h = (q + 13(m+1)/5 + K + K/4 + J/4 + 5J) mod 7, q = 1 (first day)
+    mov ax, [.k]
+    shr ax, 2
+    mov [.sum], ax          ; K/4
+    mov ax, [.t]
+    add [.sum], ax          ; + 13(m+1)/5
+    mov ax, [.k]
+    add [.sum], ax          ; + K
+    mov ax, [.j]
+    shr ax, 1
+    shr ax, 1
+    add [.sum], ax          ; + J/4
+    mov ax, [.j]
+    mov cx, 5
+    mul cx
+    add [.sum], ax          ; + 5J
+    inc word [.sum]         ; + q = 1
+
+    mov ax, [.sum]
+>>>>>>> 88a7da6 (Первый коммит)
     xor dx, dx
     mov cx, 7
     div cx
@@ -192,6 +214,10 @@ zeller:
 .j dw 0
 .k dw 0
 .t dw 0
+<<<<<<< HEAD
+=======
+.sum dw 0
+>>>>>>> 88a7da6 (Первый коммит)
 
 draw_header:
     mov dh, 0

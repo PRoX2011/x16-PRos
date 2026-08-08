@@ -29,8 +29,13 @@ start:
 
 		mov ah, 0x10
         mov si, [filename_ptr]
+<<<<<<< HEAD
         mov cx, 43008
         mov dx, 0x2000
+=======
+        mov cx, 0
+        mov dx, 0x3000
+>>>>>>> 88a7da6 (Первый коммит)
         int 22h
 
 		mov ah, 0x01
@@ -45,17 +50,30 @@ start:
 		call start_fast_clock
 
 		; imf type-1: first word is the data length
+<<<<<<< HEAD
 		mov ax, 0x2000
 		mov es, ax
 		mov si, 43008
+=======
+		mov ax, 0x3000
+		mov es, ax
+		mov si, 0
+>>>>>>> 88a7da6 (Первый коммит)
 		mov dx, [es:si]
 		mov [music_length], dx
 
 		; if imf is type-1 then index starts at 2
+<<<<<<< HEAD
 		mov ax, 43008
 		add ax, 2
 		mov [curr_off], ax
 		mov ax, 0x2000
+=======
+		mov ax, 0
+		add ax, 2
+		mov [curr_off], ax
+		mov ax, 0x3000
+>>>>>>> 88a7da6 (Первый коммит)
 		mov [curr_seg], ax
 
 		mov word [bytes_read], 0
@@ -108,8 +126,12 @@ start:
 		call stop_fast_clock
 		call reset_all_registers
 
+<<<<<<< HEAD
 		mov ax, 4c00h
 		int 21h
+=======
+		ret                     ; return to the shell (BIN exit)
+>>>>>>> 88a7da6 (Первый коммит)
 
 get_byte:
 		push ds

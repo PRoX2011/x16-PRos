@@ -16,7 +16,11 @@
 ;   0x09: CP866 control (AL=0x00 disable, AL=0x01 default font, AL=0x02 by name SI)
 ;   0x0A: Get system time (OUT: CH=hour, CL=min, DH=sec)
 ;   0x0B: Get system date (OUT: CH=century, CL=year, DH=month, DL=day)
+<<<<<<< HEAD
 ;   0x0С: Clear screen and aply theme from CONF.DIR/THEME.CFG
+=======
+;   0x0C: Clear screen and aply theme from CONF.DIR/THEME.CFG
+>>>>>>> 88a7da6 (Первый коммит)
 ; Preserves all registers unless specified
 ; ==================================================================
 
@@ -184,6 +188,10 @@ int21_handler:
 ; ========================================================================
 copy_caller_string_si_21:
     push ax
+<<<<<<< HEAD
+=======
+    push cx
+>>>>>>> 88a7da6 (Первый коммит)
     push di
     push es
     push ds
@@ -194,15 +202,31 @@ copy_caller_string_si_21:
 
     mov ax, [cs:caller_ds_save_21]
     mov ds, ax
+<<<<<<< HEAD
+=======
+    mov cx, 63
+>>>>>>> 88a7da6 (Первый коммит)
 .cl:
     lodsb
     stosb
     test al, al
+<<<<<<< HEAD
     jnz .cl
 
     pop ds
     pop es
     pop di
+=======
+    jz .cl_done
+    loop .cl
+    xor al, al
+    stosb
+.cl_done:
+    pop ds
+    pop es
+    pop di
+    pop cx
+>>>>>>> 88a7da6 (Первый коммит)
     pop ax
     mov si, .scratch
     ret

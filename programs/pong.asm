@@ -311,7 +311,11 @@ bar_vert:
     ret
 
 exit:
+<<<<<<< HEAD
     int 0x19
+=======
+    ret
+>>>>>>> 88a7da6 (Первый коммит)
 
 LEFT_PLAYER_POS:  db ((SCREEN_HEIGHT - PADDLE_SIZE) / 2)
 RIGHT_PLAYER_POS: db ((SCREEN_HEIGHT - PADDLE_SIZE) / 2)

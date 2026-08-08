@@ -65,7 +65,26 @@ start:
     mov bx, 100
     mul bx
     mov bx, [num2]
+<<<<<<< HEAD
     div bx
+=======
+    test bx, bx
+    jz .div_zero
+    div bx
+    jmp .after_div
+.div_zero:
+    ; Division by zero would fault the machine (#DE). Show an error.
+    mov ah, 0x01
+    mov si, err_zero_msg
+    int 0x21
+    mov ah, 0x05
+    int 0x21
+    mov ah, 0
+    int 0x16
+    popa
+    ret
+.after_div:
+>>>>>>> 88a7da6 (Первый коммит)
 
     mov di, result_str
     call convert_to_string
@@ -192,6 +211,10 @@ input_msg   db 'Number 1: ', 0
 input2_msg  db 'Number 2: ', 0
 result_msg  db 'Result: ', 0
 percent_msg db '%', 0
+<<<<<<< HEAD
+=======
+err_zero_msg db 'Error: division by zero', 13, 10, 0
+>>>>>>> 88a7da6 (Первый коммит)
 help_msg    db 'This programm will calculate how many percent is num 1 out of num 2. If ', 13, 10
             db 'malfunctioning then make sure num 2 is greater than num 1', 13, 10, 0
 when_done   db 'When done press any key', 13, 10, 0

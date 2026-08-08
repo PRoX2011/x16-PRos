@@ -477,6 +477,11 @@ setup:
     int 0x22
     mov si, tetris_file
     int 0x22
+<<<<<<< HEAD
+=======
+    mov si, flappy_file
+    int 0x22
+>>>>>>> 88a7da6 (Первый коммит)
     mov si, chars_file
     int 0x22
 
@@ -515,6 +520,11 @@ setup:
     int 0x22
     mov si, tetris_file
     int 0x22
+<<<<<<< HEAD
+=======
+    mov si, flappy_file
+    int 0x22
+>>>>>>> 88a7da6 (Первый коммит)
     mov si, theme_file
     int 0x22
     mov si, calc_file
@@ -836,5 +846,9 @@ space_file         db 'SPACE.BIN', 0
 tetris_file        db 'TETRIS.BIN', 0
 theme_file         db 'THEME.BIN', 0
 writer_file        db 'WRITER.BIN', 0
+<<<<<<< HEAD
+=======
+flappy_file        db 'FLAPPY.BIN', 0
+>>>>>>> 88a7da6 (Первый коммит)
 
 setup_stage_current db 0

@@ -559,7 +559,18 @@ game_over:
     call set_cursor
     mov si, msg_game_over
     call print_string
+<<<<<<< HEAD
     jmp $
+=======
+    mov dh, 14
+    mov dl, 35
+    call set_cursor
+    mov si, msg_exit_prompt
+    call print_string
+    mov ah, 0
+    int 0x16            ; wait for a key
+    ret                 ; return to the shell (never hang the machine)
+>>>>>>> 88a7da6 (Первый коммит)
 
 ; --- DATA ---
 
@@ -596,6 +607,10 @@ msg_score:     db "SCORE: ", 0
 msg_next:      db "NEXT:", 0
 clr_next:      db "          ", 0 ;
 msg_game_over: db "GAME OVER", 0
+<<<<<<< HEAD
+=======
+msg_exit_prompt: db "Press any key to exit", 0
+>>>>>>> 88a7da6 (Первый коммит)
 frame_left:    db "<|", 0
 frame_right:   db "|>", 0
 footer_start:  db "  ", 0

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #!/bin/bash
+=======
+﻿#!/bin/bash
+>>>>>>> 88a7da6 (Первый коммит)
 
 # ==================================================================
 # x16-PRos -- The x16-PRos build script for Linux
@@ -366,6 +370,10 @@ programs=(
     "programs/procentc.asm PROCENTC.BIN"
     "programs/paint.asm PAINT.BIN"
     "programs/pong.asm PONG.BIN"
+<<<<<<< HEAD
+=======
+    "programs/flappy.asm FLAPPY.BIN"
+>>>>>>> 88a7da6 (Первый коммит)
     "programs/hexedit.asm HEXEDIT.BIN"
     "programs/clock.asm CLOCK.BIN"
     "programs/mandel.asm MANDEL.BIN"
@@ -380,6 +388,11 @@ programs=(
     "programs/tree.asm TREE.BIN"
     "programs/print.asm PRINT.BIN"
     "programs/calendar.asm CALENDAR.BIN"
+<<<<<<< HEAD
+=======
+    "programs/dump.asm DUMP.BIN"
+    "programs/uptime.asm UPTIME.BIN"
+>>>>>>> 88a7da6 (Первый коммит)
     "programs/settings.asm SETTINGS.BIN"
 )
 

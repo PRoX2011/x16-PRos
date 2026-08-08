@@ -91,12 +91,28 @@ game:
     cmp eax, 3
     jl .delay
     mov [clockticks], ebx
+<<<<<<< HEAD
     in al, 0x60
     
 .direction:
     cmp al, 177     ; 'N' - новая игра
     je start
     cmp al, 0x01    ; ESC - выход
+=======
+    ; Read the keyboard via the BIOS (a raw port read would steal scan
+    ; codes from the BIOS keyboard buffer and corrupt its state).
+    mov ah, 0x01
+    int 0x16
+    jz .delay
+    mov ah, 0x00
+    int 0x16
+    mov al, ah        ; scancode in AL
+    
+.direction:
+    cmp al, 177    ; 'N' - new game
+    je start
+    cmp al, 0x01    ; ESC - exit
+>>>>>>> 88a7da6 (Первый коммит)
     je esc_exit
     and al, 0x7F
     cmp al, 17      ; W
@@ -195,11 +211,19 @@ game:
     call print
 .fail_wait:
     in al, 0x60
+<<<<<<< HEAD
     cmp al, 177     ; 'N' - новая игра
     jne .check_esc_fail
     jmp start
 .check_esc_fail:
     cmp al, 0x01    ; ESC - выход
+=======
+    cmp al, 177    ; 'N' - new game
+    jne .check_esc_fail
+    jmp start
+.check_esc_fail:
+    cmp al, 0x01    ; ESC - exit
+>>>>>>> 88a7da6 (Первый коммит)
     jne .fail_wait
     jmp esc_exit
 
@@ -248,7 +272,11 @@ print:
     ret
     
 esc_exit:
+<<<<<<< HEAD
     int 0x19
+=======
+    ret
+>>>>>>> 88a7da6 (Первый коммит)
     
 msg_name: db 'Snake game',0
 msg_controls: db 'WASD - direction N - new Game ESC - quit',0

@@ -126,6 +126,11 @@ ple_execute:
     mov [com_stack_save], sp
     mov [com_ss_save], ss
 
+<<<<<<< HEAD
+=======
+    mov byte [current_program_type], 1
+
+>>>>>>> 88a7da6 (Первый коммит)
     call DisableMouse
 
     mov ax, [ple_stack_ss]
@@ -154,6 +159,10 @@ ple_execute:
     mov ax, KERNEL_DATA_SEG
     mov ds, ax
     mov es, ax
+<<<<<<< HEAD
+=======
+    mov byte [current_program_type], 0
+>>>>>>> 88a7da6 (Первый коммит)
     mov ss, [com_ss_save]
     mov sp, [com_stack_save]
     sti

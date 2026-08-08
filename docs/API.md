@@ -415,4 +415,51 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 The x16-PRos operating system and its API are licensed under the MIT License. See the LICENSE.TXT for details.
 
 **Author**: PRoX (https://github.com/PRoX2011)
+<<<<<<< HEAD
 **Version**: 0.4, 0.5, 0.6, 0.7, 0.8, 0.9
+=======
+**Version**: 0.4, 0.5, 0.6, 0.7, 0.8, 0.9
+---
+
+## INT 0x21 - MS-DOS Compatibility API
+
+During COM and EXE program execution the kernel installs a DOS-compatible
+INT 0x21 handler. It implements the classic MS-DOS functions on top of the
+PRos file system so DOS programs can create, open, read, write and seek
+files:
+
+| AH | Function | Input | Output |
+|----|----------|-------|--------|
+| 0x2E | Set/Reset verify flag | AL = 0/1 | - |
+| 0x3C | Create file | DS:DX = name, CX = attr | AX = handle |
+| 0x3D | Open file | DS:DX = name, AL = mode | AX = handle |
+| 0x3E | Close file | BX = handle | - |
+| 0x3F | Read file | BX = handle, CX = count, DS:DX = buffer | AX = bytes read |
+| 0x40 | Write file | BX = handle, CX = count, DS:DX = buffer | AX = bytes written |
+| 0x42 | Seek | BX = handle, CX:DX = offset, AL = origin | DX:AX = new position |
+| 0x43 | Get/set attribute | DS:DX = name, AL = 0/1 | CX = attribute |
+| 0x56 | Rename file | DS:DX = old name, ES:DI = new name | - |
+
+- **Handles**: up to 4 files open simultaneously; each file is loaded into a
+  private 16 KiB buffer (segment 0x4000). Reads/writes operate on the memory
+  copy; Close writes the buffer back to disk when modified.
+- **Errors**: CF = 1 with an error code in AX (2 = file not found,
+  3 = path not found, 4 = too many open files, 6 = invalid handle).
+- **Seek origins**: 0 = start, 1 = current, 2 = end. Only 16-bit offsets
+  are supported (CX = 0).
+
+---
+
+## Terminal Commands Added
+
+| Command | Description |
+|---------|-------------|
+| `LAYOUT [EN|RU]` | Switch the keyboard layout (EN / Russian) |
+| `PWD` | Print the current working directory |
+| `LS` | Alias of DIR |
+| `MD` | Alias of MKDIR |
+| `RD` | Alias of DELDIR |
+| `TYPE` | Alias of CAT |
+| `Ctrl+Shift` | Toggle keyboard layout while typing |
+| `Ctrl+Shift+F1` | Close the running program and return to the shell |
+>>>>>>> 88a7da6 (Первый коммит)

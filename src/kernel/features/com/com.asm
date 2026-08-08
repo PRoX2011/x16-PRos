@@ -134,16 +134,30 @@ int20_handler:
     mov ds, ax
     mov es, ax
 
+<<<<<<< HEAD
+=======
+    mov byte [current_program_type], 0
+
+>>>>>>> 88a7da6 (Первый коммит)
     mov ss, [com_ss_save]
     mov sp, [com_stack_save]
 
     sti
 
+<<<<<<< HEAD
     call api_output_init
 
     mov si, .finished_msg
     mov ah, 0x01
     int 0x21
+=======
+    ; Print the finished message directly instead of via INT 0x21 - the
+    ; DOS vector was just un-hooked by the IVT restore above, so relying
+    ; on the interrupt would depend on which handler the saved table
+    ; points at.
+    mov si, .finished_msg
+    call print_string
+>>>>>>> 88a7da6 (Первый коммит)
 
     ; Wait for key press
     mov ah, 0
@@ -245,6 +259,11 @@ int21_dos_handler:
     je com_2Ah
     cmp ah, 0x2C
     je com_2Ch
+<<<<<<< HEAD
+=======
+    cmp ah, 0x2E
+    je com_2Eh
+>>>>>>> 88a7da6 (Первый коммит)
     cmp ah, 0x2F
     je com_2Fh
     cmp ah, 0x30
@@ -259,14 +278,38 @@ int21_dos_handler:
     je com_3Ah
     cmp ah, 0x3B
     je com_3Bh
+<<<<<<< HEAD
     cmp ah, 0x41
     je com_41h
+=======
+    cmp ah, 0x3C
+    je com_3Ch
+    cmp ah, 0x3D
+    je com_3Dh
+    cmp ah, 0x3E
+    je com_3Eh
+    cmp ah, 0x3F
+    je com_3Fh
+    cmp ah, 0x40
+    je com_40h
+    cmp ah, 0x41
+    je com_41h
+    cmp ah, 0x42
+    je com_42h
+    cmp ah, 0x43
+    je com_43h
+>>>>>>> 88a7da6 (Первый коммит)
     cmp ah, 0x4C
     je com_4Ch
     cmp ah, 0x4D
     je com_4Dh
     cmp ah, 0x54
     je com_54h
+<<<<<<< HEAD
+=======
+    cmp ah, 0x56
+    je com_56h
+>>>>>>> 88a7da6 (Первый коммит)
     iret
 
 
@@ -409,6 +452,10 @@ bcd_to_bin_time:
 %include "src/kernel/features/com/35h.asm"
 %include "src/kernel/features/com/36h.asm"
 %include "src/kernel/features/com/39h.asm"
+<<<<<<< HEAD
+=======
+%include "src/kernel/features/com/handles.asm"
+>>>>>>> 88a7da6 (Первый коммит)
 %include "src/kernel/features/com/3Ah.asm"
 %include "src/kernel/features/com/3Bh.asm"
 %include "src/kernel/features/com/41h.asm"

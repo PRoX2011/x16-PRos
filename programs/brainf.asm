@@ -63,11 +63,19 @@ getInput:
     cmp al, 08h
     je .handle_backspace
 
+<<<<<<< HEAD
     stosb
 
     cmp al, 0Dh
     je allocateWorkspace
 
+=======
+    cmp al, 0Dh
+    je allocateWorkspace
+
+    stosb
+
+>>>>>>> 88a7da6 (Первый коммит)
     mov ah, 09h
     int 10h
 

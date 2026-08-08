@@ -1193,4 +1193,8 @@ modified        db 0
 had_crlf        db 0
 
 filename        times 16 db 0
+<<<<<<< HEAD
 status_msg      times 30 db 0
+=======
+status_msg      times 30 db 0
+>>>>>>> 88a7da6 (Первый коммит)

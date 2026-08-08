@@ -43,7 +43,13 @@ START:
 		call	ILM_NLINE				;new line
 
 CO:
+<<<<<<< HEAD
 		mov		sp,STACK_OFF			;clear SP (error could happened)
+=======
+		mov		ax,STACK_SEG			;set a safe stack segment for the
+		mov		ss,ax					;interpreter (never leave SS = 0,
+		mov		sp,STACK_OFF			;otherwise deep stacks corrupt the IVT)
+>>>>>>> 88a7da6 (Первый коммит)
 
 		mov		ax,PGM					;copy PGM address
 		mov		[PGP],ax				;set PGP at beginning of program

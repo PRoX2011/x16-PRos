@@ -189,7 +189,11 @@ move_down:
     ret
 
 exit_program:
+<<<<<<< HEAD
     int 0x19
+=======
+    ret
+>>>>>>> 88a7da6 (Первый коммит)
 
 print_string:
     mov ah, 0x0E

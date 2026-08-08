@@ -312,6 +312,10 @@ int22_handler:
 ; ==================================================================
 copy_caller_string_si:
     push ax
+<<<<<<< HEAD
+=======
+    push cx
+>>>>>>> 88a7da6 (Первый коммит)
     push di
     push es
     push ds
@@ -322,15 +326,31 @@ copy_caller_string_si:
 
     mov ax, [cs:caller_ds_save_22]
     mov ds, ax
+<<<<<<< HEAD
+=======
+    mov cx, 63
+>>>>>>> 88a7da6 (Первый коммит)
 .cl:
     lodsb
     stosb
     test al, al
+<<<<<<< HEAD
     jnz .cl
 
     pop ds
     pop es
     pop di
+=======
+    jz .cl_done
+    loop .cl
+    xor al, al
+    stosb
+.cl_done:
+    pop ds
+    pop es
+    pop di
+    pop cx
+>>>>>>> 88a7da6 (Первый коммит)
     pop ax
     mov si, .si_scratch
     ret
@@ -344,6 +364,10 @@ copy_caller_string_si:
 ; ==================================================================
 copy_caller_string_di:
     push ax
+<<<<<<< HEAD
+=======
+    push cx
+>>>>>>> 88a7da6 (Первый коммит)
     push si
     push es
     push ds
@@ -356,15 +380,31 @@ copy_caller_string_di:
 
     mov ax, [cs:caller_ds_save_22]
     mov ds, ax
+<<<<<<< HEAD
+=======
+    mov cx, 63
+>>>>>>> 88a7da6 (Первый коммит)
 .cl:
     lodsb
     stosb
     test al, al
+<<<<<<< HEAD
     jnz .cl
 
     pop ds
     pop es
     pop si
+=======
+    jz .cl_done
+    loop .cl
+    xor al, al
+    stosb
+.cl_done:
+    pop ds
+    pop es
+    pop si
+    pop cx
+>>>>>>> 88a7da6 (Первый коммит)
     pop ax
     mov di, .di_scratch
     ret

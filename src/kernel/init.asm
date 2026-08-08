@@ -8,6 +8,11 @@ init_system:
     cld
 
     call init_segments
+<<<<<<< HEAD
+=======
+    call init_fault_handlers
+    call init_keyboard_layout
+>>>>>>> 88a7da6 (Первый коммит)
     call init_disks
     call init_timer
     call init_api

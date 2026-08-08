@@ -59,7 +59,11 @@ Thanks to everyone who supported me financially. All your nicknames will appear 
 
 ## Key Features
 
+<<<<<<< HEAD
 - **MS-DOS Compatibility**: Native support for running standard MS-DOS `.COM` and `.EXE` executables.
+=======
+- **MS-DOS Compatibility**: Native support for running standard MS-DOS `.COM` and `.EXE` executables, plus DOS file-handle API (`INT 0x21`: create/open/close/read/write/seek, rename).
+>>>>>>> 88a7da6 (Первый коммит)
 - **Encrypted Password System**: XOR-based password encryption with custom key
 - **User Authentication**: Login system with configurable user account
 - **Password Protection**: Encrypted PASSWORD.CFG prevents plaintext password storage
@@ -123,6 +127,10 @@ The system includes a powerful terminal - **PRos Terminal**. It not only allows 
 |---------|--------|-------------|
 | `dir` | `dir` | List files in current directory with size info |
 | `cat` | `cat <filename>` | Display file contents |
+<<<<<<< HEAD
+=======
+| `type` | `type <filename>` | Alias of `cat` |
+>>>>>>> 88a7da6 (Первый коммит)
 | `size` | `size <filename>` | Show file size in bytes |
 | `del` | `del <filename>` | Delete a file (kernel.bin protected) |
 | `copy` | `copy <source> <dest>` | Copy file (root directory only) |
@@ -136,6 +144,22 @@ The system includes a powerful terminal - **PRos Terminal**. It not only allows 
 | `cd` | `cd <dirname>` | Change directory (use `..` for parent, `/` for root) |
 | `mkdir` | `mkdir <dirname>` | Create new directory |
 | `deldir` | `deldir <dirname>` | Delete empty directory |
+<<<<<<< HEAD
+=======
+| `pwd` | `pwd` | Print the current working directory |
+| `ls` | `ls` | Alias of `dir` |
+| `md` | `md <dirname>` | Alias of `mkdir` |
+| `rd` | `rd <dirname>` | Alias of `deldir` |
+
+#### Keyboard Layout
+| Command | Description |
+|---------|-------------|
+| `layout` | Toggle EN/RU keyboard layout |
+| `layout ru` | Switch to the Russian (JCUKEN) layout |
+| `layout en` | Switch to the English layout |
+| `Ctrl+Shift` | Toggle the layout while typing |
+| `Ctrl+Shift+F1` | Close the running program and return to the shell |
+>>>>>>> 88a7da6 (Первый коммит)
 
 #### Media & Display
 | Command | Syntax | Description |
@@ -268,7 +292,11 @@ x16-PRos includes a comprehensive collection of built-in applications:
 <td width="33%" align="center">
     <br>
     <b>And more...</b><br>
+<<<<<<< HEAD
     SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, HEAD, TAIL, THEME.BIN, CHARS.BIN, WAVPLAY.BIN, FDISK.BIN, ED.BIN, HELLO.COM, FRACTAL.COM, CALENDAR.BIN
+=======
+    SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, HEAD, TAIL, THEME.BIN, CHARS.BIN, WAVPLAY.BIN, FDISK.BIN, ED.BIN, HELLO.COM, FRACTAL.COM, CALENDAR.BIN, DUMP.BIN, UPTIME.BIN
+>>>>>>> 88a7da6 (Первый коммит)
   </td>
 </tr>
 </table>

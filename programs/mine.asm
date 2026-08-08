@@ -143,6 +143,11 @@ DetectWin:
   jne .Break
 .Continue:
   loop .Loop
+<<<<<<< HEAD
+=======
+  pop cx
+  pop ax
+>>>>>>> 88a7da6 (Первый коммит)
   jmp GameWin
 .Break:
   pop cx

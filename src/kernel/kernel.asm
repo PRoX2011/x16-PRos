@@ -53,6 +53,14 @@ PROGRAM_LOAD_OFF     equ 0x8000
 PROGRAM_THUNK_OFF    equ 0x7FF0
 PROGRAM_PARAMS_OFF   equ 0x7F00
 
+<<<<<<< HEAD
+=======
+; Large data files (cat, copy) load here - far from the kernel so that
+; text/data files larger than 32 KiB no longer wrap into segment 0x2000.
+DATA_LOAD_SEG        equ 0x3000
+DATA_LOAD_OFF        equ 0x0000
+
+>>>>>>> 88a7da6 (Первый коммит)
 CFG_SCRATCH_SEG      equ FONT_SEG
 CFG_SCRATCH_OFF      equ 0x1000
 
@@ -357,6 +365,10 @@ print_info:
 shell:
 get_cmd:
     call refresh_prompt
+<<<<<<< HEAD
+=======
+    call append_layout_to_prompt
+>>>>>>> 88a7da6 (Первый коммит)
     mov si, final_prompt
     call print_string
 
@@ -377,6 +389,12 @@ get_cmd:
     mov ax, input
     call string_input_string
 
+<<<<<<< HEAD
+=======
+    ; Input was read successfully - the system is healthy, clear faults.
+    mov byte [fault_count], 0
+
+>>>>>>> 88a7da6 (Первый коммит)
     mov byte [autocomplete_enabled], 0
     call print_newline
     cmp byte [input], 0
@@ -501,6 +519,17 @@ get_cmd:
     call string_string_compare
     jc near list_directory
 
+<<<<<<< HEAD
+=======
+    mov di, ls_string
+    call string_string_compare
+    jc near list_directory
+
+    mov di, pwd_string
+    call string_string_compare
+    jc near pwd_command
+
+>>>>>>> 88a7da6 (Первый коммит)
     mov di, ver_string
     call string_string_compare
     jc near print_ver
@@ -517,6 +546,13 @@ get_cmd:
     call string_string_compare
     jc near cat_file
 
+<<<<<<< HEAD
+=======
+    mov di, type_string
+    call string_string_compare
+    jc near cat_file
+
+>>>>>>> 88a7da6 (Первый коммит)
     mov di, del_string
     call string_string_compare
     jc near del_file
@@ -557,10 +593,24 @@ get_cmd:
     call string_string_compare
     jc near mkdir_command
 
+<<<<<<< HEAD
+=======
+    mov di, md_string
+    call string_string_compare
+    jc near mkdir_command
+
+>>>>>>> 88a7da6 (Первый коммит)
     mov di, deldir_string
     call string_string_compare
     jc near deldir_command
 
+<<<<<<< HEAD
+=======
+    mov di, rd_string
+    call string_string_compare
+    jc near deldir_command
+
+>>>>>>> 88a7da6 (Первый коммит)
     mov di, cd_string
     call string_string_compare
     jc near cd_command
@@ -569,6 +619,13 @@ get_cmd:
     call string_string_compare
     jc near rip_terry
 
+<<<<<<< HEAD
+=======
+    mov di, layout_string
+    call string_string_compare
+    jc near layout_command
+
+>>>>>>> 88a7da6 (Первый коммит)
     mov si, command
     mov di, kernel_file
     call string_string_compare
@@ -973,6 +1030,11 @@ launch_bin_program:
     mov [bin_stack_save], sp
     mov [bin_ss_save], ss
 
+<<<<<<< HEAD
+=======
+    mov byte [current_program_type], 1
+
+>>>>>>> 88a7da6 (Первый коммит)
     call DisableMouse
 
     ; ---- Build trampoline frame on the (still kernel) stack ----
@@ -997,6 +1059,10 @@ launch_bin_program:
     mov ax, KERNEL_DATA_SEG
     mov ds, ax
     mov es, ax
+<<<<<<< HEAD
+=======
+    mov byte [current_program_type], 0
+>>>>>>> 88a7da6 (Первый коммит)
     mov ss, [bin_ss_save]
     mov sp, [bin_stack_save]
     sti
@@ -1015,6 +1081,11 @@ execute_com:
     mov [com_stack_save], sp
     mov [com_ss_save], ss
 
+<<<<<<< HEAD
+=======
+    mov byte [current_program_type], 2
+
+>>>>>>> 88a7da6 (Первый коммит)
     call api_dos_init
 
     ; Setup COM program environment
@@ -1071,6 +1142,77 @@ print_ver:
     call print_newline
     jmp get_cmd
 
+<<<<<<< HEAD
+=======
+; ===================== Keyboard Layout Command =====================
+; LAYOUT              - toggle EN/RU
+; LAYOUT EN | LAYOUT RU - set layout explicitly
+layout_command:
+    call print_newline
+    mov word si, [param_list]
+    call string_string_parse
+    test ax, ax
+    jz .layout_toggle
+
+    mov si, ax
+    mov ax, si
+    call string_string_uppercase
+    mov di, .ru_str
+    call string_string_compare
+    jc .layout_set_ru
+    mov si, ax
+    mov di, .en_str
+    call string_string_compare
+    jc .layout_set_en
+
+.layout_toggle:
+    xor byte [keyboard_layout], 1
+    jmp .layout_show
+
+.layout_set_ru:
+    mov byte [keyboard_layout], 1
+    jmp .layout_show
+
+.layout_set_en:
+    mov byte [keyboard_layout], 0
+
+.layout_show:
+    mov si, .msg
+    call print_string
+    cmp byte [keyboard_layout], 0
+    jne .layout_ru
+    mov si, .en_str
+    call print_string_cyan
+    jmp .layout_done
+.layout_ru:
+    mov si, .ru_str
+    call print_string_cyan
+.layout_done:
+    call print_newline
+    call print_newline
+    jmp get_cmd
+
+.msg   db 'Keyboard layout: ', 0
+.en_str db 'EN', 0
+.ru_str db 'RU', 0
+
+; ===================== Print Working Directory =====================
+pwd_command:
+    call print_newline
+    cmp byte [current_directory], 0
+    jne .show_dir
+    mov si, root_str
+    call print_string_cyan
+    call print_newline
+    jmp get_cmd
+.show_dir:
+    mov si, current_directory
+    call print_string_cyan
+    call print_newline
+    jmp get_cmd
+root_str db '/', 0
+
+>>>>>>> 88a7da6 (Первый коммит)
 exit:
     jmp reboot_system
 
@@ -1368,8 +1510,13 @@ cat_file:
     pop ax
     jc .not_found
 
+<<<<<<< HEAD
     mov cx, PROGRAM_LOAD_OFF
     mov dx, PROGRAM_LOAD_SEG
+=======
+    mov cx, DATA_LOAD_OFF
+    mov dx, DATA_LOAD_SEG
+>>>>>>> 88a7da6 (Первый коммит)
 
     call fs_load_huge_file
     jc .load_fail
@@ -1381,8 +1528,13 @@ cat_file:
     or cx, dx
     jz .empty_file
 
+<<<<<<< HEAD
     mov word [.curr_seg], PROGRAM_LOAD_SEG
     mov word [.curr_off], PROGRAM_LOAD_OFF
+=======
+    mov word [.curr_seg], DATA_LOAD_SEG
+    mov word [.curr_off], DATA_LOAD_OFF
+>>>>>>> 88a7da6 (Первый коммит)
     mov word [.line_count], 0
 
 .print_loop:
@@ -1566,15 +1718,25 @@ copy_file:
     call fs_file_exists
     jnc .already_exists
     mov ax, dx
+<<<<<<< HEAD
     mov cx, PROGRAM_LOAD_OFF
     mov dx, PROGRAM_LOAD_SEG
+=======
+    mov cx, DATA_LOAD_OFF
+    mov dx, DATA_LOAD_SEG
+>>>>>>> 88a7da6 (Первый коммит)
     call fs_load_huge_file
     jc .load_fail
     ; DX:AX = file size
     mov bx, ax                  ; size_low
     mov di, dx                  ; size_high
+<<<<<<< HEAD
     mov cx, PROGRAM_LOAD_OFF
     mov dx, PROGRAM_LOAD_SEG
+=======
+    mov cx, DATA_LOAD_OFF
+    mov dx, DATA_LOAD_SEG
+>>>>>>> 88a7da6 (Первый коммит)
     mov word ax, [.tmp]
     call fs_write_huge_file
     jc .write_fail
@@ -1653,8 +1815,16 @@ touch_file:
     jmp get_cmd
 
 .filename_provided:
+<<<<<<< HEAD
     call fs_file_exists
     jnc .already_exists
+=======
+    mov word [.touch_filename], ax
+    mov ax, [.touch_filename]
+    call fs_file_exists
+    jnc .already_exists
+    mov ax, [.touch_filename]
+>>>>>>> 88a7da6 (Первый коммит)
     call fs_create_file
     jc .failure
     mov si, .success_msg
@@ -1676,6 +1846,10 @@ touch_file:
 
 .success_msg db 'File created successfully', 0
 .failure_msg db 'Could not create file - invalid filename or disk error', 0
+<<<<<<< HEAD
+=======
+.touch_filename dw 0
+>>>>>>> 88a7da6 (Первый коммит)
 
 write_file:
     mov word si, [param_list]
@@ -1986,7 +2160,14 @@ cd_command:
     je .comp_end
     stosb
     inc cx
+<<<<<<< HEAD
     jmp .copy_comp
+=======
+    cmp cx, 14
+    jb .copy_comp
+    ; Component too long for the 16-byte buffer - abort cleanly.
+    jmp .cd_rollback_clean
+>>>>>>> 88a7da6 (Первый коммит)
 
 .comp_sep:
     mov byte [di], 0
@@ -2060,6 +2241,11 @@ cd_command:
 
 .cd_rollback:
     pop si                  ; clean remaining path from stack
+<<<<<<< HEAD
+=======
+
+.cd_rollback_clean:
+>>>>>>> 88a7da6 (Первый коммит)
     ; Restore original state
     mov ax, [.saved_cluster]
     mov [current_dir_cluster], ax
@@ -2150,6 +2336,46 @@ rip_terry:
 
 .rip_terry db "Rest in peace Terry A. Devis (1969 - 2018)", 0
 
+<<<<<<< HEAD
+=======
+; ==================================================================
+; APPEND_LAYOUT_TO_PROMPT - appends "[EN] " / "[RU] " to final_prompt
+; so the active keyboard layout is always visible. Skips appending
+; if the prompt is already too long to fit the 64-byte buffer.
+; ==================================================================
+append_layout_to_prompt:
+    pusha
+    mov di, final_prompt
+.find_end:
+    cmp byte [di], 0
+    je .found_end
+    inc di
+    jmp .find_end
+.found_end:
+    mov ax, di
+    sub ax, final_prompt
+    cmp ax, 56
+    ja .done
+    cmp byte [keyboard_layout], 0
+    jne .tag_ru
+    mov si, .en_tag
+    jmp .copy_tag
+.tag_ru:
+    mov si, .ru_tag
+.copy_tag:
+    lodsb
+    test al, al
+    jz .done
+    stosb
+    jmp .copy_tag
+.done:
+    popa
+    ret
+
+.en_tag db '[EN] ', 0
+.ru_tag db '[RU] ', 0
+
+>>>>>>> 88a7da6 (Первый коммит)
 %INCLUDE "src/kernel/init.asm"                      ; x16-PRos initialisation
 %INCLUDE "src/kernel/log.asm"                       ; Log functions
 %INCLUDE "src/kernel/features/fs.asm"               ; FAT12 filesystem functions
@@ -2163,6 +2389,11 @@ rip_terry:
 %INCLUDE "src/kernel/features/exe/exe.asm"          ; MZ EXE
 %INCLUDE "src/kernel/features/ple/ple.asm"          ; PLE
 %INCLUDE "src/kernel/features/cp866.asm"            ; .FNT font loading
+<<<<<<< HEAD
+=======
+%INCLUDE "src/kernel/features/keyboard_layout.asm"  ; EN/RU keyboard layout
+%INCLUDE "src/kernel/features/fault_handlers.asm"   ; CPU exception handlers
+>>>>>>> 88a7da6 (Первый коммит)
 
 ; ====== DRIVERS ======
 %INCLUDE "src/drivers/ps2_mouse.asm"                ; Mouse driver
@@ -2197,9 +2428,19 @@ kshell_comands db 'HELP               - get list of commands', 10, 13
                db 'WRITE  <f> <text>  - write to file', 10, 13
                db 'VIEW   <f> <flags> - view BMP image', 10, 13
                db 'CD     <dir>       - change directory', 10, 13
+<<<<<<< HEAD
                db 'MKDIR  <dir>       - create directory', 10, 13
                db 'DELDIR <dir>       - delete directory', 10, 13
                db 'EXIT               - exit to bootloader', 10, 13, 0
+=======
+                db 'MKDIR  <dir>       - create directory', 10, 13
+                db 'DELDIR <dir>       - delete directory', 10, 13
+                db 'LAYOUT [EN|RU]     - switch keyboard layout', 10, 13
+                db 'PWD                - print working directory', 10, 13
+                db 'LS / MD / RD / TYPE - DOS-style aliases', 10, 13
+                db 'Ctrl+Shift+F1      - close a running program', 10, 13
+                db 'EXIT               - exit to bootloader', 10, 13, 0
+>>>>>>> 88a7da6 (Первый коммит)
 
 ; ------ About OS ------
 info db 10, 13
@@ -2239,6 +2480,15 @@ mkdir_string   db 'MKDIR', 0
 deldir_string  db 'DELDIR', 0
 cd_string      db 'CD', 0
 terry_string   db 'TERRY', 0
+<<<<<<< HEAD
+=======
+layout_string  db 'LAYOUT', 0
+ls_string      db 'LS', 0
+pwd_string     db 'PWD', 0
+md_string      db 'MD', 0
+rd_string      db 'RD', 0
+type_string    db 'TYPE', 0
+>>>>>>> 88a7da6 (Первый коммит)
 
 autocomplete_cmd_table:
     dw exit_string, help_string, info_string, cls_string
@@ -2246,7 +2496,12 @@ autocomplete_cmd_table:
     dw cat_string, del_string, copy_string, ren_string
     dw size_string, shut_string, reboot_string
     dw touch_string, write_string, view_string, mkdir_string
+<<<<<<< HEAD
     dw deldir_string
+=======
+    dw deldir_string, layout_string, ls_string, pwd_string
+    dw md_string, rd_string, type_string
+>>>>>>> 88a7da6 (Первый коммит)
     dw 0
 
 ; ------ Errors ------
@@ -2421,6 +2676,13 @@ bin_stack_save       dw 0
 bin_ss_save          dw 0
 program_seg_runtime  dw program_seg
 
+<<<<<<< HEAD
+=======
+; 0 = shell, 1 = BIN/PLE program, 2 = COM/EXE program.
+; Used by the Ctrl+Alt+Del program abort feature.
+current_program_type db 0
+
+>>>>>>> 88a7da6 (Первый коммит)
 first_boot_value     db '1', 0
 
 kernel_file          db 'KERNEL.BIN', 0
