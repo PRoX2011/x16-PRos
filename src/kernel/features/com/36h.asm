@@ -1,4 +1,6 @@
 com_36h:
+    push bp
+    mov bp, sp
     push si
     push ds
 
@@ -18,10 +20,10 @@ com_36h:
 .measure:
     call fs_free_space
     mov bx, ax
-    mov ax, 1           ; sectors per cluster
-    mov cx, 512         ; bytes per sector
-    mov dx, 2847        ; total clusters (FAT12 1.44MB geometry)
-    clc
+    mov ax, 1
+    mov cx, 512
+    mov dx, 2847
+    and word [bp+6], 0xFFFE
     jmp .restore
 
 .bad_drive:
@@ -29,10 +31,11 @@ com_36h:
     xor bx, bx
     xor cx, cx
     xor dx, dx
-    stc
+    or word [bp+6], 1
 
 .restore:
     call restore_current_dir
     pop ds
     pop si
+    pop bp
     iret

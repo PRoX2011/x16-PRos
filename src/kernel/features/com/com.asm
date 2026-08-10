@@ -51,15 +51,15 @@
 ;  Function 28h: Random block write using FCB
 ;  Function 29h: Parse filename and build FCB
 ;  [DONE] Function 2Ah: Get system date
-;  Function 2Bh: Set system date
+;  [DONE] Function 2Bh: Set system date
 ;  [DONE] Function 2Ch: Get system time
-;  Function 2Dh: Set system time
+;  [DONE] Function 2Dh: Set system time
 ;  Function 2Eh: Set/Reset verify switch
 ;  [DONE] Function 2Fh: Get current DTA address
 ;  [DONE] Function 30h: Get DOS version number
 ;  Function 31h: Terminate and stay resident (TSR)
 ;  Function 32h: Get DOS drive information (undocumented)
-;  Function 33h: Get/Set Ctrl+C / Ctrl+Break handling
+;  [DONE] Function 33h: Get/Set Ctrl+C / Ctrl+Break handling
 ;  Function 34h: Get address of InDOS flag (undocumented)
 ;  [DONE] Function 35h: Get interrupt vector
 ;  [DONE] Function 36h: Get free disk space
@@ -68,21 +68,21 @@
 ;  [DONE] Function 39h: Create subdirectory (MKDIR)
 ;  [DONE] Function 3Ah: Remove subdirectory (RMDIR)
 ;  [DONE] Function 3Bh: Change current directory (CHDIR)
-;  Function 3Ch: Create file
-;  Function 3Dh: Open file
-;  Function 3Eh: Close file
-;  Function 3Fh: Read from file/device
-;  Function 40h: Write to file/device
+;  [DONE] Function 3Ch: Create file
+;  [DONE] Function 3Dh: Open file
+;  [DONE] Function 3Eh: Close file
+;  [DONE] Function 3Fh: Read from file/device
+;  [DONE] Function 40h: Write to file/device
 ;  [DONE] Function 41h: Delete file
-;  Function 42h: Move file pointer (seek)
-;  Function 43h: Get/Set file attributes
-;  Function 44h: I/O control for devices (IOCTL)
-;  Function 45h: Duplicate file handle
-;  Function 46h: Force duplicate file handle
+;  [DONE] Function 42h: Move file pointer (seek)
+;  [DONE] Function 43h: Get/Set file attributes
+;  [DONE] Function 44h: I/O control for devices (IOCTL)
+;  [DONE] Function 45h: Duplicate file handle
+;  [DONE] Function 46h: Force duplicate file handle
 ;  Function 47h: Get current directory path
-;  Function 48h: Allocate memory block
-;  Function 49h: Free allocated memory block
-;  Function 4Ah: Resize memory block
+;  [DONE] Function 48h: Allocate memory block
+;  [DONE] Function 49h: Free allocated memory block
+;  [DONE] Function 4Ah: Resize memory block
 ;  Function 4Bh: Load/Execute program (EXEC)
 ;  [DONE] Function 4Ch: Terminate program with return code
 ;  [DONE] Function 4Dh: Get program return code
@@ -90,15 +90,15 @@
 ;  Function 4Fh: Find next matching file (FindNext)
 ;  [DONE] Function 54h: Get verify flag
 ;  Function 56h: Rename/move file
-;  Function 57h: Get/Set file date and time
-;  Function 59h: Get extended error information
+;  [DONE] Function 57h: Get/Set file date and time
+;  [DONE] Function 59h: Get extended error information
 ;  Function 5Ah: Create unique temporary file
 ;  Function 5Bh: Create new file (fails if already exists)
 ;  Function 5Ch: Lock/Unlock file region (record locking)
 ;  Function 5Eh: Various network functions
 ;  Function 5Fh: Network redirection functions
-;  Function 62h: Get PSP (Program Segment Prefix) address
-;  Function 68h: Commit file (flush buffers)
+;  [DONE] Function 62h: Get PSP (Program Segment Prefix) address
+;  [DONE] Function 68h: Commit file (flush buffers)
 ;  Function 6Ch: Extended open/create file
 ; ---------------------------------------------
 ;
@@ -117,6 +117,8 @@ int20_handler:
 
 .com_teardown:
     mov byte [cs:com_active], 0
+
+    call dosfile_close_all
 
     push ds
     push es
@@ -160,6 +162,7 @@ int20_handler:
     int 16h
 
     call api_output_init
+    call set_video_mode
     call string_clear_screen
 
     call EnableMouse
@@ -172,6 +175,16 @@ api_dos_init:
     pusha
     push es
     push ds
+
+    call dosmem_init
+    call dosfile_init
+
+    xor ax, ax
+    mov es, ax
+    mov di, 0x0500
+    mov cx, 128
+    cld
+    rep stosw
 
     push ds
     push es
@@ -271,15 +284,55 @@ int21_dos_handler:
     je com_3Ah
     cmp ah, 0x3B
     je com_3Bh
+    cmp ah, 0x3C
+    je com_3Ch
+    cmp ah, 0x3D
+    je com_3Dh
+    cmp ah, 0x3E
+    je com_3Eh
+    cmp ah, 0x3F
+    je com_3Fh
+    cmp ah, 0x40
+    je com_40h
     cmp ah, 0x41
     je com_41h
+    cmp ah, 0x42
+    je com_42h
+    cmp ah, 0x43
+    je com_43h
+    cmp ah, 0x44
+    je com_44h
+    cmp ah, 0x45
+    je com_45h
+    cmp ah, 0x46
+    je com_46h
+    cmp ah, 0x48
+    je com_48h
+    cmp ah, 0x49
+    je com_49h
+    cmp ah, 0x4A
+    je com_4Ah
     cmp ah, 0x4C
     je com_4Ch
     cmp ah, 0x4D
     je com_4Dh
     cmp ah, 0x54
     je com_54h
-    iret
+    cmp ah, 0x57
+    je com_57h
+    cmp ah, 0x59
+    je com_59h
+    cmp ah, 0x62
+    je com_62h
+    cmp ah, 0x68
+    je com_68h
+    cmp ah, 0x2B
+    je com_2Bh
+    cmp ah, 0x2D
+    je com_2Dh
+    cmp ah, 0x33
+    je com_33h
+    jmp com_unsupported
 
 
 saved_interrupt_table times 1024 db 0
@@ -427,3 +480,18 @@ bcd_to_bin_time:
 %include "src/kernel/features/com/4Ch.asm"
 %include "src/kernel/features/com/4Dh.asm"
 %include "src/kernel/features/com/54h.asm"
+
+%include "src/kernel/features/com/dosmem.asm"
+%include "src/kernel/features/com/48h.asm"
+%include "src/kernel/features/com/49h.asm"
+%include "src/kernel/features/com/4Ah.asm"
+
+%include "src/kernel/features/com/dosfile.asm"
+%include "src/kernel/features/com/3Ch.asm"
+%include "src/kernel/features/com/3Dh.asm"
+%include "src/kernel/features/com/3Eh.asm"
+%include "src/kernel/features/com/3Fh.asm"
+%include "src/kernel/features/com/40h.asm"
+%include "src/kernel/features/com/42h.asm"
+
+%include "src/kernel/features/com/stubs.inc"

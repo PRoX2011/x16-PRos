@@ -163,6 +163,7 @@ int22_handler:
     mov [.saved_dx], dx
 
     push es
+    push ds
     mov ax, dx
     mov bx, 18
     mul bx
@@ -171,7 +172,10 @@ int22_handler:
     mov si, dirlist
     mov ax, [cs:caller_ds_save_22]
     mov es, ax
+    mov ax, KERNEL_WORK_SEG
+    mov ds, ax
     rep movsb
+    pop ds
     pop es
 
     mov bp, sp

@@ -3,8 +3,8 @@
 ; Copyright (C) 2025 PRoX2011
 ; ==================================================================
 
-EXE_PSP_SEG         equ 0x3000
-EXE_LOAD_SEG        equ 0x3010
+EXE_PSP_SEG         equ 0x3040
+EXE_LOAD_SEG        equ 0x3050
 
 ; MZ header offsets
 MZ_SIGNATURE        equ 0x00
@@ -29,6 +29,7 @@ MZ_OVERLAY_NUM      equ 0x1A
 ; =======================================================================
 exe_execute:
     push ax
+    mov [exe_name_ptr], ax
 
     xor cx, cx
     mov dx, EXE_LOAD_SEG
@@ -43,6 +44,16 @@ exe_execute:
     ret
 
 .loaded:
+    add ax, 15
+    adc dx, 0
+    mov cl, 4
+    shr ax, cl
+    mov bx, dx
+    mov cl, 12
+    shl bx, cl
+    or ax, bx
+    mov [exe_total_paras], ax
+
     pop ax
 
     mov ax, EXE_LOAD_SEG
@@ -61,8 +72,11 @@ exe_execute:
     jnz .bad_sig
 
     mov ax, [es:MZ_HEADER_PARAS]
+    mov [exe_hdr_paras], ax
     add ax, EXE_LOAD_SEG
-    mov [exe_code_seg], ax
+    mov [exe_image_seg], ax
+
+    mov word [exe_code_seg], EXE_LOAD_SEG
 
     mov ax, [es:MZ_INIT_SS]
     mov [exe_init_ss], ax
@@ -78,7 +92,8 @@ exe_execute:
     jz .reloc_done
 
     mov si, [es:MZ_RELOC_TABLE_OFF]
-    mov bp, [exe_code_seg]
+    mov bp, [exe_image_seg]
+    mov di, [exe_code_seg]
 
 .reloc_loop:
     mov bx, [es:si]
@@ -89,12 +104,14 @@ exe_execute:
     mov ax, bp
     add ax, dx
     mov es, ax
-    add [es:bx], bp
+    add [es:bx], di
     pop es
 
     loop .reloc_loop
 
 .reloc_done:
+    call exe_strip_header
+
     mov ax, KERNEL_DATA_SEG
     mov es, ax
 
@@ -108,6 +125,10 @@ exe_execute:
 
     call api_dos_init
     call DisableMouse
+
+    mov ah, 0x00
+    mov al, 0x03
+    int 0x10
 
     mov ax, [exe_code_seg]
     add ax, [exe_init_ss]
@@ -137,6 +158,63 @@ exe_execute:
     stc
     ret
 
+exe_strip_header:
+    pusha
+    push ds
+    push es
+
+    mov bx, [exe_hdr_paras]
+    test bx, bx
+    jz .done
+
+    mov ax, [exe_total_paras]
+    sub ax, bx
+    jbe .done
+
+    mov si, EXE_LOAD_SEG
+    add si, bx
+    mov di, EXE_LOAD_SEG
+    mov bx, ax
+
+.slide:
+    mov cx, 0x0800
+    cmp bx, cx
+    jae .have_chunk
+    mov cx, bx
+.have_chunk:
+    sub bx, cx
+
+    push bx
+    push cx
+    push si
+    push di
+
+    mov ds, si
+    mov es, di
+    xor si, si
+    xor di, di
+    add cx, cx
+    add cx, cx
+    add cx, cx
+    cld
+    rep movsw
+
+    pop di
+    pop si
+    pop cx
+    pop bx
+
+    add si, cx
+    add di, cx
+    test bx, bx
+    jnz .slide
+
+.done:
+    pop es
+    pop ds
+    popa
+    ret
+
 ; =======================================================================
 ; EXE_BUILD_PSP - Constructs a 256-byte PSP at PSP_seg:0000
 ; IN : AX = PSP segment
@@ -158,8 +236,10 @@ exe_build_psp:
     rep stosw
 
     mov word [es:0x00], 0x20CD
-    mov word [es:0x02], 0xA000
-    mov word [es:0x2C], 0x0000
+    mov ax, [dosmem_top_seg]
+    mov [es:0x02], ax
+    mov word [es:0x2C], DOSMEM_ENV_SEG
+    call exe_build_env
 
     mov byte [es:0x50], 0xCD
     mov byte [es:0x51], 0x21
@@ -190,12 +270,57 @@ exe_build_psp:
     popa
     ret
 
+exe_build_env:
+    pusha
+    push es
+
+    mov ax, DOSMEM_ENV_SEG
+    mov es, ax
+    xor di, di
+    cld
+
+    mov si, exe_env_strings
+    mov cx, exe_env_strings_len
+    rep movsb
+
+    mov ax, 1
+    stosw
+
+    mov si, [exe_name_ptr]
+    test si, si
+    jz .no_name
+.copy_name:
+    lodsb
+    stosb
+    test al, al
+    jnz .copy_name
+    jmp .done
+
+.no_name:
+    xor al, al
+    stosb
+
+.done:
+    pop es
+    popa
+    ret
+
+exe_env_strings:
+    db 'COMSPEC=A:\COMMAND.COM', 0
+    db 'PATH=A:\', 0
+    db 0
+exe_env_strings_len equ $ - exe_env_strings
+
 exe_bad_sig_msg     db 'Not an EXE file (bad signature)', 10, 13, 0
 exe_load_failed_msg db 'EXE load failed', 10, 13, 0
 
 exe_extension       db '.EXE', 0
 
 exe_code_seg        dw 0
+exe_image_seg       dw 0
+exe_hdr_paras       dw 0
+exe_total_paras     dw 0
+exe_name_ptr        dw 0
 exe_init_ss         dw 0
 exe_init_sp         dw 0
 exe_init_ip         dw 0

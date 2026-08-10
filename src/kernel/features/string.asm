@@ -389,7 +389,9 @@ string_input_string:
     mov bx, [.current_history_pos]
     shl bx, 8
     lea si, [command_history + bx]
-    
+    mov ax, KERNEL_WORK_SEG
+    mov es, ax
+
     mov bl, 0x1F
 .handle_history_scroll_up_clear_loop:
     test cx, cx
@@ -404,7 +406,7 @@ string_input_string:
     jmp .handle_history_scroll_up_clear_loop
 
 .handle_history_scroll_up_loop:
-    mov al, [si]
+    mov al, [es:si]
     mov [di], al
     cmp al, 0
     je .handle_history_scroll_up_done
@@ -416,6 +418,8 @@ string_input_string:
     jmp .handle_history_scroll_up_loop
 
 .handle_history_scroll_up_done:
+    push ds
+    pop es
     jmp .read_loop
 
 
@@ -429,7 +433,9 @@ string_input_string:
     mov bx, [.current_history_pos]
     shl bx, 8
     lea si, [command_history + bx]
-    
+    mov ax, KERNEL_WORK_SEG
+    mov es, ax
+
     mov bl, 0x1F
 .handle_history_scroll_down_clear_loop:
     test cx, cx
@@ -444,7 +450,7 @@ string_input_string:
     jmp .handle_history_scroll_down_clear_loop
 
 .handle_history_scroll_down_loop:
-    mov al, [si]
+    mov al, [es:si]
     mov [di], al
     cmp al, 0
     je .handle_history_scroll_down_done
@@ -456,6 +462,8 @@ string_input_string:
     jmp .handle_history_scroll_down_loop
 
 .handle_history_scroll_down_done:
+    push ds
+    pop es
     jmp .read_loop
 
 .handle_history_scroll_down_history_exit:
@@ -902,9 +910,11 @@ string_input_string:
     push si
     push di
     mov [.ac_search_ptr], si
+    mov ax, KERNEL_WORK_SEG
+    mov es, ax
     mov bx, dirlist
 .ac_file_loop:
-    cmp byte [bx], 0
+    cmp byte [es:bx], 0
     je .ac_file_fail
     push bx
     mov si, bx
@@ -917,6 +927,8 @@ string_input_string:
     add bx, 18
     jmp .ac_file_loop
 .ac_file_ok:
+    push ds
+    pop es
     mov ax, .ac_name_buf
     pop di
     pop si
@@ -925,6 +937,8 @@ string_input_string:
     stc
     ret
 .ac_file_fail:
+    push ds
+    pop es
     pop di
     pop si
     pop cx
@@ -941,7 +955,7 @@ string_input_string:
     mov di, .ac_name_buf
     mov cx, 9
 .ac_e2n_name:
-    mov al, [si]
+    mov al, [es:si]
     cmp al, ' '
     je .ac_e2n_skip_ns
     mov [di], al
@@ -950,11 +964,11 @@ string_input_string:
     inc si
     dec cx
     jnz .ac_e2n_name
-    cmp byte [si], ' '
+    cmp byte [es:si], ' '
     jne .ac_e2n_has_ext
-    cmp byte [si+1], ' '
+    cmp byte [es:si+1], ' '
     jne .ac_e2n_has_ext
-    cmp byte [si+2], ' '
+    cmp byte [es:si+2], ' '
     jne .ac_e2n_has_ext
     jmp .ac_e2n_done
 .ac_e2n_has_ext:
@@ -962,7 +976,7 @@ string_input_string:
     inc di
     mov cx, 3
 .ac_e2n_ext:
-    mov al, [si]
+    mov al, [es:si]
     cmp al, ' '
     je .ac_e2n_skip_es
     mov [di], al

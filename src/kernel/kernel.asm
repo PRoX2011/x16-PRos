@@ -56,8 +56,9 @@ PROGRAM_PARAMS_OFF   equ 0x7F00
 CFG_SCRATCH_SEG      equ FONT_SEG
 CFG_SCRATCH_OFF      equ 0x1000
 
-DIRLIST_OFF          equ 0xA800
-COMMAND_HISTORY_OFF  equ 0xD000
+KERNEL_WORK_SEG      equ 0x0060
+DIRLIST_OFF          equ 0x0000
+COMMAND_HISTORY_OFF  equ 0x2800
 DISK_BUFFER_OFF      equ 0xE000
 DISK_BUFFER_SIZE     equ 0x1C00
 KERNEL_WORK_END_OFF  equ DISK_BUFFER_OFF + DISK_BUFFER_SIZE  ; 0xFC00
@@ -384,6 +385,8 @@ get_cmd:
 
     ; append input to command history (16 entries x 256 bytes)
     pusha
+    mov ax, KERNEL_WORK_SEG
+    mov es, ax
     cmp byte [command_history_top], 16
     jbe .history_top_ok
     mov byte [command_history_top], 16
@@ -404,8 +407,8 @@ get_cmd:
     add bx, 256
     lea di, [command_history + bx]
 .shift_history_shift_char:
-    mov al, [si]
-    mov [di], al
+    mov al, [es:si]
+    mov [es:di], al
     inc si
     inc di
     cmp al, 0
@@ -420,7 +423,7 @@ get_cmd:
     mov si, input
 .save_input_loop:
     mov al, [si]
-    mov [di], al
+    mov [es:di], al
     cmp al, 0
     je .save_input_to_history_end
     inc si
@@ -431,6 +434,8 @@ get_cmd:
     jae .save_input_to_history_done
     inc byte [command_history_top]
 .save_input_to_history_done:
+    push ds
+    pop es
     popa
 
 .save_input_to_history_skip:
@@ -1068,6 +1073,10 @@ execute_com:
 
     call DisableMouse
 
+    mov ah, 0x00
+    mov al, 0x03
+    int 0x10
+
     push word 0x0000
 
     ; Jump to COM program entry point (COM_ENTRY_OFFSET).
@@ -1227,11 +1236,13 @@ list_directory:
     call fs_get_file_list
     mov word [file_count], dx
 
+    mov ax, KERNEL_WORK_SEG
+    mov es, ax
     mov si, dirlist
     mov word [.files_in_row], 0
 
 .print_entry:
-    cmp byte [si], 0
+    cmp byte [es:si], 0
     je .done_entries
 
     push si
@@ -1239,7 +1250,7 @@ list_directory:
     mov ah, 0x0E
     mov bl, COLOR_WHITE
 .print_name_char:
-    lodsb
+    es lodsb
     int 0x10
     loop .print_name_char
     pop si
@@ -1250,10 +1261,10 @@ list_directory:
     int 0x10
     int 0x10
 
-    test byte [si+16], 0x10
+    test byte [es:si+16], 0x10
     jnz .print_dir_marker
 
-    mov ax, [si+12]
+    mov ax, [es:si+12]
     call .print_size_decimal
     jmp .after_size
 
@@ -1290,6 +1301,9 @@ list_directory:
     jmp .print_entry
 
 .done_entries:
+    push ds
+    pop es
+
     cmp word [.files_in_row], 0
     je .no_final_newline
     call print_newline
