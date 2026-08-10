@@ -2,7 +2,7 @@
 ; x16-PRos - PS/2 mouse driver
 ; Copyright (C) 2025 PRoX2011
 ;
-; Driver version: 0.3
+; Driver version: 0.4
 ;
 ; Compatible with video modes:
 ;   - 0x12  (VGA, 640x480, 16 colors, planar)
@@ -170,6 +170,7 @@ MouseCallback:
     cmp byte [CursorVisible], 0
     je .silent_exit
     call SaveBackground
+    call PickCursorColor
     mov si, mousebmp
     mov al, 0x0F
     call DrawCursor
@@ -370,6 +371,46 @@ cursor_arm_vga:
     pop ax
     ret
 
+PickCursorColor:
+    pusha
+    mov si, BackgroundBuffer
+    xor di, di
+    xor bx, bx
+.plane:
+    xor bp, bp
+    mov cx, HCURSOR * 2
+.byte:
+    mov al, [si]
+    inc si
+    mov dl, 8
+.bit:
+    shl al, 1
+    adc bp, 0
+    dec dl
+    jnz .bit
+    dec cx
+    jnz .byte
+
+    mov ax, bx
+    and ax, 1
+    jz .weigh
+    add di, bp
+.weigh:
+    add di, bp
+    inc bx
+    cmp bx, 4
+    jl .plane
+
+    cmp di, HCURSOR * 16 * 3
+    jb .dark
+    mov byte [CursorColor], 0
+    popa
+    ret
+.dark:
+    mov byte [CursorColor], 15
+    popa
+    ret
+
 SaveBackground:
     pusha
     call cursor_arm_vga
@@ -487,6 +528,11 @@ DrawCursor:
     inc dx
     mov al, bl
     out dx, al
+    mov al, [CursorColor]
+    mov cl, bl
+    shr al, cl
+    and al, 1
+    mov [.planebit], al
     mov si, [CursorPtr]
     push di
     mov cx, HCURSOR
@@ -496,12 +542,24 @@ DrawCursor:
     xor ah, ah
     mov cl, [.shcnt]
     shl ax, cl
+    cmp byte [.planebit], 0
+    je .clear_row
     mov dl, [es:di]
     or dl, ah
     mov [es:di], dl
     mov dl, [es:di+1]
     or dl, al
     mov [es:di+1], dl
+    jmp .row_done
+.clear_row:
+    not ax
+    mov dl, [es:di]
+    and dl, ah
+    mov [es:di], dl
+    mov dl, [es:di+1]
+    and dl, al
+    mov [es:di+1], dl
+.row_done:
     inc si
     add di, 80
     pop cx
@@ -518,7 +576,8 @@ DrawCursor:
     out dx, al
     popa
     ret
-.shcnt db 0
+.shcnt   db 0
+.planebit db 0
 
 HideCursor:
     call RestoreBackground
@@ -527,6 +586,7 @@ HideCursor:
 ShowCursor:
     pusha
     call SaveBackground
+    call PickCursorColor
     mov si, mousebmp
     mov al, 0x0F
     call DrawCursor
@@ -576,6 +636,7 @@ MouseRow     dw 0
 PrevLMB       db 0
 CursorVisible db 1
 CursorPtr     dw mousebmp
+CursorColor   db 15
 
 SelStartRow  dw 0
 SelStartCol  dw 0
