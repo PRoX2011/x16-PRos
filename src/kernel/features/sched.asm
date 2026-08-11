@@ -3,7 +3,7 @@
 ; Copyright (C) 2026 PRoX2011
 ; ==================================================================
 
-TASK_SLOT_COUNT      equ 4
+TASK_SLOT_COUNT      equ 8
 TASK_SLOT_SIZE       equ 16
 TASK_NAME_LEN        equ 16
 
@@ -15,11 +15,13 @@ TASK_SS              equ 6       ; word (saved stack segment)
 TASK_SP              equ 8       ; word (saved stack pointer)
 TASK_WAKE_LO         equ 10      ; word (BIOS tick low)
 TASK_WAKE_HI         equ 12      ; word (BIOS tick high)
+TASK_PARENT          equ 14      ; byte (slot id blocked on this task, or 0xFF)
 
 TASK_S_FREE          equ 0
 TASK_S_READY         equ 1
 TASK_S_RUNNING       equ 2
 TASK_S_SLEEPING      equ 3
+TASK_S_WAITING       equ 4       ; blocked until a foreground child exits
 
 TASK_F_BACKGROUND    equ 0x01
 TASK_F_KERNEL        equ 0x80
@@ -41,8 +43,9 @@ sched_init:
 
     mov byte [sched_tasks + TASK_STATE], TASK_S_RUNNING
     mov byte [sched_tasks + TASK_FLAGS], TASK_F_KERNEL
-    mov ax, cs                                    ; real kernel segment
+    mov ax, cs
     mov [sched_tasks + TASK_BASE_SEG], ax
+    mov byte [sched_tasks + TASK_PARENT], 0xFF
     mov byte [sched_cur_task], 0
 
     mov di, sched_task_names
@@ -101,6 +104,13 @@ sched_task_create_from_ple:
     mov ax, [ple_base_seg]
     mov [bx + TASK_BASE_SEG], ax
     mov word [bx + TASK_PARAS], PLE_MAX_PARAS
+    mov byte [bx + TASK_PARENT], 0xFF             ; no parent by default
+
+    push bx
+    xor bh, bh
+    mov bl, [.id_tmp]
+    mov byte [task_win_flags + bx], 0
+    pop bx
 
     ; ----- build initial stack frame in task's stack segment -----
     ; Layout (from epilogue's perspective, low -> high addresses):
@@ -180,10 +190,8 @@ sched_task_create_from_ple:
 .id_tmp    db 0
 
 ; ==================================================================
-; sched_dispatch - called from foreground exec path. Saves kernel's
-; resume context into slot 0, switches to the next ready task. When
-; the scheduler later returns to the kernel slot, control resumes at
-; the .resume_point label and returns to the caller.
+; sched_dispatch - foreground exec. Parks the current task in the
+; waiting state and switches to the freshly created child task.
 ; ==================================================================
 sched_dispatch:
     cli
@@ -197,18 +205,18 @@ sched_dispatch:
     mov ax, KERNEL_DATA_SEG
     mov ds, ax
 
-    mov [sched_tasks + TASK_SS], ss
-    mov [sched_tasks + TASK_SP], sp
-    mov byte [sched_tasks + TASK_STATE], TASK_S_READY
-
-    call sched_pick_next
-    mov [sched_cur_task], al
+    xor bh, bh
+    mov bl, [sched_cur_task]
+    shl bx, 4
+    mov [sched_tasks + bx + TASK_SS], ss
+    mov [sched_tasks + bx + TASK_SP], sp
+    mov byte [sched_tasks + bx + TASK_STATE], TASK_S_WAITING
 
     xor bh, bh
-    mov bl, al
+    mov bl, [sched_disp_child]
+    mov [sched_cur_task], bl
     shl bx, 4
     mov byte [sched_tasks + bx + TASK_STATE], TASK_S_RUNNING
-
     mov ss, [sched_tasks + bx + TASK_SS]
     mov sp, [sched_tasks + bx + TASK_SP]
 
@@ -319,6 +327,9 @@ sched_exit:
     mov bl, [sched_cur_task]
     shl bx, 4
 
+    mov al, [sched_tasks + bx + TASK_PARENT]
+    mov [.parent_tmp], al
+
     cmp bl, 0
     je .no_free  ; never free kernel slot
 
@@ -331,8 +342,20 @@ sched_exit:
     mov byte [sched_tasks + bx + TASK_STATE], TASK_S_FREE
     mov word [sched_tasks + bx + TASK_BASE_SEG], 0
     mov byte [sched_tasks + bx + TASK_FLAGS], 0
+    mov byte [sched_tasks + bx + TASK_PARENT], 0xFF
     mov al, [sched_cur_task]
     call sched_task_clear_name
+
+    mov al, [.parent_tmp]
+    cmp al, 0xFF
+    je .no_parent
+    xor bh, bh
+    mov bl, al
+    shl bx, 4
+    cmp byte [sched_tasks + bx + TASK_STATE], TASK_S_WAITING
+    jne .no_parent
+    mov byte [sched_tasks + bx + TASK_STATE], TASK_S_READY
+.no_parent:
 
     call sched_pick_next
     mov [sched_cur_task], al
@@ -350,6 +373,8 @@ sched_exit:
     pop ds
     popa
     iret
+
+.parent_tmp db 0
 
 ; ==================================================================
 ; sched_pick_next - wake any due sleepers, then round-robin scan
@@ -595,3 +620,4 @@ section .data
 sched_tasks       times TASK_SLOT_COUNT * TASK_SLOT_SIZE db 0
 sched_task_names  times TASK_SLOT_COUNT * TASK_NAME_LEN  db 0
 sched_cur_task                                           db 0
+sched_disp_child                                         db 0

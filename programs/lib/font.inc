@@ -144,6 +144,31 @@ font_put_char:
     shr al, 4
     mov [.bg], al
 
+    mov dx, FONT_GFX_IDX
+    mov al, 0x01
+    out dx, al
+    mov dx, FONT_GFX_DAT
+    xor al, al
+    out dx, al
+    mov dx, FONT_GFX_IDX
+    mov al, 0x03
+    out dx, al
+    mov dx, FONT_GFX_DAT
+    xor al, al
+    out dx, al
+    mov dx, FONT_GFX_IDX
+    mov al, 0x05
+    out dx, al
+    mov dx, FONT_GFX_DAT
+    xor al, al
+    out dx, al
+    mov dx, FONT_GFX_IDX
+    mov al, 0x08
+    out dx, al
+    mov dx, FONT_GFX_DAT
+    mov al, 0xFF
+    out dx, al
+
     mov dx, FONT_SEQ_IDX
     mov al, FONT_MAP_MASK
     out dx, al

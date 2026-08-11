@@ -56,8 +56,9 @@ PROGRAM_PARAMS_OFF   equ 0x7F00
 CFG_SCRATCH_SEG      equ FONT_SEG
 CFG_SCRATCH_OFF      equ 0x1000
 
-DIRLIST_OFF          equ 0xA800
-COMMAND_HISTORY_OFF  equ 0xD000
+KERNEL_WORK_SEG      equ 0x0060
+DIRLIST_OFF          equ 0x0000
+COMMAND_HISTORY_OFF  equ 0x2800
 DISK_BUFFER_OFF      equ 0xE000
 DISK_BUFFER_SIZE     equ 0x1C00
 KERNEL_WORK_END_OFF  equ DISK_BUFFER_OFF + DISK_BUFFER_SIZE  ; 0xFC00
@@ -384,6 +385,8 @@ get_cmd:
 
     ; append input to command history (16 entries x 256 bytes)
     pusha
+    mov ax, KERNEL_WORK_SEG
+    mov es, ax
     cmp byte [command_history_top], 16
     jbe .history_top_ok
     mov byte [command_history_top], 16
@@ -404,8 +407,8 @@ get_cmd:
     add bx, 256
     lea di, [command_history + bx]
 .shift_history_shift_char:
-    mov al, [si]
-    mov [di], al
+    mov al, [es:si]
+    mov [es:di], al
     inc si
     inc di
     cmp al, 0
@@ -420,7 +423,7 @@ get_cmd:
     mov si, input
 .save_input_loop:
     mov al, [si]
-    mov [di], al
+    mov [es:di], al
     cmp al, 0
     je .save_input_to_history_end
     inc si
@@ -431,6 +434,8 @@ get_cmd:
     jae .save_input_to_history_done
     inc byte [command_history_top]
 .save_input_to_history_done:
+    push ds
+    pop es
     popa
 
 .save_input_to_history_skip:
@@ -452,6 +457,8 @@ get_cmd:
 
     mov ax, command
     call string_string_uppercase
+
+    mov byte [ple_fallthrough], 0
 
     ; ============ Drive Change Check (A:, B:, C:) ============
     mov si, command
@@ -673,11 +680,10 @@ get_cmd:
     mov byte [si+3], 'E'
     mov byte [si+4], 0
 
-    ; Check if .PLE file exists
-    mov ax, command
-    call fs_file_exists
-    jnc .load_ple_program
+    mov byte [ple_fallthrough], 1
+    jmp .load_ple_program
 
+.try_bin_extension:
     ; .PLE not found, try .BIN
     mov ax, command
     call string_string_length
@@ -886,7 +892,7 @@ get_cmd:
 .restore_and_try_a_ple:
     call restore_current_dir
     cmp byte [current_drive_char], 'A'
-    je total_fail
+    je .ple_not_found
 
     ; Try A:/PLE.DIR
     call save_current_dir
@@ -913,7 +919,10 @@ get_cmd:
 
 .restore_and_fail_a_ple:
     call restore_current_dir
-    jmp total_fail
+.ple_not_found:
+    cmp byte [ple_fallthrough], 0
+    je total_fail
+    jmp .try_bin_extension
 
 .success_disk_change_msg db 'Disk changed', 0
 
@@ -963,8 +972,10 @@ install_program_thunk:
 ; OUT: DS = ES = KERNEL_DATA_SEG, SS:SP restored, mouse/floppy/font
 ;      and theme reinstalled. Caller resumes with kernel state intact.
 ;
-; Stack layout when exec:
-;   [SP+0] = PROGRAM_THUNK_OFF   ; what program's near ret will pop
+; The program runs with SS = DS = ES = CS = PROGRAM_LOAD_SEG (its own stack
+; at the top of the segment), so SS == DS as C tiny/small model requires.
+; The exit trampoline lives on the program's stack:
+;   [SP+0] = PROGRAM_THUNK_OFF   ; what the program's near ret pops
 ;   [SP+2] = .program_done       ; IP for thunk's retf
 ;   [SP+4] = kernel CS           ; CS for thunk's retf
 ; ==================================================================
@@ -993,25 +1004,26 @@ launch_bin_program:
     pop si
     pop ax
 
-    ; ---- Save kernel stack in case BIN messes with SS:SP ----
     mov [bin_stack_save], sp
     mov [bin_ss_save], ss
 
     call DisableMouse
 
-    ; ---- Build trampoline frame on the (still kernel) stack ----
-    push cs                       ; -> [SP+4] for retf
-    push word .program_done       ; -> [SP+2] for retf
-    push word PROGRAM_THUNK_OFF   ; -> [SP+0] for program's near ret
-
-    ; ---- Set up program entry registers ----
     test si, si
     jz .si_zero
     mov si, PROGRAM_PARAMS_OFF
 .si_zero:
 
     mov ax, PROGRAM_LOAD_SEG
-    mov ds, ax
+    cli
+    mov ss, ax
+    mov sp, COM_STACK_TOP         ; 0xFFFE, top of the program segment
+    push cs                       ; [SP+4] kernel CS for the thunk's retf
+    push word .program_done       ; [SP+2] IP for the thunk's retf
+    push word PROGRAM_THUNK_OFF   ; [SP+0] target of the program's near ret
+    sti
+
+    mov ds, ax                    ; SS == DS == ES == CS == PROGRAM_LOAD_SEG
     mov es, ax
 
     jmp PROGRAM_LOAD_SEG:PROGRAM_LOAD_OFF
@@ -1041,6 +1053,7 @@ execute_com:
     ; Save current stack
     mov [com_stack_save], sp
     mov [com_ss_save], ss
+    mov byte [com_active], 1
 
     call api_dos_init
 
@@ -1059,6 +1072,10 @@ execute_com:
     sti
 
     call DisableMouse
+
+    mov ah, 0x00
+    mov al, 0x03
+    int 0x10
 
     push word 0x0000
 
@@ -1219,11 +1236,13 @@ list_directory:
     call fs_get_file_list
     mov word [file_count], dx
 
+    mov ax, KERNEL_WORK_SEG
+    mov es, ax
     mov si, dirlist
     mov word [.files_in_row], 0
 
 .print_entry:
-    cmp byte [si], 0
+    cmp byte [es:si], 0
     je .done_entries
 
     push si
@@ -1231,7 +1250,7 @@ list_directory:
     mov ah, 0x0E
     mov bl, COLOR_WHITE
 .print_name_char:
-    lodsb
+    es lodsb
     int 0x10
     loop .print_name_char
     pop si
@@ -1242,10 +1261,10 @@ list_directory:
     int 0x10
     int 0x10
 
-    test byte [si+16], 0x10
+    test byte [es:si+16], 0x10
     jnz .print_dir_marker
 
-    mov ax, [si+12]
+    mov ax, [es:si+12]
     call .print_size_decimal
     jmp .after_size
 
@@ -1282,6 +1301,9 @@ list_directory:
     jmp .print_entry
 
 .done_entries:
+    push ds
+    pop es
+
     cmp word [.files_in_row], 0
     je .no_final_newline
     call print_newline
@@ -1378,6 +1400,7 @@ list_directory:
 cat_file:
     call print_newline
     pusha
+    push es
 
     mov word si, [param_list]
     call string_string_parse
@@ -1487,6 +1510,7 @@ cat_file:
     call print_newline
 
 .exit_cat:
+    pop es
     popa
     call print_newline
     jmp get_cmd
@@ -2491,6 +2515,7 @@ y_offset             dw 0
 
 bin_extension        db '.BIN', 0
 com_extension        db '.COM', 0
+ple_fallthrough      db 0
 
 total_file_size      dd 0
 file_count           dw 0
@@ -2499,6 +2524,7 @@ timezone_offset      dw 0
 
 com_stack_save       dw 0
 com_ss_save          dw 0
+com_active           db 0
 bin_stack_save       dw 0
 bin_ss_save          dw 0
 program_seg_runtime  dw program_seg

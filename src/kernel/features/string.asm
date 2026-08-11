@@ -364,6 +364,8 @@ string_input_string:
     je .handle_history_scroll_up
     cmp ah, 0x50
     je .handle_history_scroll_down
+    cmp ah, 0x3C
+    je .launch_gui
     cmp cx, 255
     jge .read_loop
     stosb
@@ -387,7 +389,9 @@ string_input_string:
     mov bx, [.current_history_pos]
     shl bx, 8
     lea si, [command_history + bx]
-    
+    mov ax, KERNEL_WORK_SEG
+    mov es, ax
+
     mov bl, 0x1F
 .handle_history_scroll_up_clear_loop:
     test cx, cx
@@ -402,7 +406,7 @@ string_input_string:
     jmp .handle_history_scroll_up_clear_loop
 
 .handle_history_scroll_up_loop:
-    mov al, [si]
+    mov al, [es:si]
     mov [di], al
     cmp al, 0
     je .handle_history_scroll_up_done
@@ -414,6 +418,8 @@ string_input_string:
     jmp .handle_history_scroll_up_loop
 
 .handle_history_scroll_up_done:
+    push ds
+    pop es
     jmp .read_loop
 
 
@@ -427,7 +433,9 @@ string_input_string:
     mov bx, [.current_history_pos]
     shl bx, 8
     lea si, [command_history + bx]
-    
+    mov ax, KERNEL_WORK_SEG
+    mov es, ax
+
     mov bl, 0x1F
 .handle_history_scroll_down_clear_loop:
     test cx, cx
@@ -442,7 +450,7 @@ string_input_string:
     jmp .handle_history_scroll_down_clear_loop
 
 .handle_history_scroll_down_loop:
-    mov al, [si]
+    mov al, [es:si]
     mov [di], al
     cmp al, 0
     je .handle_history_scroll_down_done
@@ -454,6 +462,8 @@ string_input_string:
     jmp .handle_history_scroll_down_loop
 
 .handle_history_scroll_down_done:
+    push ds
+    pop es
     jmp .read_loop
 
 .handle_history_scroll_down_history_exit:
@@ -566,6 +576,19 @@ string_input_string:
     mov bl, 0x1F
     call print_char
     jmp .read_loop
+    
+.launch_gui:
+    call .ac_clear
+    mov di, [.start_input_buf_addr]
+    mov si, .gui_cmd
+.lg_copy:
+    lodsb
+    test al, al
+    jz .done_read
+    stosb
+    jmp .lg_copy
+
+.gui_cmd db 'GUI.PLE', 0
 
 .done_read:
     call .cur_erase
@@ -887,9 +910,11 @@ string_input_string:
     push si
     push di
     mov [.ac_search_ptr], si
+    mov ax, KERNEL_WORK_SEG
+    mov es, ax
     mov bx, dirlist
 .ac_file_loop:
-    cmp byte [bx], 0
+    cmp byte [es:bx], 0
     je .ac_file_fail
     push bx
     mov si, bx
@@ -902,6 +927,8 @@ string_input_string:
     add bx, 18
     jmp .ac_file_loop
 .ac_file_ok:
+    push ds
+    pop es
     mov ax, .ac_name_buf
     pop di
     pop si
@@ -910,6 +937,8 @@ string_input_string:
     stc
     ret
 .ac_file_fail:
+    push ds
+    pop es
     pop di
     pop si
     pop cx
@@ -926,7 +955,7 @@ string_input_string:
     mov di, .ac_name_buf
     mov cx, 9
 .ac_e2n_name:
-    mov al, [si]
+    mov al, [es:si]
     cmp al, ' '
     je .ac_e2n_skip_ns
     mov [di], al
@@ -935,11 +964,11 @@ string_input_string:
     inc si
     dec cx
     jnz .ac_e2n_name
-    cmp byte [si], ' '
+    cmp byte [es:si], ' '
     jne .ac_e2n_has_ext
-    cmp byte [si+1], ' '
+    cmp byte [es:si+1], ' '
     jne .ac_e2n_has_ext
-    cmp byte [si+2], ' '
+    cmp byte [es:si+2], ' '
     jne .ac_e2n_has_ext
     jmp .ac_e2n_done
 .ac_e2n_has_ext:
@@ -947,7 +976,7 @@ string_input_string:
     inc di
     mov cx, 3
 .ac_e2n_ext:
-    mov al, [si]
+    mov al, [es:si]
     cmp al, ' '
     je .ac_e2n_skip_es
     mov [di], al
@@ -1024,8 +1053,58 @@ string_input_string:
 ; =======================================================================
 string_clear_screen:
     pusha
-    call set_video_mode
+    mov al, 0x00
+    push es
+    and al, 0x0F
+    mov bl, al
+    mov dx, 0x3CE
+    mov al, 0
+    out dx, al
+    inc dx
+    mov al, bl
+    out dx, al
+    mov dx, 0x3CE
+    mov al, 1
+    out dx, al
+    inc dx
+    mov al, 0x0F
+    out dx, al
+    mov dx, 0x3CE
+    mov al, 3
+    out dx, al
+    inc dx
+    xor al, al
+    out dx, al
+    mov dx, 0x3CE
+    mov al, 8
+    out dx, al
+    inc dx
+    mov al, 0xFF
+    out dx, al
+    mov dx, 0x3C4
+    mov al, 2
+    out dx, al
+    inc dx
+    mov al, 0x0F
+    out dx, al
+    mov ax, 0xA000
+    mov es, ax
+    xor di, di
+    mov cx, 19200
+    xor ax, ax
+    cld
+    rep stosw
+    mov dx, 0x3CE
+    mov al, 1
+    out dx, al
+    inc dx
+    xor al, al
+    out dx, al
+    pop es
     popa
+    mov dl, 0x00
+    mov dh, 0x00
+    call string_move_cursor
     call load_and_apply_theme
     ret
 

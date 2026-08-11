@@ -11,7 +11,10 @@ physical address = segment * 16 + offset
   ---------------------------------------------------------------
   0000:0000 - 0000:03FF      1 KiB   Interrupt Vector Table (IVT)
   0000:0400 - 0000:04FF      256 B   BIOS Data Area (BDA)
-  0000:0500 - 0000:7BFF      30 KiB  Low conventional RAM
+  0000:0500 - 0000:05FF      256 B   DOS data area
+  0000:0600 - 0000:3DFF      14 KiB  dirlist (0060:0000 - 0060:27FF)
+                                     command_history (0060:2800 - 0060:37FF)
+  0000:3E00 - 0000:7BFF      15 KiB  Low conventional RAM
   0000:7C00 - 0000:7DFF      512 B   Boot sector load area
   0000:7E00 - 0000:FFEF     ~32 KiB  Temporary low RAM
   0000:FFF0 - 0000:FFFF      16 B    Kernel boot stack top
@@ -58,13 +61,11 @@ physical address = segment * 16 + offset
 
   Offset range           Size    Name / Description
   ---------------------------------------------------------------
-  0000 - kernel_end-1    <42 KiB    Kernel image (.text / .data / .bss)
-  A800 - CFFF            10 KiB     dirlist
-  D000 - DFFF             4 KiB     command_history
+  0000 - kernel_end-1    <56 KiB    Kernel image (.text / .data / .bss)
   E000 - FBFF             7 KiB     disk_buffer (DISK_BUFFER_SIZE = 0x1C00)
   FC00                     ---      KERNEL_WORK_END_OFF
 
-  kernel_end must be < 0xA800 (42 KiB max for kernel image).
+  kernel_end must be < 0xE000 (56 KiB max for kernel image).
 
 
 ================================================================
@@ -83,7 +84,7 @@ physical address = segment * 16 + offset
 
 
 ================================================================
-  Segment 3000h - A000h  (kernel heap)
+  Segment 3000h - A000h  (kernel heap / DOS arena)
 ================================================================
 
   Physical: 0x30000 - 0x9FFFF (~448 KiB)

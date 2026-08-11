@@ -41,7 +41,16 @@ PLE_INSN_SIZE_BYTES equ 8
 ple_load:
     mov [ple_filename], ax
 
-    mov bx, PLE_MAX_PARAS
+    mov ax, [ple_filename]
+    call fs_get_file_size
+    jc .alloc_failed
+    add ebx, 15
+    shr ebx, 4
+    add ebx, 0x1000
+    cmp ebx, PLE_MAX_PARAS
+    jbe .have_paras
+    mov ebx, PLE_MAX_PARAS
+.have_paras:
     call mem_alloc
     jc .alloc_failed
     mov [ple_base_seg], ax
@@ -232,6 +241,15 @@ ple_run_loaded:
     mov si, [ple_filename]
     call sched_task_set_name
     pop ax
+
+    mov [sched_disp_child], al
+    push bx
+    xor bh, bh
+    mov bl, al
+    shl bx, 4
+    mov al, [sched_cur_task]
+    mov [sched_tasks + bx + TASK_PARENT], al
+    pop bx
 
     call sched_dispatch
 

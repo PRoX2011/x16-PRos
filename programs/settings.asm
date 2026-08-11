@@ -5,9 +5,6 @@
 ; Made by PRoX-dev
 ; ==================================================================
 
-; KNOWN ISUE: when exiting the program, the system clears the screen,
-;             displays a prompt, but then freezes
-
 [BITS 16]
 [ORG 0x8000]
 

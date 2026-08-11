@@ -58,6 +58,7 @@ init_timer:
     ret
 
 init_memory:
+    call dosmem_probe_top
     call mem_init
 
     mov si, memory_init_msg

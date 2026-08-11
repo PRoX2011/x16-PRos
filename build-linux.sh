@@ -15,8 +15,8 @@ FLAG_NO_LOGO_DISPLAY=0
 FLAG_NO_SETUP=0
 FLAG_DTM=0  # DTM - Dev Tesing Mode
 
-MAX_KERNEL_LOADER_BYTES=43008   # 0xA800 - kernel image must end before dirlist
-KERNEL_SIZE_WARN_BYTES=40960    # 0xA000 - warn 2 KiB before the ceiling
+MAX_KERNEL_LOADER_BYTES=57344   # 0xE000 - kernel image must end before disk_buffer
+KERNEL_SIZE_WARN_BYTES=55296    # 0xD800 - warn 2 KiB before the ceiling
 
 for arg in $@; do
     if [ $arg == "-quiet" ]; then FLAG_QUIET_MODE=1; continue; fi
@@ -208,6 +208,12 @@ mmd -i disk_img/x16pros.img ::/PLE.DIR
 check_error "Failed to create PLE directory"
 print_ok "PLE directory created successfully"
 
+# Create PLE/GUI directory (windowed programs the GUI launches)
+print_info "Creating PLE/GUI directory..."
+mmd -i disk_img/x16pros.img ::/PLE.DIR/GUI.DIR
+check_error "Failed to create PLE/GUI directory"
+print_ok "PLE/GUI directory created successfully"
+
 # Create BMP directory
 print_splitline "Creating BMP directory..."
 print_info "Creating BMP directory..."
@@ -249,6 +255,13 @@ print_info "Creating THEMES directory..."
 mmd -i disk_img/x16pros.img ::/THEMES.DIR
 check_error "Failed to create THEMES directory"
 print_ok "THEMES directory created successfully"
+
+# Create ASM directory
+print_splitline "Creating ASM directory..."
+print_info "Creating ASM directory..."
+mmd -i disk_img/x16pros.img ::/ASM.DIR
+check_error "Failed to create ASM directory"
+print_ok "ASM directory created successfully"
 
 # Copy fonts
 print_info "Copying DEFAULT.FNT to disk..."
@@ -384,6 +397,7 @@ programs=(
     "programs/calendar.asm CALENDAR.BIN"
     "programs/settings.asm SETTINGS.BIN"
     "programs/ping.asm PING.BIN"
+    "programs/prasm.asm PRASM.BIN"
 )
 
 for prog in "${programs[@]}"; do
@@ -448,9 +462,11 @@ for prog in "${programs_exe[@]}"; do
     print_ok "$bin_name copied successfully"
 done
 
+# CLI PLE programs
 programs_ple=(
     "programs/PLE/src/hello.asm HELLO.PLE"
     "programs/PLE/src/clock.asm CLOCK.PLE"
+    "programs/PLE/src/gui/gui.asm GUI.PLE"
 )
 
 for prog in "${programs_ple[@]}"; do
@@ -459,7 +475,7 @@ for prog in "${programs_ple[@]}"; do
 
     if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
         print_info "Compiling $src => bin/$bin_name..."
-        nasm -f bin -I programs/PLE/ $src -o bin/$bin_name
+        nasm -f bin -I programs/PLE/ -I programs/lib/ -I programs/PLE/src/gui/ $src -o bin/$bin_name
         check_error "Compilation of $src failed"
         print_ok "$bin_name compiled successfully"
     fi
@@ -470,7 +486,45 @@ for prog in "${programs_ple[@]}"; do
     print_ok "$bin_name copied successfully"
 done
 
-mcopy -i disk_img/x16pros.img bin/prasm.bin ::/BIN.DIR/
+# Windowed PLE programs (GUI.PLE compatible)
+programs_ple_gui=(
+    "programs/PLE/src/windowed/eyes.asm EYES.PLE"
+    "programs/PLE/src/windowed/clock.asm CLOCK.PLE"
+    "programs/PLE/src/windowed/hello.asm HELLO.PLE"
+    "programs/PLE/src/windowed/calc.asm CALC.PLE"
+)
+
+for prog in "${programs_ple_gui[@]}"; do
+    src=$(echo $prog | cut -d' ' -f1)
+    bin_name=$(echo $prog | cut -d' ' -f2)
+
+    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+        print_info "Compiling $src => bin/$bin_name..."
+        nasm -f bin -I programs/PLE/ -I programs/lib/ $src -o bin/$bin_name
+        check_error "Compilation of $src failed"
+        print_ok "$bin_name compiled successfully"
+    fi
+
+    print_info "Copying $bin_name to PLE.DIR/GUI.DIR..."
+    mcopy -i disk_img/x16pros.img bin/$bin_name ::/PLE.DIR/GUI.DIR/
+    check_error "Copy of $bin_name failed"
+    print_ok "$bin_name copied successfully"
+done
+
+# Copy ASM source code wich can be assembled using prasm
+print_splitline "Copying ASM files..."
+asm_files=(
+    "assets/ASM/HELLO.ASM"
+    "assets/ASM/TIME.ASM"
+    "assets/ASM/DATE.ASM"
+)
+
+for file in "${asm_files[@]}"; do
+    print_info "Copying $file..."
+    mcopy -i disk_img/x16pros.img $file ::/ASM.DIR/
+    check_error "Copy of $file failed"
+    print_ok "$file copied successfully"
+done
 
 # Copy text files
 if [ $FLAG_NO_TXT == 0 ]; then
@@ -500,6 +554,7 @@ if [ $FLAG_NO_TXT == 0 ]; then
         "QUICKST.TXT"
         "COMMANDS.TXT"
         "EDMAN.TXT"
+        "PRASM.TXT"
     )
 
     print_info "Creating DOCS.DIR/EN.DIR directory..."

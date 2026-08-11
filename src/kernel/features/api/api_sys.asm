@@ -31,6 +31,7 @@
 ;   0x23: Mouse show cursor
 ;   0x24: Mouse enable (AL = 1 enable, 0 disable)
 ;   0x25: Mouse drag-select (AL = 1 enable, 0 disable)
+;   0x26: Set cursor shape (AL = 0 arrow, 1 resize)
 ; ==================================================================
 
 [BITS 16]
@@ -101,6 +102,14 @@ int23_handler:
     je .mouse_enable
     cmp ah, 0x25
     je .mouse_drag_select
+    cmp ah, 0x26
+    je .mouse_set_cursor
+    cmp ah, 0x30
+    je .win_set
+    cmp ah, 0x31
+    je .win_get
+    cmp ah, 0x32
+    je .win_close
     stc
     jmp .done
 
@@ -309,6 +318,66 @@ int23_handler:
     clc
     jmp .done
 
+.mouse_set_cursor:
+    test al, al
+    jz .cursor_arrow
+    mov word [CursorPtr], resizebmp
+    jmp .cursor_apply
+.cursor_arrow:
+    mov word [CursorPtr], mousebmp
+.cursor_apply:
+    cmp byte [CursorVisible], 0
+    je .cursor_done
+    call HideCursor
+    call ShowCursor
+.cursor_done:
+    clc
+    jmp .done
+
+.win_set:
+    cmp bl, TASK_SLOT_COUNT
+    jae .win_bad
+    xor bh, bh
+    mov byte [task_win_flags + bx], 0x05
+    shl bx, 1
+    mov [task_win_x + bx], cx
+    mov [task_win_y + bx], dx
+    mov [task_win_w + bx], si
+    mov [task_win_h + bx], di
+    clc
+    jmp .done
+.win_bad:
+    stc
+    jmp .done
+
+.win_close:
+    cmp bl, TASK_SLOT_COUNT
+    jae .win_bad
+    xor bh, bh
+    or byte [task_win_flags + bx], 0x02
+    clc
+    jmp .done
+
+.win_get:
+    xor bh, bh
+    mov bl, [sched_cur_task]
+    mov al, [task_win_flags + bx]
+    and byte [task_win_flags + bx], 0xFB
+    mov bp, sp
+    xor ah, ah
+    mov [bp+18], ax
+    shl bx, 1
+    mov ax, [task_win_x + bx]
+    mov [bp+16], ax
+    mov ax, [task_win_y + bx]
+    mov [bp+14], ax
+    mov ax, [task_win_w + bx]
+    mov [bp+6], ax
+    mov ax, [task_win_h + bx]
+    mov [bp+4], ax
+    clc
+    jmp .done
+
 .done:
     jc .set_cf
     push bp
@@ -334,6 +403,7 @@ int23_handler:
 ; ==================================================================
 copy_caller_string_si_23:
     push ax
+    push cx
     push di
     push es
     push ds
@@ -341,18 +411,21 @@ copy_caller_string_si_23:
     push cs
     pop es
     mov di, .scratch
-
+    mov cx, 63
     mov ax, [cs:caller_ds_save_23]
     mov ds, ax
 .cl:
     lodsb
     stosb
     test al, al
-    jnz .cl
-
+    jz .done
+    loop .cl
+    mov byte [es:di], 0
+.done:
     pop ds
     pop es
     pop di
+    pop cx
     pop ax
     mov si, .scratch
     ret
@@ -360,3 +433,9 @@ copy_caller_string_si_23:
 .scratch times 64 db 0
 
 caller_ds_save_23 dw 0
+
+task_win_flags  times TASK_SLOT_COUNT db 0
+task_win_x      times TASK_SLOT_COUNT dw 0
+task_win_y      times TASK_SLOT_COUNT dw 0
+task_win_w      times TASK_SLOT_COUNT dw 0
+task_win_h      times TASK_SLOT_COUNT dw 0

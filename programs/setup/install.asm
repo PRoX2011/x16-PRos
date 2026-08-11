@@ -1,4 +1,5 @@
-INSTALL_MAX_DRIVES   equ 4
+INSTALL_MAX_HDD      equ 14
+INSTALL_MAX_DRIVES   equ 16
 INSTALL_ENTRY_BYTES  equ 16
 
 INST_BOX_X           equ 1
@@ -154,14 +155,43 @@ install_init_index:
 install_probe_drives:
     pusha
     mov byte [install_count], 0
+
+    ; --- Floppy slots ---
     mov dl, 0x00
     call install_probe_one
     mov dl, 0x01
     call install_probe_one
+
+    push es
+    xor ax, ax
+    mov es, ax
+    xor di, di
+    mov ah, 0x08
     mov dl, 0x80
+    int 0x13
+    pop es
+    jc .probe_done
+    movzx cx, dl
+    test cx, cx
+    jz .probe_done
+    cmp cx, INSTALL_MAX_HDD
+    jbe .probe_hdd
+    mov cx, INSTALL_MAX_HDD
+.probe_hdd:
+    mov dl, 0x80
+.probe_hdd_loop:
+    push cx
+    push dx
     call install_probe_one
-    mov dl, 0x81
-    call install_probe_one
+    pop dx
+    pop cx
+    inc dl
+    cmp dl, 0x80 + INSTALL_MAX_HDD
+    jae .probe_done
+    dec cx
+    jnz .probe_hdd_loop
+
+.probe_done:
     popa
     ret
 
