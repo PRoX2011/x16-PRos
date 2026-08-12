@@ -1,3 +1,6 @@
+%define CLK_COL       (80 - 20 - 1)
+%define DATE_X        ((CLK_COL + 10) * 8)
+
 draw_menubar:
     pusha
     mov cx, 0
@@ -104,7 +107,7 @@ draw_clock:
     mov byte [di], 0
 
     mov si, clk_buf
-    mov cl, 80 - 20 - 1
+    mov cl, CLK_COL
     mov ch, 0
     mov bl, 0xF0
     call font_print_string
@@ -135,6 +138,27 @@ bin2_to_buf:
     inc di
     pop bx
     pop ax
+    ret
+
+; ========================================================================
+; HIT_DATE - Tests the pointer against the date field of the clock
+; IN : mx, my
+; OUT : CF = 1 if the pointer is over the date
+; ========================================================================
+hit_date:
+    push ax
+    mov ax, [my]
+    cmp ax, MENUBAR_H
+    jae .no
+    mov ax, [mx]
+    cmp ax, DATE_X
+    jb .no
+    pop ax
+    stc
+    ret
+.no:
+    pop ax
+    clc
     ret
 
 tick_clock:

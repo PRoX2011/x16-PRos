@@ -188,6 +188,7 @@ draw_wp_menu:
     mov di, WPMENU_H
     xor al, al
     call gfx_rect
+
     mov ah, 0x23
     int 0x23
     popa
@@ -229,11 +230,46 @@ draw_menu_arrow:
 .top dw 0
 .r   dw 0
 
+; ========================================================================
+; OPEN_FONT_SUBMENU - Opens the font list, keeping what it covers
+; IN : nothing
+; OUT : font_menu_open = 1, area behind it saved
+; ========================================================================
 open_font_submenu:
     call load_font_list
     mov byte [font_menu_open], 1
     mov byte [font_sel], 0xFF
+    mov ax, [font_count]
+    mov bx, MENU_IH
+    mul bx
+    mov di, ax
+    mov cx, FONT_MENU_X
+    mov dx, FONT_MENU_Y
+    mov si, FONT_MENU_IW
+    call popup_set_rect
+    mov ah, 0x22
+    int 0x23
+    call popup_save
     call draw_font_menu
+    ret
+
+; ========================================================================
+; OPEN_WP_SUBMENU - Opens the wallpaper list, keeping what it covers
+; IN : nothing
+; OUT : wp_menu_open = 1, area behind it saved
+; ========================================================================
+open_wp_submenu:
+    mov byte [wp_menu_open], 1
+    mov byte [wp_sel], 0xFF
+    mov cx, WPMENU_X
+    mov dx, WPMENU_Y
+    mov si, WPMENU_IW
+    mov di, WPMENU_H
+    call popup_set_rect
+    mov ah, 0x22
+    int 0x23
+    call popup_save
+    call draw_wp_menu
     ret
 
 menu_handle_press:
@@ -295,9 +331,7 @@ menu_handle_press:
     stc
     ret
 .open_wp:
-    mov byte [wp_menu_open], 1
-    mov byte [wp_sel], 0xFF
-    call draw_wp_menu
+    call open_wp_submenu
     stc
     ret
 .open_font:
@@ -326,6 +360,8 @@ menu_tick:
 
 .tick_wp:
     call wp_hit
+    cmp al, 0xFF
+    je .sub_outside
     cmp al, [wp_sel]
     je .ret
     mov [wp_sel], al
@@ -335,22 +371,31 @@ menu_tick:
 .tick_font:
     call font_menu_hit
     cmp al, 0xFF
-    je .font_outside
+    je .sub_outside
     cmp al, [font_sel]
     je .ret
     mov [font_sel], al
     call draw_font_menu
     ret
-.font_outside:
+
+.sub_outside:
     call menu_hit
-    cmp al, FONT_ITEM
-    je .ret
     cmp al, 0xFF
     je .ret
+    cmp al, [menu_sel]
+    je .ret
+    mov ah, 0x22
+    int 0x23
+    call popup_restore
+    mov byte [wp_menu_open], 0
     mov byte [font_menu_open], 0
     mov [menu_sel], al
-    call full_repaint
     call draw_menu
+    cmp al, WP_ITEM
+    je .open_wp2
+    cmp al, FONT_ITEM
+    jne .ret
+    call open_font_submenu
     ret
 
 .hover_main:
@@ -366,9 +411,7 @@ menu_tick:
     call open_font_submenu
     ret
 .open_wp2:
-    mov byte [wp_menu_open], 1
-    mov byte [wp_sel], 0xFF
-    call draw_wp_menu
+    call open_wp_submenu
 .ret:
     ret
 

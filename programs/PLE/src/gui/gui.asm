@@ -29,6 +29,9 @@ PLE_LOGO          "logo/gui.raw"
 %define LOGO_LOAD_MAX   0x4000
 %define LOGO_CACHE_OFF  0x8000
 %define LOGO_PX         32
+%define POPUP_BUF_OFF   0xC000
+%define POPUP_MAX_BPR   16
+%define POPUP_MAX_ROWS  (MAX_FONTS * 16)
 
 %define ICON_ROUND      2  ; corner chamfer
 %define NAME_GAP        6  ; gap between icon and label
@@ -121,6 +124,8 @@ start:
     test al, al
     jz .released
 
+    call cal_handle_press
+    jc .after_edge
     call menu_handle_press
     jc .after_edge
     call win_at
@@ -264,6 +269,10 @@ start:
     cmp byte [menu_open], 0
     jne .skip_reap
     cmp byte [font_menu_open], 0
+    jne .skip_reap
+    cmp byte [wp_menu_open], 0
+    jne .skip_reap
+    cmp byte [cal_open], 0
     jne .skip_reap
     call reap_dead_windows
 .skip_reap:
@@ -426,6 +435,9 @@ gui_quit:
 %include "icons.inc"
 %include "menu.inc"
 %include "fonts.inc"
+%include "widget.inc"
+%include "popup.inc"
+%include "calendar.inc"
 %include "data.inc"
 
 %include "grafx.inc"
