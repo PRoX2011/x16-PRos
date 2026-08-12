@@ -27,4 +27,6 @@ qemu-system-x86_64 \
     -device adlib,audiodev=snd0 \
     -audiodev pa,id=snd0 \
     -drive format=raw,file=disk_img/FLOPPY2.img,if=floppy,index=1 \
-    -parallel file:lpt/output.txt
+    -parallel file:lpt/output.txt \
+    -device ne2k_isa,iobase=0x300,irq=9,netdev=net0 \
+    -netdev user,id=net0
