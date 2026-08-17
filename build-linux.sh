@@ -317,6 +317,11 @@ mcopy -i disk_img/x16pros.img assets/fonts/ITALIC.FNT ::/FONTS.DIR/
 check_error "ITALIC.FNT copy failed"
 print_ok "ITALIC.FNT copied successfully"
 
+print_info "Copying DOTS.FNT to disk..."
+mcopy -i disk_img/x16pros.img assets/fonts/DOTS.FNT ::/FONTS.DIR/
+check_error "DOTS.FNT copy failed"
+print_ok "DOTS.FNT copied successfully"
+
 # Copy themes
 print_splitline "Copying themes..."
 for thm in assets/themes/*.THM; do
