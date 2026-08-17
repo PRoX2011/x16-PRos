@@ -207,7 +207,7 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
   file count.
 - **Input**:
     - `AH` = 0x01
-    - `AX` = Pointer to buffer for storing the file list (comma-separated, null-terminated)
+    - `SI` = Pointer to buffer for storing the file list (comma-separated, null-terminated)
 - **Output**:
     - `BX` = Low word of total file size (in bytes)
     - `CX` = High word of total file size (32-bit size)
