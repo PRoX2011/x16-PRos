@@ -556,6 +556,7 @@ sched_task_query:
     mov al, [sched_tasks + bx + TASK_STATE]
     mov ah, [sched_tasks + bx + TASK_FLAGS]
     mov cx, [sched_tasks + bx + TASK_BASE_SEG]
+    mov dl, [sched_tasks + bx + TASK_PARENT]
     pop bx
     clc
     ret
@@ -613,6 +614,35 @@ sched_yield_call:
     push es
     jmp sched_yield
 .resume:
+    ret
+
+; ==================================================================
+; sched_task_set_parent - hand a task over to a different parent.
+; A foreground parent sleeps until its child exits, so a replacement
+; task has to take over that link or the parent never wakes up.
+; IN : BL = task id, BH = parent id
+; OUT: CF = 1 on a bad or free task id
+; ==================================================================
+sched_task_set_parent:
+    cmp bl, TASK_SLOT_COUNT
+    jae .bad
+    push bx
+    push ax
+    mov al, bh
+    xor bh, bh
+    shl bx, 4
+    cmp byte [sched_tasks + bx + TASK_STATE], TASK_S_FREE
+    je .bad_pop
+    mov [sched_tasks + bx + TASK_PARENT], al
+    pop ax
+    pop bx
+    clc
+    ret
+.bad_pop:
+    pop ax
+    pop bx
+.bad:
+    stc
     ret
 
 section .data

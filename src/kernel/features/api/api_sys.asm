@@ -17,7 +17,8 @@
 ;   0x16: Blocking key read with cooperative yield while idle
 ;         (returns AX = INT 16h/AH=0 result)
 ;   0x17: Query task slot (BL = id; OUT AL = state, AH = flags, CX = base_seg
-;         (kernel's CS for slot 0); CF on bad id)
+;         (kernel's CS for slot 0), DL = parent id (0xFF = none);
+;         CF on bad id)
 ;         States: 0=free, 1=ready, 2=running, 3=sleeping
 ;         Flags : bit0=background, bit7=kernel
 ;   0x18: Kill task by id (BL = id; CF on failure -
@@ -32,6 +33,7 @@
 ;   0x24: Mouse enable (AL = 1 enable, 0 disable)
 ;   0x25: Mouse drag-select (AL = 1 enable, 0 disable)
 ;   0x26: Set cursor shape (AL = 0 arrow, 1 resize)
+;   0x34: Reparent a task (BL = task id, BH = new parent id; CF on a bad or free task id)
 ; ==================================================================
 
 [BITS 16]
@@ -110,6 +112,8 @@ int23_handler:
     je .win_get
     cmp ah, 0x32
     je .win_close
+    cmp ah, 0x34
+    je .task_reparent
     stc
     jmp .done
 
@@ -212,12 +216,14 @@ int23_handler:
     mov bp, sp
     mov [bp+18], ax
     mov [bp+16], cx
+    mov [bp+14], dx
     clc
     jmp .done
 .task_query_bad:
     mov bp, sp
     mov word [bp+18], 0
     mov word [bp+16], 0
+    mov word [bp+14], 0x00FF
     stc
     jmp .done
 
@@ -348,6 +354,10 @@ int23_handler:
     jmp .done
 .win_bad:
     stc
+    jmp .done
+
+.task_reparent:
+    call sched_task_set_parent
     jmp .done
 
 .win_close:

@@ -396,7 +396,7 @@ the hooks for launching PLE programs and steering the cooperative scheduler, and
 handful of mouse calls.
 
 The functions fall into three groups: memory (`0x00`–`0x03`), tasks and PLE
-(`0x10`–`0x19`), and mouse (`0x20`–`0x25`).
+(`0x10`–`0x19` plus `0x34`), and mouse (`0x20`–`0x26`).
 
 ### Function 0x00: Get Version
 
@@ -552,6 +552,7 @@ manager or a `ps`-style listing.
     - `AL` = State: 0 = free, 1 = ready, 2 = running, 3 = sleeping
     - `AH` = Flags: bit 0 = background, bit 7 = kernel slot
     - `CX` = Base segment of the task's arena (kernel `CS` for slot 0, 0 for a free slot)
+    - `DL` = Parent task id, or `0xFF` when the task has no parent
     - `CF` = 1 if `BL` is out of range
 
 ### Function 0x18: Kill Task by Id
@@ -647,6 +648,28 @@ themselves can switch this off so the selection overlay stays out of their way.
     - `AH` = 0x25
     - `AL` = 1 to enable, 0 to disable
 - **Output**: None
+
+### Function 0x26: Set Cursor Shape
+
+Swaps the sprite the driver draws for the mouse pointer.
+
+- **Input**:
+    - `AH` = 0x26
+    - `AL` = 0 for the arrow, non-zero for the resize shape
+- **Output**: None
+
+### Function 0x34: Reparent a Task
+
+Points a task's parent link at a different slot.
+
+Only the parent field is touched; state, flags and arena are left alone.
+
+- **Input**:
+    - `AH` = 0x34
+    - `BL` = Task id to reparent (0..3)
+    - `BH` = New parent task id (`0xFF` for none)
+- **Output**:
+    - `CF` = 1 if `BL` is out of range or names a free slot
 
 ---
 

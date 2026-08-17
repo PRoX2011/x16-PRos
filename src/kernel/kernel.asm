@@ -63,6 +63,14 @@ DISK_BUFFER_OFF      equ 0xE000
 DISK_BUFFER_SIZE     equ 0x1C00
 KERNEL_WORK_END_OFF  equ DISK_BUFFER_OFF + DISK_BUFFER_SIZE  ; 0xFC00
 
+; Sector staging for file transfers. It has to live outside disk_buffer:
+; that holds the FAT while a file is being walked, and staging a sector
+; through it destroys the chain half way down a large file. Physical
+; 0x3E00, in the free low RAM below the boot sector, and 512 bytes from
+; there never cross a 64 KiB DMA boundary.
+FS_STAGE_SEG         equ KERNEL_WORK_SEG
+FS_STAGE_OFF         equ 0x3800
+
 disk_buffer          equ DISK_BUFFER_OFF
 dirlist              equ DIRLIST_OFF
 command_history      equ COMMAND_HISTORY_OFF
@@ -73,6 +81,7 @@ section .text
 
 start:
     cli
+    mov [cs:boot_drive], dl         ; the bootloader leaves it in DL
 
     ; ------ Stack installation ------
     xor ax, ax
@@ -1219,8 +1228,7 @@ list_directory:
     cmp byte [current_directory], 0
     je .show_root
 
-    mov si, .subdir_prefix
-    call print_string
+    call print_drive_prefix
     mov si, current_directory
     call print_string
     jmp .show_path_done
@@ -1265,6 +1273,7 @@ list_directory:
     jnz .print_dir_marker
 
     mov ax, [es:si+12]
+    mov dx, [es:si+14]
     call .print_size_decimal
     jmp .after_size
 
@@ -1321,11 +1330,11 @@ list_directory:
     call print_string
 
     call fs_free_space
-    shr ax, 1
+    call fs_clus_to_kb
     mov [.freespace], ax
-    mov bx, 1440
-    sub bx, ax
-    mov ax, bx
+    mov ax, [fs_total_clus]
+    call fs_clus_to_kb
+    sub ax, [.freespace]
     call string_int_to_string
     mov si, ax
     call print_string_green
@@ -1354,12 +1363,19 @@ list_directory:
     push dx
     xor cx, cx
 .sd_push_digits:
-    test ax, ax
+    mov bx, ax
+    or bx, dx
     je .sd_check_zero
-    xor dx, dx
     mov bx, 10
+    push ax
+    mov ax, dx
+    xor dx, dx
+    div bx
+    mov [.sd_qhi], ax
+    pop ax
     div bx
     push dx
+    mov dx, [.sd_qhi]
     inc cx
     inc word [.size_digits]
     jmp .sd_push_digits
@@ -1390,11 +1406,11 @@ list_directory:
 
 .files_in_row    dw 0
 .size_digits     dw 0
+.sd_qhi        dw 0
 .dir_marker_str  db '<DIR>', 0
 .free_msg        db ' KB free', 0
 .kb_msg          db ' KB', 0
 .sep             db '   ', 0
-.subdir_prefix   db 'A:/', 0
 .freespace       dw 0
 
 cat_file:
@@ -2564,6 +2580,15 @@ login_password_prompt  db 19 dup(' '), 0xC9, 39 dup(0xCD), 0xBB, 10, 13
 mt                   db '', 10, 13, 0
 Sides                dw 2
 SecsPerTrack         dw 18
+
+fs_fat_lba           dw 1
+fs_fat_secs          dw 9
+fs_root_lba          dw 19
+fs_root_secs         dw 14 
+fs_root_ents         dw 224
+fs_spc               dw 1
+fs_clus_base         dw 31
+fs_total_clus        dw 2847 
 bootdev              db 0
 current_disk         db 0 
 fmt_date             dw 1
@@ -2572,6 +2597,7 @@ command_history_top  db 0
 saved_disk           db 0
 saved_drive_char     db 0
 autocomplete_enabled db 0
+boot_drive           db 0
 current_dir_cluster  dw 0
 saved_dir_cluster    dw 0
 

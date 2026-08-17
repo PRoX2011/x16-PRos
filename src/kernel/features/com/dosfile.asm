@@ -479,6 +479,8 @@ dosfile_read_stream:
     mov ax, [si + DF_POS]
     mov dx, [si + DF_POS + 2]
     call dosfile_sector_of
+    xor dx, dx
+    div word [fs_spc]
     cmp ax, [si + DF_CIDX]
     jne .need_fat
     mov ax, [si + DF_POS]
@@ -488,6 +490,8 @@ dosfile_read_stream:
     sub ax, 1
     sbb dx, 0
     call dosfile_sector_of
+    xor dx, dx
+    div word [fs_spc]
     cmp ax, [si + DF_CIDX]
     je .next
 
@@ -508,12 +512,16 @@ dosfile_read_stream:
     and bx, 0x01FF
     mov [cs:.secoff], bx
     call dosfile_sector_of
+    xor dx, dx
+    div word [fs_spc]
+    mov [cs:.secinclus], dx
 
     call dosfile_cluster_at
     jc .finish
 
     push cx
-    add ax, 31
+    call fs_cluster_lba
+    add ax, [cs:.secinclus]
     call fs_convert_l2hts
     push es
     push ds
@@ -584,6 +592,7 @@ dosfile_read_stream:
 .done       dw 0
 .chunk      dw 0
 .secoff     dw 0
+.secinclus  dw 0
 .retries    db 0
 
 ; ==================================================================

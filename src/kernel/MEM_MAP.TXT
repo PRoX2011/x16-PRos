@@ -14,7 +14,11 @@ physical address = segment * 16 + offset
   0000:0500 - 0000:05FF      256 B   DOS data area
   0000:0600 - 0000:3DFF      14 KiB  dirlist (0060:0000 - 0060:27FF)
                                      command_history (0060:2800 - 0060:37FF)
-  0000:3E00 - 0000:7BFF      15 KiB  Low conventional RAM
+  0000:3E00 - 0000:3FFF      512 B   FS_STAGE (0060:3800): sector staging
+                                     for file transfers. Kept out of
+                                     disk_buffer, which holds the FAT while
+                                     a file's cluster chain is walked.
+  0000:4000 - 0000:7BFF      15 KiB  Low conventional RAM
   0000:7C00 - 0000:7DFF      512 B   Boot sector load area
   0000:7E00 - 0000:FFEF     ~32 KiB  Temporary low RAM
   0000:FFF0 - 0000:FFFF      16 B    Kernel boot stack top

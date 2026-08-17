@@ -78,6 +78,25 @@ exe_execute:
 
     mov word [exe_code_seg], EXE_LOAD_SEG
 
+    mov ax, [exe_total_paras]
+    sub ax, [exe_hdr_paras]
+    add ax, 0x10
+    mov [exe_prog_base], ax
+
+    mov bx, [dosmem_top_seg]
+    sub bx, EXE_PSP_SEG
+
+    mov ax, [es:MZ_MAX_ALLOC]
+    add ax, [exe_prog_base]
+    jc .prog_all
+    cmp ax, bx
+    jae .prog_all
+    mov [dosmem_prog_paras], ax
+    jmp .prog_done
+.prog_all:
+    mov word [dosmem_prog_paras], 0
+.prog_done:
+
     mov ax, [es:MZ_INIT_SS]
     mov [exe_init_ss], ax
     mov ax, [es:MZ_INIT_SP]
@@ -319,6 +338,7 @@ exe_extension       db '.EXE', 0
 exe_code_seg        dw 0
 exe_image_seg       dw 0
 exe_hdr_paras       dw 0
+exe_prog_base       dw 0
 exe_total_paras     dw 0
 exe_name_ptr        dw 0
 exe_init_ss         dw 0

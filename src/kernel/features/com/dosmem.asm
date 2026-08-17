@@ -61,8 +61,28 @@ dosmem_init:
     mov word [dosmem_table + DOSMEM_ENT + DM_START], EXE_PSP_SEG
     mov ax, [dosmem_top_seg]
     sub ax, EXE_PSP_SEG
+    mov bx, [dosmem_prog_paras]
+    test bx, bx
+    jz .whole_arena
+    cmp bx, ax
+    jae .whole_arena
+
+    mov [dosmem_table + DOSMEM_ENT + DM_PARAS], bx
+    mov byte [dosmem_table + DOSMEM_ENT + DM_USED], 1
+
+    sub ax, bx
+    add bx, EXE_PSP_SEG
+    mov [dosmem_table + 2 * DOSMEM_ENT + DM_START], bx
+    mov [dosmem_table + 2 * DOSMEM_ENT + DM_PARAS], ax
+    mov byte [dosmem_table + 2 * DOSMEM_ENT + DM_USED], 0
+    jmp .slots_ready
+
+.whole_arena:
     mov [dosmem_table + DOSMEM_ENT + DM_PARAS], ax
     mov byte [dosmem_table + DOSMEM_ENT + DM_USED], 1
+
+.slots_ready:
+    mov word [dosmem_prog_paras], 0
 
     pop es
     pop ds
@@ -383,5 +403,6 @@ section .data
 
 dosmem_table times DOSMEM_SLOTS * DOSMEM_ENT db 0
 dosmem_top_seg dw DOSMEM_TOP
+dosmem_prog_paras dw 0
 
 section .text

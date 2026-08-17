@@ -144,6 +144,8 @@ main:
     mov ss, ax
     mov sp, 0xFFFF
     sti
+
+    mov BYTE [bsDriveNumber], dl
     mov si, msgLoading
     call Print
 
@@ -229,8 +231,8 @@ LOAD_IMAGE:
 DONE:
     mov si, msgCRLF
     call Print
+    mov dl, BYTE [bsDriveNumber]
     jmp 0x2000:0x0000
-    retf
 
 FAILURE:
     mov si, msgFailure

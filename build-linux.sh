@@ -168,6 +168,33 @@ mkfs.vfat disk_img/FLOPPY2.img -n "x16-PROS"
 check_error "FLOPPY2.img formatting failed"
 # ==================================================================
 
+# ==================================================================
+# This section builds the HDD.IMG (5MiB).
+#
+# The geometry matters!!! FAT12 addresses at most 4084 clusters, so a
+# 5 MiB volume needs 4 sectors to a cluster.
+# Anything dropped into assets/hdd_img ends up on the disk.
+# ==================================================================
+print_splitline "Creating HDD image..."
+print_info "Creating 5 MiB HDD image..."
+dd if=/dev/zero of=disk_img/HDD.img bs=1M count=5 status=none
+check_error "HDD.img creation failed"
+
+mkfs.fat -F 12 -s 4 -r 192 -n "x16-PROS" disk_img/HDD.img >/dev/null
+check_error "HDD.img formatting failed"
+print_ok "HDD image created successfully"
+
+if [ -d assets/hdd_img ] && [ -n "$(ls -A assets/hdd_img 2>/dev/null)" ]; then
+    print_info "Copying files to HDD image..."
+    for f in assets/hdd_img/*; do
+        [ -e "$f" ] || continue
+        mcopy -s -o -i disk_img/HDD.img "$f" ::/
+        check_error "Copying $(basename "$f") to HDD.img failed"
+        print_ok "$(basename "$f") copied to HDD"
+    done
+fi
+# ==================================================================
+
 # Write bootloader
 print_info "Writing bootloader to disk..."
 dd status=none if=bin/BOOT.BIN of=disk_img/x16pros.img conv=notrunc
@@ -227,6 +254,12 @@ print_info "Creating CONF directory..."
 mmd -i disk_img/x16pros.img ::/CONF.DIR
 check_error "Failed to create CONF directory"
 print_ok "CONF directory created successfully"
+
+# Create CONF/GUI directory (settings SETTINGS.PLE writes)
+print_info "Creating CONF/GUI directory..."
+mmd -i disk_img/x16pros.img ::/CONF.DIR/GUI.DIR
+check_error "Failed to create CONF/GUI directory"
+print_ok "CONF/GUI directory created successfully"
 
 # Create DOCS directory
 print_splitline "Creating DOCS directory..."
@@ -319,6 +352,12 @@ print_ok "THEME.CFG copied successfully"
 mcopy -i disk_img/x16pros.img src/kernel/configs/FONT.CFG ::/CONF.DIR/
 check_error "FONT.CFG copy failed"
 print_ok "FONT.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/gui/IC_ROUND.CFG ::/CONF.DIR/GUI.DIR/
+check_error "IC_ROUND.CFG copy failed"
+print_ok "IC_ROUND.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/gui/NAME_GAP.CFG ::/CONF.DIR/GUI.DIR/
+check_error "NAME_GAP.CFG copy failed"
+print_ok "NAME_GAP.CFG copied successfully"
 mcopy -i disk_img/x16pros.img src/kernel/configs/SYSTEM.CFG ::/
 check_error "SYSTEM.CFG copy failed"
 print_ok "SYSTEM.CFG copied successfully"
@@ -491,6 +530,7 @@ programs_ple_gui=(
     "programs/PLE/src/windowed/clock.asm CLOCK.PLE"
     "programs/PLE/src/windowed/hello.asm HELLO.PLE"
     "programs/PLE/src/windowed/calc.asm CALC.PLE"
+    "programs/PLE/src/windowed/settings.asm SETTINGS.PLE"
 )
 
 for prog in "${programs_ple_gui[@]}"; do

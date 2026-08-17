@@ -11,4 +11,5 @@
 [     TODO    ] I/O redirection and pipes (cmd > file, cmd1 | cmd2)
 [     TODO    ] Batch script support (.BAT / .SH style)
 [     TODO    ] System uptime counter and INT 0x23 syscall to query it
-[     TODO    ] RUN DOOM!
+[     DONE    ] RUN DOOM!
+[     TODO    ] Run Microsoft Windows

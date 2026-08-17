@@ -25,6 +25,7 @@ PLE_LOGO          "logo/gui.raw"
 %define ICON_DY     80
 %define ICON_COLS   6
 %define MAX_ICONS   16
+%define MAX_TASKS   8
 %define LOGO_LOAD_OFF   0x4000
 %define LOGO_LOAD_MAX   0x4000
 %define LOGO_CACHE_OFF  0x8000
@@ -33,8 +34,8 @@ PLE_LOGO          "logo/gui.raw"
 %define POPUP_MAX_BPR   16
 %define POPUP_MAX_ROWS  (MAX_FONTS * 16)
 
-%define ICON_ROUND      2  ; corner chamfer
-%define NAME_GAP        6  ; gap between icon and label
+%define ICON_ROUND_MAX  16 ; corner chamfer ceiling
+%define NAME_GAP_MAX    24 ; icon to label gap ceiling
 
 %define STAR_X        4
 %define STAR_Y        3
@@ -102,8 +103,10 @@ start:
     mov al, 0
     int 0x23
 
+    call load_gui_configs
     call enumerate_ple
     call cache_logos
+    call adopt_tasks
     call full_repaint
 
 .loop:
@@ -438,6 +441,7 @@ gui_quit:
 %include "widget.inc"
 %include "popup.inc"
 %include "calendar.inc"
+%include "config.inc"
 %include "data.inc"
 
 %include "grafx.inc"

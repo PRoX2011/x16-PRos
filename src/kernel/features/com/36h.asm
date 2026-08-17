@@ -20,9 +20,9 @@ com_36h:
 .measure:
     call fs_free_space
     mov bx, ax
-    mov ax, 1
+    mov ax, [fs_spc]
     mov cx, 512
-    mov dx, 2847
+    mov dx, [fs_total_clus]
     and word [bp+6], 0xFFFE
     jmp .restore
 

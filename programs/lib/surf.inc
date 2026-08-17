@@ -784,6 +784,139 @@ surf_menu_hit:
     pop bx
     ret
 
+; ========================================================================
+; surf_slider - draw a horizontal slider with its knob at the current value
+; IN:  CX = x, DX = y, SI = width, DI = height
+;      AX = value, BX = minimum, BP = maximum
+; OUT: nothing (all registers preserved)
+; ========================================================================
+surf_slider:
+    pusha
+    mov [.x], cx
+    mov [.y], dx
+    mov [.w], si
+    mov [.h], di
+    mov [.val], ax
+    mov [.min], bx
+    mov [.max], bp
+
+    mov cx, [.x]
+    mov ax, [.h]
+    shr ax, 1
+    add ax, [.y]
+    dec ax
+    mov dx, ax
+    mov si, [.w]
+    mov di, 2
+    xor al, al
+    call surf_fill_rect
+
+    mov ax, [.val]
+    sub ax, [.min]
+    mov bx, [.w]
+    sub bx, SURF_SLIDER_KW
+    mul bx
+    mov bx, [.max]
+    sub bx, [.min]
+    test bx, bx
+    jz .no_range
+    div bx
+    jmp .knob
+.no_range:
+    xor ax, ax
+.knob:
+    add ax, [.x]
+    mov [.kx], ax
+
+    mov cx, [.kx]
+    mov dx, [.y]
+    mov si, SURF_SLIDER_KW
+    mov di, [.h]
+    mov al, 15
+    call surf_fill_rect
+    mov cx, [.kx]
+    mov dx, [.y]
+    mov si, SURF_SLIDER_KW
+    mov di, [.h]
+    xor al, al
+    call surf_rect
+
+    popa
+    ret
+.kx  dw 0
+.x   dw 0
+.y   dw 0
+.w   dw 0
+.h   dw 0
+.val dw 0
+.min dw 0
+.max dw 0
+
+; ========================================================================
+; surf_slider_val - value the cursor points at on a slider
+; IN:  CX = x, DX = y, SI = width, DI = height (same as surf_slider)
+;      BX = minimum, BP = maximum
+; OUT: AX = value under [surf_mx], clamped to the range
+;      CF = 1 if the cursor lies on the slider
+; ========================================================================
+surf_slider_val:
+    push cx
+    push dx
+    push si
+    push di
+    mov [.min], bx
+    mov [.max], bp
+    mov [.w], si
+
+    call surf_in_rect
+    jnc .outside
+
+    mov ax, [surf_mx]
+    sub ax, cx
+    sub ax, SURF_SLIDER_KW / 2
+    jns .span
+    xor ax, ax
+.span:
+    mov cx, [.w]
+    sub cx, SURF_SLIDER_KW
+    cmp ax, cx
+    jbe .scale
+    mov ax, cx
+.scale:
+    mov bx, [.max]
+    sub bx, [.min]
+    mul bx
+    test cx, cx
+    jz .at_min
+    div cx
+    add ax, [.min]
+    pop di
+    pop si
+    pop dx
+    pop cx
+    stc
+    ret
+.at_min:
+    mov ax, [.min]
+    pop di
+    pop si
+    pop dx
+    pop cx
+    stc
+    ret
+.outside:
+    pop di
+    pop si
+    pop dx
+    pop cx
+    clc
+    ret
+.min dw 0
+.max dw 0
+.w   dw 0
+
+SURF_SLIDER_KW  equ 10
+
 surf_mx       dw 0
 surf_my       dw 0
 surf_mb       db 0
