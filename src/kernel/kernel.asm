@@ -2199,6 +2199,7 @@ kshell_comands db 'HELP               - get list of commands', 10, 13
                db 'CD     <dir>       - change directory', 10, 13
                db 'MKDIR  <dir>       - create directory', 10, 13
                db 'DELDIR <dir>       - delete directory', 10, 13
+               db 'BIRDS              - play Birds', 10, 13
                db 'EXIT               - exit to bootloader', 10, 13, 0
 
 ; ------ About OS ------
@@ -2238,6 +2239,7 @@ view_string    db 'VIEW', 0
 mkdir_string   db 'MKDIR', 0
 deldir_string  db 'DELDIR', 0
 cd_string      db 'CD', 0
+BIRDS_string   db 'BIRDS', 0
 terry_string   db 'TERRY', 0
 
 autocomplete_cmd_table:
@@ -2247,6 +2249,7 @@ autocomplete_cmd_table:
     dw size_string, shut_string, reboot_string
     dw touch_string, write_string, view_string, mkdir_string
     dw deldir_string
+    dw BIRDS_string
     dw 0
 
 ; ------ Errors ------

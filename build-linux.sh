@@ -17,6 +17,7 @@ FLAG_DTM=0  # DTM - Dev Tesing Mode
 
 MAX_KERNEL_LOADER_BYTES=43008   # 0xA800 - kernel image must end before dirlist
 KERNEL_SIZE_WARN_BYTES=40960    # 0xA000 - warn 2 KiB before the ceiling
+REQUIRED_COMMANDS=(nasm mkfs.vfat mcopy mmd mdir dd stat)
 
 for arg in $@; do
     if [ $arg == "-quiet" ]; then FLAG_QUIET_MODE=1; continue; fi
@@ -67,6 +68,19 @@ print_splitline() {
     fi
 }
 
+check_dependencies() {
+    local missing_commands=()
+    for command_name in "${REQUIRED_COMMANDS[@]}"; do
+        if ! command -v "$command_name" >/dev/null 2>&1; then
+            missing_commands+=("$command_name")
+        fi
+    done
+
+    if [ "${#missing_commands[@]}" -gt 0 ]; then
+        print_failed "Missing required commands: ${missing_commands[*]}. Install them with: sudo apt install nasm dosfstools mtools"
+    fi
+}
+
 check_error() {
     if [ $? -ne 0 ]; then
         print_failed "$1"
@@ -105,6 +119,8 @@ check_kernel_size_guard() {
 
 mkdir -p bin
 mkdir -p disk_img
+
+check_dependencies
 
 print_splitline "Starting x16-PRos build..."
 
@@ -381,6 +397,7 @@ programs=(
     "programs/print.asm PRINT.BIN"
     "programs/calendar.asm CALENDAR.BIN"
     "programs/settings.asm SETTINGS.BIN"
+    "programs/birds.asm BIRDS.BIN"
 )
 
 for prog in "${programs[@]}"; do

@@ -19,10 +19,18 @@ print_msg() {
 
 print_msg "$NC" ""
 print_msg "$GREEN" "Starting emulator..."
+if [ ! -f disk_img/x16pros.img ] || [ ! -f disk_img/FLOPPY2.img ]; then
+    print_msg "$RED" "Disk images are missing. Run ./build-linux.sh first."
+    exit 1
+fi
+if [ "disk_img/x16pros.img" -ot "bin/BIRDS.BIN" ]; then
+    print_msg "$RED" "Disk image is older than BIRDS.BIN. Run ./build-linux.sh first."
+    exit 1
+fi
 mkdir -p lpt
 qemu-system-x86_64 \
     -display gtk \
-    -fda disk_img/x16pros.img \
+    -drive format=raw,file=disk_img/x16pros.img,if=floppy,index=0 \
     -machine pcspk-audiodev=snd0 \
     -device adlib,audiodev=snd0 \
     -audiodev pa,id=snd0 \

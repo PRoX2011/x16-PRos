@@ -206,6 +206,7 @@ help_menu_5 db 0xC9, 18 dup(0xCD), ' PRos help ', 18 dup(0xCD), 0xBB, 10, 13
      db 0xBA, ' Other stuff                             [5/6] ', 0xBA, 10, 13
      db 0xBA, 47 dup(0xC4), 0xBA, 10, 13
      db 0xBA, '  exit            - exit to boot loader        ', 0xBA, 10, 13
+    db 0xBA, '  birds           - play Flappy Birds           ', 0xBA, 10, 13
      db 0xBA, '                                               ', 0xBA, 10, 13
      db 0xBA, '                                               ', 0xBA, 10, 13
      db 0xBA, '                                               ', 0xBA, 10, 13
