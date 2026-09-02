@@ -1817,8 +1817,15 @@ fs_rename_file_body:
 
 .rename_in_subdir:
     mov ax, [current_dir_cluster]
-    mov [.rename_cluster], ax
     call fs_cluster_lba
+    mov [.rename_cluster], ax
+    pop ax
+    call string_string_uppercase
+    call int_filename_convert
+    mov [.rename_wanted], ax
+
+.rename_read:
+    mov ax, [.rename_cluster]
     call fs_convert_l2hts
     mov bx, disk_buffer
     mov ah, 2
@@ -1827,12 +1834,18 @@ fs_rename_file_body:
     int 13h
     jc .fail_read_sub
 
+    mov ax, [.rename_wanted]
     mov di, disk_buffer
-    pop ax
-    call string_string_uppercase
-    call int_filename_convert
     call fs_get_subdir_entry
-    jc .fail_read
+    jnc .rename_found
+
+    mov ax, [.rename_cluster]
+    call fs_next_dir_sector
+    jc .fail_read_sub
+    mov [.rename_cluster], ax
+    jmp .rename_read
+
+.rename_found:
     pop bx
     mov ax, bx
     call string_string_uppercase
@@ -1842,7 +1855,6 @@ fs_rename_file_body:
     rep movsb
 
     mov ax, [.rename_cluster]
-    call fs_cluster_lba
     call fs_convert_l2hts
     mov bx, disk_buffer
     mov ah, 3
@@ -1865,6 +1877,7 @@ fs_rename_file_body:
     ret
 
 .rename_cluster dw 0
+.rename_wanted  dw 0
 
 ; ========================================================================
 ; FS_GET_FILE_SIZE - Gets the size of a file from the current directory
@@ -1894,19 +1907,30 @@ fs_get_file_size:
 .size_in_subdir:
     mov ax, [current_dir_cluster]
     call fs_cluster_lba
-    call fs_convert_l2hts
+    mov [.dirsec], ax
+    pop ax
+    mov [.wanted], ax
 
+.size_dir_read:
+    mov ax, [.dirsec]
+    call fs_convert_l2hts
     mov bx, disk_buffer
     mov ah, 2
     mov al, 1
     stc
     int 13h
-    jc .failure_pushed
+    jc .failure
 
-    pop ax
+    mov ax, [.wanted]
     mov di, disk_buffer
     call fs_get_subdir_entry
+    jnc .get_size
+
+    mov ax, [.dirsec]
+    call fs_next_dir_sector
     jc .failure
+    mov [.dirsec], ax
+    jmp .size_dir_read
 
 .get_size:
     mov ebx, [di+28]
@@ -1934,6 +1958,8 @@ fs_get_file_size:
 
 .tmp dd 0
 .clus dw 0
+.dirsec dw 0
+.wanted dw 0
 
 fs_last_ftime dw 0
 fs_last_fdate dw 0

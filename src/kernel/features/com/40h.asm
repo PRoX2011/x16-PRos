@@ -23,7 +23,7 @@ com_40h:
     jc .fail
 
     call dosfile_materialise
-    jc .stream
+    jc .to_stream
 
     test cx, cx
     jz .truncate
@@ -41,13 +41,31 @@ com_40h:
 
 .to_stream:
     test byte [si + DF_FLAGS], DFF_STREAM
-    jnz .stream
+    jnz .streaming
+    cmp word [si + DF_FIRST], 0
+    jne .adopt
     call dosfile_spill
     jc .full
+    jmp .streaming
+.adopt:
+    or byte [si + DF_FLAGS], DFF_STREAM
+
+.streaming:
+    cmp word [cs:dosf_count], 0
+    je .stream_truncate
 
 .stream:
     mov cx, [cs:dosf_count]
     call dosfile_write_stream
+    jmp .ok
+
+.stream_truncate:
+    mov ax, [si + DF_POS]
+    mov dx, [si + DF_POS + 2]
+    mov [si + DF_SIZE], ax
+    mov [si + DF_SIZE + 2], dx
+    or byte [si + DF_FLAGS], DFF_DIRTY
+    xor ax, ax
     jmp .ok
 
 .have_room:

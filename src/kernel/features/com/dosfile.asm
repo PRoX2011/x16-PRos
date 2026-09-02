@@ -681,6 +681,8 @@ dosfile_write_stream:
     pop es
     jc .finish
 
+    or byte [si + DF_FLAGS], DFF_DIRTY
+
     mov ax, [cs:.chunk]
     add [si + DF_POS], ax
     adc word [si + DF_POS + 2], 0
@@ -1238,6 +1240,9 @@ dosfile_close_slot:
 
     mov ax, KERNEL_DATA_SEG
     mov es, ax
+
+    test byte [si + DF_FLAGS], DFF_DIRTY
+    jz .no_flush
 
     test byte [si + DF_FLAGS], DFF_STREAM
     jnz .streamed
