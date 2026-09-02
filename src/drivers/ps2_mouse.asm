@@ -2,7 +2,7 @@
 ; x16-PRos - PS/2 mouse driver
 ; Copyright (C) 2025 PRoX2011
 ;
-; Driver version: 0.4
+; Driver version: 0.4.1
 ;
 ; Compatible with video modes:
 ;   - 0x12  (VGA, 640x480, 16 colors, planar)
@@ -99,9 +99,23 @@ MouseCallback:
     mov dx, 479 - HCURSOR
 
 .update_pos:
+    mov bh, [ButtonStatus]
     mov [ButtonStatus], bl
+
+    push ax
+    push dx
+    sub ax, [MouseX]
+    sub dx, [MouseY]
+    mov [m33_dx], ax
+    mov [m33_dy], dx
+    add [m33_mickx], ax
+    add [m33_micky], dx
+    pop dx
+    pop ax
+
     mov [MouseX], ax
     mov [MouseY], dx
+    call m33_edges
 
 
     mov ax, [MouseX]
@@ -581,6 +595,46 @@ DrawCursor:
 
 HideCursor:
     call RestoreBackground
+    ret
+
+; ==================================================================
+; MOUSE_DOS_BEGIN - hand the mouse to a DOS program.
+; ==================================================================
+mouse_dos_begin:
+    push ds
+    push es
+    push cs
+    pop ds
+    push cs
+    pop es
+    cmp byte [CursorVisible], 0
+    je .already_hidden
+    call HideCursor
+    mov byte [CursorVisible], 0
+.already_hidden:
+    mov byte [SelEnabled], 0
+    call m33_reset_state
+    call DisableMouse
+    pop es
+    pop ds
+    ret
+
+; ==================================================================
+; MOUSE_DOS_END - take the mouse back once the program has exited
+; ==================================================================
+mouse_dos_end:
+    push ds
+    push es
+    push cs
+    pop ds
+    push cs
+    pop es
+    mov byte [SelEnabled], 1
+    mov byte [CursorVisible], 1
+    call m33_reset_state
+    call EnableMouse
+    pop es
+    pop ds
     ret
 
 ShowCursor:

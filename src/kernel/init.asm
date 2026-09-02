@@ -4,6 +4,9 @@ init_system:
     mov word [es:0x80], int20_handler
     mov word [es:0x82], cs
 
+    mov word [es:0x2F*4], int2F_handler
+    mov word [es:0x2F*4 + 2], cs
+
     sti
     cld
 
@@ -99,6 +102,12 @@ init_api:
     call api_sys_init
 
     mov si, api_sys_init_msg
+    call log_okay
+
+    call dosvars_init
+    call int33_init
+
+    mov si, int33_init_msg
     call log_okay
     ret
 
@@ -1018,6 +1027,7 @@ api_init_msg             db 'API initialization', 0
 api_output_init_msg      db 'Output API (INT 0x21)', 0
 api_fs_init_msg          db 'File System API (INT 0x22)', 0
 api_sys_init_msg         db 'System API (INT 0x23)', 0
+int33_init_msg           db 'Mouse API (INT 0x33)', 0
 config_init_msg          db 'Configuration loading', 0
 display_init_msg         db 'Display initialization', 0
 mouse_init_msg           db 'Mouse driver loaded', 0

@@ -30,9 +30,16 @@ MZ_OVERLAY_NUM      equ 0x1A
 exe_execute:
     push ax
     mov [exe_name_ptr], ax
+    cmp byte [exe_nested], 0
+    jne .layout_ready
+    mov word [exe_psp_seg], EXE_PSP_SEG
+    mov word [exe_load_seg], EXE_LOAD_SEG
+    mov word [exe_parent_psp], 0
+    mov word [exe_tail_seg], 0
+.layout_ready:
 
     xor cx, cx
-    mov dx, EXE_LOAD_SEG
+    mov dx, [exe_load_seg]
     call fs_load_huge_file
     jnc .loaded
 
@@ -56,7 +63,7 @@ exe_execute:
 
     pop ax
 
-    mov ax, EXE_LOAD_SEG
+    mov ax, [exe_load_seg]
     mov es, ax
 
     mov ax, [es:MZ_SIGNATURE]
@@ -73,10 +80,11 @@ exe_execute:
 
     mov ax, [es:MZ_HEADER_PARAS]
     mov [exe_hdr_paras], ax
-    add ax, EXE_LOAD_SEG
+    add ax, [exe_load_seg]
     mov [exe_image_seg], ax
 
-    mov word [exe_code_seg], EXE_LOAD_SEG
+    mov ax, [exe_load_seg]
+    mov [exe_code_seg], ax
 
     mov ax, [exe_total_paras]
     sub ax, [exe_hdr_paras]
@@ -84,9 +92,11 @@ exe_execute:
     mov [exe_prog_base], ax
 
     mov bx, [dosmem_top_seg]
-    sub bx, EXE_PSP_SEG
+    sub bx, [exe_psp_seg]
 
     mov ax, [es:MZ_MAX_ALLOC]
+    test ax, ax
+    jz .prog_all
     add ax, [exe_prog_base]
     jc .prog_all
     cmp ax, bx
@@ -96,6 +106,19 @@ exe_execute:
 .prog_all:
     mov word [dosmem_prog_paras], 0
 .prog_done:
+
+    mov ax, [exe_psp_seg]
+    mov [dosmem_prog_base], ax
+
+    mov ax, [dosmem_prog_paras]
+    test ax, ax
+    jz .top_is_arena
+    add ax, [exe_psp_seg]
+    jmp short .top_done
+.top_is_arena:
+    mov ax, [dosmem_top_seg]
+.top_done:
+    mov [exe_mem_top], ax
 
     mov ax, [es:MZ_INIT_SS]
     mov [exe_init_ss], ax
@@ -134,20 +157,33 @@ exe_execute:
     mov ax, KERNEL_DATA_SEG
     mov es, ax
 
-    mov ax, EXE_PSP_SEG
+    mov ax, [exe_psp_seg]
     mov si, [param_list]
     call exe_build_psp
+
+    mov ax, [exe_psp_seg]
+    mov [dos_current_psp], ax
+
+    cmp byte [exe_nested], 0
+    jne .nested_ctx
 
     mov [com_stack_save], sp
     mov [com_ss_save], ss
     mov byte [com_active], 1
 
     call api_dos_init
-    call DisableMouse
+    call mouse_dos_begin
 
     mov ah, 0x00
     mov al, 0x03
     int 0x10
+    jmp short .ctx_ready
+
+.nested_ctx:
+    mov byte [exe_nested], 0
+    call dosmem_init
+
+.ctx_ready:
 
     mov ax, [exe_code_seg]
     add ax, [exe_init_ss]
@@ -161,7 +197,7 @@ exe_execute:
     mov ss, ax
     mov sp, bx
 
-    mov ax, EXE_PSP_SEG
+    mov ax, [exe_psp_seg]
     mov ds, ax
     mov es, ax
     sti
@@ -190,9 +226,9 @@ exe_strip_header:
     sub ax, bx
     jbe .done
 
-    mov si, EXE_LOAD_SEG
+    mov si, [exe_load_seg]
     add si, bx
-    mov di, EXE_LOAD_SEG
+    mov di, [exe_load_seg]
     mov bx, ax
 
 .slide:
@@ -250,20 +286,96 @@ exe_build_psp:
     mov ds, ax
 
     xor di, di
+    mov ax, [exe_parent_psp]
+    test ax, ax
+    jz .blank_psp
+
+    push si
+    push ds
+    mov ds, ax
+    xor si, si
+    mov cx, 128
+    cld
+    rep movsw
+    pop ds
+    pop si
+    jmp short .psp_ready
+
+.blank_psp:
     xor ax, ax
     mov cx, 128
+    cld
     rep stosw
 
+.psp_ready:
     mov word [es:0x00], 0x20CD
-    mov ax, [dosmem_top_seg]
+    mov ax, [exe_mem_top]
     mov [es:0x02], ax
-    mov word [es:0x2C], DOSMEM_ENV_SEG
+    mov ax, [exe_parent_psp]
+    mov [es:0x16], ax
+    push ds
+    push si
+    xor si, si
+    mov ds, si
+    mov si, [0x22 * 4]
+    mov [es:0x0A], si
+    mov si, [0x22 * 4 + 2]
+    mov [es:0x0C], si
+    mov si, [0x23 * 4]
+    mov [es:0x0E], si
+    mov si, [0x23 * 4 + 2]
+    mov [es:0x10], si
+    mov si, [0x24 * 4]
+    mov [es:0x12], si
+    mov si, [0x24 * 4 + 2]
+    mov [es:0x14], si
+    pop si
+    pop ds
+    push di
+    mov di, 0x18
+    xor al, al
+.jft:
+    cmp al, SFT_COUNT
+    jae .jft_free
+    mov [es:di], al
+    jmp short .jft_step
+.jft_free:
+    mov byte [es:di], 0xFF
+.jft_step:
+    inc al
+    inc di
+    cmp al, 20
+    jb .jft
+    pop di
+
+    mov word [es:0x32], 20
+    mov word [es:0x34], 0x0018
+    mov ax, es
+    mov [es:0x36], ax
+    mov ax, [dosmem_env_seg]
+    mov [es:0x2C], ax
     call exe_build_env
 
     mov byte [es:0x50], 0xCD
     mov byte [es:0x51], 0x21
     mov byte [es:0x52], 0xCB
 
+    cmp word [exe_tail_seg], 0
+    je .plain_tail
+
+    push ds
+    push si
+    mov si, [exe_tail_off]
+    mov ds, [exe_tail_seg]
+    mov di, 0x0080
+    mov cx, 64
+    cld
+    rep movsw
+    pop si
+    pop ds
+    jmp short .cmd_ready
+
+.plain_tail:
     mov di, 0x81
     xor cx, cx
 
@@ -284,6 +396,7 @@ exe_build_psp:
     mov [es:0x80], cl
     mov byte [es:di], 0x0D
 
+.cmd_ready:
     pop ds
     pop es
     popa
@@ -293,7 +406,7 @@ exe_build_env:
     pusha
     push es
 
-    mov ax, DOSMEM_ENV_SEG
+    mov ax, [dosmem_env_seg]
     mov es, ax
     xor di, di
     cld
@@ -301,6 +414,24 @@ exe_build_env:
     mov si, exe_env_strings
     mov cx, exe_env_strings_len
     rep movsb
+
+    push ds
+    pop es
+    mov al, [current_drive_char]
+    mov [cs:exe_env_drive], al
+    mov ax, [dosmem_env_seg]
+    mov es, ax
+    xor di, di
+    mov cx, exe_env_strings_len
+.stamp:
+    cmp byte [es:di + 1], ':'
+    jne .stamp_next
+    mov al, [cs:exe_env_drive]
+    mov [es:di], al
+.stamp_next:
+    inc di
+    loop .stamp
+    mov di, exe_env_strings_len
 
     mov ax, 1
     stosw
@@ -327,11 +458,15 @@ exe_build_env:
 exe_env_strings:
     db 'COMSPEC=A:\COMMAND.COM', 0
     db 'PATH=A:\', 0
+    db 'TEMP=C:\', 0
+    db 'TMP=C:\', 0
     db 0
 exe_env_strings_len equ $ - exe_env_strings
 
 exe_bad_sig_msg     db 'Not an EXE file (bad signature)', 10, 13, 0
 exe_load_failed_msg db 'EXE load failed', 10, 13, 0
+
+exe_env_drive       db 'A'
 
 exe_extension       db '.EXE', 0
 
@@ -345,3 +480,11 @@ exe_init_ss         dw 0
 exe_init_sp         dw 0
 exe_init_ip         dw 0
 exe_init_cs         dw 0
+
+exe_psp_seg         dw EXE_PSP_SEG
+exe_load_seg        dw EXE_LOAD_SEG
+exe_nested          db 0
+exe_parent_psp      dw 0
+exe_tail_seg        dw 0
+exe_tail_off        dw 0
+exe_mem_top         dw 0

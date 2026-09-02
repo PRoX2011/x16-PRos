@@ -6,7 +6,7 @@
 ;       store whole files, so an open file is held
 ;       in a RAM buffer taken from the DOS arena (see dosmem.asm)
 
-DOSF_SLOTS       equ 8
+DOSF_SLOTS       equ 15
 DOSF_FIRST       equ 5
 DOSF_MAXPARAS    equ DOSMEM_TOP - DOSMEM_BASE
 DOSF_NEWPARAS    equ 0x0400
@@ -23,11 +23,14 @@ DF_FLAGS         equ 25
 DF_FIRST         equ 26
 DF_CCLUS         equ 28
 DF_CIDX          equ 30
-DF_ENT           equ 32
+DF_TIME          equ 32
+DF_DATE          equ 34
+DF_ENT           equ 36
 
 DFF_USED         equ 0x01
 DFF_DIRTY        equ 0x02
 DFF_BUF          equ 0x04
+DFF_STREAM       equ 0x08
 
 ; ==================================================================
 ; dosfile_init - drop every opened handle
@@ -122,7 +125,7 @@ dosfile_free_slot:
 dosfile_store_name:
     pusha
     mov di, si
-    mov si, com_path_buffer
+    mov si, [dosfile_open.name]
     mov cx, 12
     cld
 .copy:
@@ -450,6 +453,264 @@ dosfile_cluster_at:
     ret
 
 ; ==================================================================
+; dosfile_last_cluster - the end of a file's chain
+;
+; IN : SI = slot
+;      DS = KERNEL_DATA_SEG, the FAT already in disk_buffer
+; OUT: AX = last cluster, or 0 when the file has none yet
+; ==================================================================
+dosfile_last_cluster:
+    push bx
+    mov ax, [si + DF_FIRST]
+    test ax, ax
+    jz .none
+.walk:
+    mov bx, ax
+    call fs_fat_next_cluster
+    jc .done
+    test ax, ax
+    jz .done
+    jmp .walk
+.done:
+    mov ax, bx
+.none:
+    pop bx
+    ret
+
+; ==================================================================
+; dosfile_spill - put a buffered file on the volume and let go of it
+;
+; IN : SI = slot
+;      DS = KERNEL_DATA_SEG
+; OUT: CF = 1 when it could not be written
+; ==================================================================
+dosfile_spill:
+    pusha
+    push es
+
+    mov ax, KERNEL_DATA_SEG
+    mov es, ax
+
+    push si
+    mov di, com_path_buffer
+    mov cx, 13
+    cld
+    rep movsb
+    pop si
+
+    mov ax, com_path_buffer
+    xor cx, cx
+    mov dx, [si + DF_SEG]
+    mov di, [si + DF_SIZE + 2]
+    mov bx, [si + DF_SIZE]
+    call fs_write_huge_file
+    jc .fail
+
+    mov ax, com_path_buffer
+    call fs_get_file_size
+    jc .fail
+    mov [si + DF_FIRST], cx
+    mov word [si + DF_CCLUS], 0
+    mov word [si + DF_CIDX], 0
+
+    mov ax, [si + DF_SEG]
+    test ax, ax
+    jz .no_buffer
+    cmp ax, DOSF_SPARE_SEG
+    jne .arena
+    mov byte [dosf_spare_taken], 0
+    jmp .no_buffer
+.arena:
+    call dosmem_free
+.no_buffer:
+    mov word [si + DF_SEG], 0
+    mov word [si + DF_PARAS], 0
+
+    and byte [si + DF_FLAGS], ~(DFF_BUF | DFF_DIRTY) & 0xFF
+    or byte [si + DF_FLAGS], DFF_STREAM
+
+    pop es
+    popa
+    clc
+    ret
+
+.fail:
+    pop es
+    popa
+    stc
+    ret
+
+; ==================================================================
+; dosfile_write_stream - write to a file that is not held in RAM
+;
+; IN : SI = slot
+;      CX = bytes wanted
+;      DS = KERNEL_DATA_SEG, the data at [cs:dosf_caller_ds]:[cs:dosf_caller_dx]
+; OUT: AX = bytes actually written
+; ==================================================================
+dosfile_write_stream:
+    mov [cs:.want], cx
+    mov word [cs:.done], 0
+
+    push es
+    call fs_read_fat
+    pop es
+    jc .finish
+
+.next:
+    mov cx, [cs:.want]
+    sub cx, [cs:.done]
+    jz .finish
+
+    mov ax, [si + DF_POS]
+    and ax, 0x01FF
+    mov [cs:.secoff], ax
+    mov bx, 512
+    sub bx, ax
+    cmp cx, bx
+    jbe .chunk_ready
+    mov cx, bx
+.chunk_ready:
+    mov [cs:.chunk], cx
+
+    mov ax, [si + DF_POS]
+    mov dx, [si + DF_POS + 2]
+    call dosfile_sector_of
+    xor dx, dx
+    div word [fs_spc]
+    mov [cs:.secinclus], dx
+    mov [cs:.clusidx], ax
+
+    call dosfile_cluster_at
+    jnc .have_cluster
+
+    call dosfile_last_cluster
+    push es
+    call fs_extend_chain
+    pop es
+    jc .finish
+    cmp word [si + DF_FIRST], 0
+    jne .chain_grown
+    mov [si + DF_FIRST], ax
+.chain_grown:
+    mov word [si + DF_CCLUS], 0
+    mov word [si + DF_CIDX], 0
+    mov ax, [cs:.clusidx]
+    call dosfile_cluster_at
+    jc .finish
+
+.have_cluster:
+    mov [cs:.cluster], ax
+
+    cmp word [cs:.chunk], 512
+    je .fill
+
+    mov ax, [si + DF_POS]
+    mov dx, [si + DF_POS + 2]
+    and ax, 0xFE00
+    cmp dx, [si + DF_SIZE + 2]
+    ja .blank
+    jb .read_first
+    cmp ax, [si + DF_SIZE]
+    jb .read_first
+
+.blank:
+    push es
+    push di
+    push cx
+    push ax
+    push ds
+    pop es
+    mov di, DOSF_SECTOR
+    mov cx, 256
+    xor ax, ax
+    cld
+    rep stosw
+    pop ax
+    pop cx
+    pop di
+    pop es
+    jmp .fill
+
+.read_first:
+    mov ax, [cs:.cluster]
+    call fs_cluster_lba
+    add ax, [cs:.secinclus]
+    call fs_convert_l2hts
+    push es
+    push ds
+    pop es
+    mov bx, DOSF_SECTOR
+    mov ah, 0x02
+    mov al, 0x01
+    stc
+    int 0x13
+    pop es
+
+.fill:
+    push ds
+    push si
+    push di
+    mov ax, [cs:dosf_caller_ds]
+    mov ds, ax
+    mov si, [cs:dosf_caller_dx]
+    add si, [cs:.done]
+    mov ax, KERNEL_DATA_SEG
+    mov es, ax
+    mov di, DOSF_SECTOR
+    add di, [cs:.secoff]
+    mov cx, [cs:.chunk]
+    cld
+    rep movsb
+    pop di
+    pop si
+    pop ds
+
+    mov ax, [cs:.cluster]
+    call fs_cluster_lba
+    add ax, [cs:.secinclus]
+    call fs_convert_l2hts
+    push es
+    push ds
+    pop es
+    mov bx, DOSF_SECTOR
+    mov ah, 0x03
+    mov al, 0x01
+    stc
+    int 0x13
+    pop es
+    jc .finish
+
+    mov ax, [cs:.chunk]
+    add [si + DF_POS], ax
+    adc word [si + DF_POS + 2], 0
+    add [cs:.done], ax
+
+    mov ax, [si + DF_POS]
+    mov dx, [si + DF_POS + 2]
+    cmp dx, [si + DF_SIZE + 2]
+    ja .longer
+    jb .next
+    cmp ax, [si + DF_SIZE]
+    jbe .next
+.longer:
+    mov [si + DF_SIZE], ax
+    mov [si + DF_SIZE + 2], dx
+    jmp .next
+
+.finish:
+    mov ax, [cs:.done]
+    ret
+
+.want       dw 0
+.done       dw 0
+.chunk      dw 0
+.secoff     dw 0
+.secinclus  dw 0
+.clusidx    dw 0
+.cluster    dw 0
+
+; ==================================================================
 ; dosfile_read_stream - read from a file that is not held in RAM.
 ;
 ; IN : SI = slot, CX = bytes wanted, ES:DI = destination,
@@ -603,6 +864,8 @@ dosfile_read_stream:
 ; OUT: CF = 1 if there is no room for the buffer
 ; ==================================================================
 dosfile_materialise:
+    test byte [si + DF_FLAGS], DFF_STREAM
+    jnz .on_volume
     test byte [si + DF_FLAGS], DFF_BUF
     jnz .already
 
@@ -681,6 +944,131 @@ dosfile_materialise:
     clc
     ret
 
+.on_volume:
+    stc
+    ret
+
+; ==================================================================
+; PATH_SPLIT / PATH_RESTORE - open a file by the path it was given
+;
+; IN : com_path_buffer holds the path
+;      DS = KERNEL_DATA_SEG
+; OUT: SI = the file name, the named directory is current
+;      CF = 1 if a directory along the way does not exist
+; ==================================================================
+path_split:
+    push ax
+    push bx
+    push cx
+    push di
+    push es
+
+    mov ax, [current_dir_cluster]
+    mov [cs:path_saved_cluster], ax
+    push ds
+    pop es
+    mov si, current_directory
+    mov di, path_saved_path
+    mov cx, 64
+    cld
+    rep movsb
+
+    mov si, com_path_buffer
+
+    cmp byte [si + 1], ':'
+    jne .no_drive
+    mov al, [si]
+    cmp al, 'a'
+    jb .letter_ready
+    cmp al, 'z'
+    ja .letter_ready
+    sub al, 'a' - 'A'
+.letter_ready:
+    cmp al, [current_drive_char]
+    jne .fail
+    add si, 2
+
+.no_drive:
+    cmp byte [si], '\'
+    je .from_root
+    cmp byte [si], '/'
+    jne .scan
+.from_root:
+    inc si
+    mov word [current_dir_cluster], 0
+    mov byte [current_directory], 0
+
+.scan:
+    mov bx, si
+    mov di, si
+.find_sep:
+    mov al, [di]
+    test al, al
+    je .done
+    cmp al, '\'
+    je .component
+    cmp al, '/'
+    je .component
+    inc di
+    jmp .find_sep
+
+.component:
+    mov byte [di], 0
+    inc di
+    cmp byte [bx], 0
+    je .next
+    cmp word [bx], '.'
+    je .next
+    mov ax, bx
+    call fs_change_directory
+    jc .fail
+.next:
+    mov si, di
+    jmp .scan
+
+.done:
+    pop es
+    pop di
+    pop cx
+    pop bx
+    pop ax
+    clc
+    ret
+
+.fail:
+    call path_restore
+    pop es
+    pop di
+    pop cx
+    pop bx
+    pop ax
+    stc
+    ret
+
+path_restore:
+    push ax
+    push cx
+    push si
+    push di
+    push es
+    mov ax, [cs:path_saved_cluster]
+    mov [current_dir_cluster], ax
+    push ds
+    pop es
+    mov si, path_saved_path
+    mov di, current_directory
+    mov cx, 64
+    cld
+    rep movsb
+    pop es
+    pop di
+    pop si
+    pop cx
+    pop ax
+    ret
+
+path_saved_cluster dw 0
+path_saved_path    times 64 db 0
 
 ; ==================================================================
 ; dosfile_open - shared body of AH=3Dh and AH=3Ch.
@@ -706,21 +1094,40 @@ dosfile_open:
     mov ds, ax
     mov es, ax
 
+    call path_split
+    jc .not_found
+    mov [.name], si
+
     call dosfile_free_slot
     jc .too_many
     mov [.slot], si
     mov [.handle], bx
 
     cmp byte [cs:.creating], 0
+    je .open_existing
+    cmp byte [cs:.creating], 2
     jne .make_new
 
-    mov ax, com_path_buffer
+    mov ax, [.name]
+    call fs_get_file_size
+    jc .make_new
+    call path_restore
+    mov ax, 0x0050
+    jmp .err
+
+.open_existing:
+    mov ax, [.name]
     call fs_get_file_size
     jc .not_found
 
     mov [.size_lo], bx
     mov [.size_hi], dx
     mov [.first], cx
+
+    mov ax, [fs_last_ftime]
+    mov [.ftime], ax
+    mov ax, [fs_last_fdate]
+    mov [.fdate], ax
 
     xor ax, ax
     mov [.buf_seg], ax
@@ -735,6 +1142,8 @@ dosfile_open:
     mov [.size_lo], ax
     mov [.size_hi], ax
     mov [.first], ax
+    mov [.ftime], ax
+    mov word [.fdate], 0x0021
     mov byte [.newflags], DFF_USED | DFF_DIRTY
 
 .finish:
@@ -755,19 +1164,27 @@ dosfile_open:
     mov [si + DF_FIRST], ax
     mov word [si + DF_CCLUS], 0
     mov word [si + DF_CIDX], 0
+    mov ax, [.ftime]
+    mov [si + DF_TIME], ax
+    mov ax, [.fdate]
+    mov [si + DF_DATE], ax
 
     mov al, [.newflags]
     mov [si + DF_FLAGS], al
 
     call dosfile_materialise
+    call dosvars_sync_sft
+    call path_restore
 
     mov ax, [.handle]
     jmp .ok
 
 .too_many:
+    call path_restore
     mov ax, 0x0004                  ; too many open files
     jmp .err
 .not_found:
+    call path_restore
     mov ax, 0x0002                  ; file not found
     jmp .err
 .no_memory:
@@ -796,6 +1213,7 @@ dosfile_open:
     ret
 
 .creating   db 0
+.name       dw 0
 .newflags   db 0
 .slot       dw 0
 .handle     dw 0
@@ -803,6 +1221,8 @@ dosfile_open:
 .size_hi    dw 0
 .first      dw 0
 .buf_seg    dw 0
+.ftime      dw 0
+.fdate      dw 0
 .buf_paras  dw 0
 
 ; ==================================================================
@@ -819,6 +1239,30 @@ dosfile_close_slot:
     mov ax, KERNEL_DATA_SEG
     mov es, ax
 
+    test byte [si + DF_FLAGS], DFF_STREAM
+    jnz .streamed
+    cmp word [si + DF_SEG], 0
+    jne .not_streamed
+    cmp word [si + DF_FIRST], 0
+    je .not_streamed
+.streamed:
+    push si
+    mov di, com_path_buffer
+    mov cx, 13
+    cld
+    rep movsb
+    pop si
+
+    mov ax, com_path_buffer
+    mov bx, [si + DF_FIRST]
+    mov cx, [si + DF_SIZE]
+    mov dx, [si + DF_SIZE + 2]
+    call fs_set_file_info
+    jnc .no_flush
+    mov byte [cs:dosf_flush_failed], 1
+    jmp .no_flush
+
+.not_streamed:
     test byte [si + DF_FLAGS], DFF_DIRTY
     jz .no_flush
 

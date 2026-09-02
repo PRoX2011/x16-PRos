@@ -53,40 +53,10 @@ fs_get_file_list:
 
 .list_root_dir:
     call fs_reset_floppy
-
-    mov ax, [fs_root_lba]
-    call fs_convert_l2hts
-
-    mov si, disk_buffer
-    mov bx, si
-
-    mov ah, 2
-    mov al, [fs_root_secs]
-    mov byte [.read_retries], 5
-    pusha
-
-.read_root_dir:
-    popa
-    pusha
-
-    push ds
-    pop es
-    stc
-    int 13h
-    jnc .show_dir_init
-
-    dec byte [.read_retries]
-    jz .root_read_fail
-    call fs_reset_floppy
-    jnc .read_root_dir
-    jmp .root_read_fail
-
-.root_read_fail:
-    popa
-    jmp .done
+    call fs_read_root_dir           ; a track at a time, so it survives
+    jc .done                        ; a boundary on real hardware
 
 .show_dir_init:
-    popa
 
     mov ax, KERNEL_WORK_SEG
     mov es, ax
@@ -364,15 +334,9 @@ fs_load_huge_file:
     jmp .search_subdir
 
 .search_root:
-    mov ax, [fs_root_lba]
-    call fs_convert_l2hts
-    mov si, disk_buffer
-    mov bx, si
-    mov ah, 2
-    mov al, [fs_root_secs]
-    stc
-    int 13h
+    call fs_read_root_dir
     jc .error_exit
+    mov si, disk_buffer
 
     mov cx, [fs_root_ents]
     xor bx, bx
@@ -1173,6 +1137,213 @@ fs_write_huge_file:
 .wh_free_clusters    times 128 dw 0
 
 ; ========================================================================
+; FS_EXTEND_CHAIN - hand a file one more cluster
+;
+; IN : AX = the file's last cluster, or 0 when it has none yet
+; OUT : AX = the new cluster
+;       CF = 1 when the volume is full or the FAT could not be written
+; ========================================================================
+fs_extend_chain:
+    push bx
+    push cx
+    push dx
+    push si
+
+    mov [.prev], ax
+
+    call fs_read_fat
+    jc .fail
+
+    mov cx, 2
+.scan:
+    mov ax, [fs_total_clus]
+    add ax, 2
+    cmp cx, ax
+    jae .fail
+
+    mov ax, cx
+    call fs_fat12_cluster_offset
+    mov si, disk_buffer
+    add si, ax
+    mov ax, [si]
+    or dx, dx
+    jz .even
+    shr ax, 4
+    jmp .test
+.even:
+    and ax, 0x0FFF
+.test:
+    test ax, ax
+    jz .found
+    inc cx
+    jmp .scan
+
+.found:
+    mov ax, cx
+    call fs_fat12_cluster_offset
+    mov si, disk_buffer
+    add si, ax
+    mov ax, [si]
+    or dx, dx
+    jz .eof_even
+    and ax, 0x000F
+    or ax, 0xFF80
+    mov [si], ax
+    jmp .link
+.eof_even:
+    and ax, 0xF000
+    or ax, 0x0FF8
+    mov [si], ax
+
+.link:
+    mov ax, [.prev]
+    test ax, ax
+    jz .store
+    call fs_fat12_cluster_offset
+    mov si, disk_buffer
+    add si, ax
+    mov ax, [si]
+    or dx, dx
+    jz .link_even
+    and ax, 0x000F
+    mov bx, cx
+    shl bx, 4
+    or ax, bx
+    mov [si], ax
+    jmp .store
+.link_even:
+    and ax, 0xF000
+    or ax, cx
+    mov [si], ax
+
+.store:
+    call fs_write_fat
+    jc .fail
+
+    mov ax, cx
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    clc
+    ret
+
+.fail:
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    stc
+    ret
+
+.prev dw 0
+
+; ========================================================================
+; FS_SET_FILE_INFO - write a file's first cluster and length into its
+; directory entry
+;
+; IN : AX = file name, BX = first cluster, CX = length low,
+;      DX = length high
+; OUT : CF = 1 on error
+; ========================================================================
+fs_set_file_info:
+    pusha
+    push es
+
+    mov [.first], bx
+    mov [.size_lo], cx
+    mov [.size_hi], dx
+
+    push ds
+    pop es
+    call string_string_uppercase
+    call int_filename_convert
+    jc .fail
+
+    mov si, ax
+    mov di, .name
+    mov cx, 12
+    cld
+    rep movsb
+
+    cmp word [current_dir_cluster], 0
+    jne .subdir
+
+    call fs_read_root_dir
+    jc .fail
+    mov ax, .name
+    mov di, disk_buffer
+    call fs_get_root_entry
+    jc .fail
+    call .patch
+    call fs_write_root_dir
+    jc .fail
+    jmp .ok
+
+.subdir:
+    mov ax, [current_dir_cluster]
+    call fs_cluster_lba
+    mov [.dirsec], ax
+.dir_read:
+    mov ax, [.dirsec]
+    call fs_convert_l2hts
+    mov bx, disk_buffer
+    mov ah, 2
+    mov al, 1
+    stc
+    int 13h
+    jc .fail
+
+    mov ax, .name
+    mov di, disk_buffer
+    call fs_get_subdir_entry
+    jnc .patch_it
+
+    mov ax, [.dirsec]
+    call fs_next_dir_sector
+    jc .fail
+    mov [.dirsec], ax
+    jmp .dir_read
+
+.patch_it:
+    call .patch
+    mov ax, [.dirsec]
+    call fs_convert_l2hts
+    mov bx, disk_buffer
+    mov ah, 3
+    mov al, 1
+    stc
+    int 13h
+    jc .fail
+
+.ok:
+    pop es
+    popa
+    clc
+    ret
+
+.fail:
+    pop es
+    popa
+    stc
+    ret
+
+.patch:
+    mov ax, [.first]
+    mov [di+26], ax
+    mov ax, [.size_lo]
+    mov [di+28], ax
+    mov ax, [.size_hi]
+    mov [di+30], ax
+    ret
+
+.first    dw 0
+.size_lo  dw 0
+.size_hi  dw 0
+.dirsec   dw 0
+.name     times 13 db 0
+
+; ========================================================================
 ; FS_WRITE_FILE - Writes a file to the current directory
 ; IN : AX = file name, BX = data address, CX = size
 ; OUT : CF = error flag
@@ -1307,6 +1478,14 @@ fs_file_exists:
 ; OUT : CF = error flag
 ; ========================================================================
 fs_create_file:
+    push es
+    push ds
+    pop es
+    call fs_create_file_body
+    pop es
+    ret
+
+fs_create_file_body:
     clc
     call string_string_uppercase
     call int_filename_convert
@@ -1432,6 +1611,14 @@ fs_create_file:
 ; OUT : CF = error flag
 ; =========================================================================
 fs_remove_file:
+    push es
+    push ds
+    pop es
+    call fs_remove_file_body
+    pop es
+    ret
+
+fs_remove_file_body:
     pusha
     call string_string_uppercase
     call int_filename_convert
@@ -1594,6 +1781,14 @@ fs_remove_file:
 .target_file dw 0
 
 fs_rename_file:
+    push es
+    push ds
+    pop es
+    call fs_rename_file_body
+    pop es
+    ret
+
+fs_rename_file_body:
     push bx
     push ax
     clc
@@ -1718,6 +1913,10 @@ fs_get_file_size:
     mov [.tmp], ebx
     mov bx, [di+26]
     mov [.clus], bx
+    mov bx, [di+22]
+    mov [fs_last_ftime], bx
+    mov bx, [di+24]
+    mov [fs_last_fdate], bx
     popa
     mov ebx, [.tmp]
     mov dx, [.tmp+2]
@@ -1736,6 +1935,9 @@ fs_get_file_size:
 .tmp dd 0
 .clus dw 0
 
+fs_last_ftime dw 0
+fs_last_fdate dw 0
+
 fs_fatal_error:
     pusha
     mov si, ax
@@ -1746,62 +1948,83 @@ fs_fatal_error:
 
 int_filename_convert:
     pusha
+    push es
+    push ax
+    mov ax, ds
+    mov es, ax
+    pop ax
+
     mov si, ax
     call string_string_length
-    cmp ax, 14
-    jg .failure
+    cmp ax, 12
+    ja .failure
     test ax, ax
     je .failure
-    mov dx, ax
+
     mov di, .dest_string
     xor cx, cx
 
-.copy_loop:
+.copy_base:
     lodsb
+    test al, al
+    je .base_done
     cmp al, '.'
-    je .extension_found
+    je .base_done
+    cmp cx, 8
+    jae .failure
     stosb
     inc cx
-    cmp cx, dx
-    jg .failure
-    jmp .copy_loop
+    jmp .copy_base
 
-.extension_found:
-    test cx, cx
-    je .failure
+.base_done:
     cmp cx, 8
-    je .do_extension
-.add_spaces:
+    jae .copy_ext
+.pad_base:
     mov byte [di], ' '
     inc di
     inc cx
     cmp cx, 8
-    jl .add_spaces
-.do_extension:
+    jb .pad_base
+
+.copy_ext:
+    xor cx, cx
+    test al, al
+    jz .pad_ext
+.ext_loop:
     lodsb
-    cmp al, 0
-    je .failure
+    test al, al
+    je .pad_ext
+    cmp cx, 3
+    jae .failure
     stosb
-    lodsb
-    cmp al, 0
-    je .failure
-    stosb
-    lodsb
-    cmp al, 0
-    je .failure
-    stosb
+    inc cx
+    jmp .ext_loop
+
+.pad_ext:
+    cmp cx, 3
+    jae .terminate
+.pad_ext_loop:
+    mov byte [di], ' '
+    inc di
+    inc cx
+    cmp cx, 3
+    jb .pad_ext_loop
+
+.terminate:
     mov byte [di], 0
+    pop es
     popa
     mov ax, .dest_string
     clc
     ret
 
 .failure:
+    pop es
     popa
     stc
     ret
 
-.dest_string times 13 db 0
+.dest_string times 16 db 0
 
 ; ========================================================================
 ; FS_GET_DIR_ENTRY - Searches disk_buffer for a directory entry
@@ -1869,37 +2092,86 @@ fs_get_subdir_entry:
     pop cx
     ret
 
+; ========================================================================
+; FS_SECTOR_RUN - move a run of sectors, a track at a time
+;
+; IN : AX = first LBA, CX = sectors, ES:BX = buffer,
+;      DH = 2 to read, 3 to write
+; OUT : CF = 1 if the run could not be moved
+; ========================================================================
+fs_sector_run:
+    pusha
+    mov [.op], dh
+    mov [.lba], ax
+    mov [.left], cx
+
+.chunk:
+    cmp word [.left], 0
+    je .done
+
+    mov ax, [.lba]
+    xor dx, dx
+    div word [SecsPerTrack]
+    mov ax, [SecsPerTrack]
+    sub ax, dx
+    cmp ax, [.left]
+    jbe .have
+    mov ax, [.left]
+.have:
+    mov [.this], ax
+
+    mov byte [.retries], 5
+.attempt:
+    mov ax, [.lba]
+    call fs_convert_l2hts
+    mov ah, [.op]
+    mov al, [.this]
+    stc
+    int 13h
+    jnc .moved
+    dec byte [.retries]
+    jz .fail
+    call fs_reset_floppy
+    jmp .attempt
+
+.moved:
+    mov ax, [.this]
+    add [.lba], ax
+    sub [.left], ax
+    push cx
+    mov cx, 9
+    shl ax, cl
+    pop cx
+    add bx, ax
+    jmp .chunk
+
+.done:
+    popa
+    clc
+    ret
+
+.fail:
+    popa
+    stc
+    ret
+
+.op      db 0
+.retries db 0
+.lba     dw 0
+.left    dw 0
+.this    dw 0
+
 fs_read_fat:
     push es
     pusha
+    push ds
+    pop es
     mov ax, [fs_fat_lba]
-    call fs_convert_l2hts
-    mov si, disk_buffer
-    mov bx, ds
-    mov es, bx
-    mov bx, si
-    mov ah, 2
-    mov al, [fs_fat_secs]
-    mov byte [.retries], 5
-    pusha
-
-.read_fat_loop:
-    popa
-    pusha
-    stc
-    int 13h
-    jnc .fat_done
-    dec byte [.retries]
-    jz .retry_exhausted
-    call fs_reset_floppy
-    jnc .read_fat_loop
-
-.retry_exhausted:
-    popa
-    jmp .read_failure
-
-.fat_done:
-    popa
+    mov bx, disk_buffer
+    movzx cx, byte [fs_fat_secs]
+    mov dh, 2
+    call fs_sector_run
+    jc .read_failure
     popa
     pop es
     clc
@@ -1911,90 +2183,69 @@ fs_read_fat:
     stc
     ret
 
-.retries db 0
-
 fs_write_fat:
+    push es
     pusha
+    push ds
+    pop es
     mov ax, [fs_fat_lba]
-    call fs_convert_l2hts
-    mov si, disk_buffer
-    mov bx, ds
-    mov es, bx
-    mov bx, si
-    mov ah, 3
-    mov al, [fs_fat_secs]
-    stc
-    int 13h
+    mov bx, disk_buffer
+    movzx cx, byte [fs_fat_secs]
+    mov dh, 3
+    call fs_sector_run
     jc .write_failure
     popa
+    pop es
     clc
     ret
 
 .write_failure:
     popa
+    pop es
     stc
     ret
 
 fs_read_root_dir:
+    push es
     pusha
+    push ds
+    pop es
     mov ax, [fs_root_lba]
-    call fs_convert_l2hts
-    mov si, disk_buffer
-    mov bx, ds
-    mov es, bx
-    mov bx, si
-    mov ah, 2
-    mov al, [fs_root_secs]
-    mov byte [.retries], 5
-    pusha
-
-.read_root_dir_loop:
+    mov bx, disk_buffer
+    movzx cx, byte [fs_root_secs]
+    mov dh, 2
+    call fs_sector_run
+    jc .read_failure
     popa
-    pusha
-    stc
-    int 13h
-    jnc .root_dir_finished
-    dec byte [.retries]
-    jz .retry_exhausted
-    call fs_reset_floppy
-    jnc .read_root_dir_loop
-
-.retry_exhausted:
-    popa
-    jmp .read_failure
-
-.root_dir_finished:
-    popa
-    popa
+    pop es
     clc
     ret
 
 .read_failure:
     popa
+    pop es
     stc
     ret
 
-.retries db 0
-
 fs_write_root_dir:
+    push es
     pusha
+    push ds
+    pop es
     mov ax, [fs_root_lba]
-    call fs_convert_l2hts
-    mov si, disk_buffer
-    mov bx, ds
-    mov es, bx
-    mov bx, si
-    mov ah, 3
-    mov al, [fs_root_secs]
-    stc
-    int 13h
+    mov bx, disk_buffer
+    movzx cx, byte [fs_root_secs]
+    mov dh, 3
+    call fs_sector_run
     jc .write_failure
     popa
+    pop es
     clc
     ret
 
 .write_failure:
     popa
+    pop es
     stc
     ret
 
@@ -2253,6 +2504,9 @@ fs_free_space:
 ; ======================================================================
 fs_create_directory:
     pusha
+    push es
+    push ds
+    pop es
 
     mov si, ax
     mov di, .dir_name_buffer
@@ -2263,7 +2517,18 @@ fs_create_directory:
     call int_dirname_convert
     jc .failure
 
-    mov [.dirname_converted], ax
+    push si
+    push di
+    push cx
+    mov si, ax
+    mov di, .name_fcb
+    mov cx, 11
+    cld
+    rep movsb
+    pop cx
+    pop di
+    pop si
+    mov word [.dirname_converted], .name_fcb
 
     mov ax, [.dirname_converted]
     call fs_file_exists
@@ -2462,20 +2727,23 @@ fs_create_directory:
     jc .failure
 
 .mkdir_done:
+    pop es
     popa
     clc
     ret
 
 .failure:
+    pop es
     popa
     stc
     ret
 
 .dirname_converted  dw 0
+.name_fcb           times 12 db 0
 .cluster            dw 0
 .parent_cluster     dw 0
-.dir_lba        dw 0
-.dir_left       dw 0
+.dir_lba            dw 0
+.dir_left           dw 0
 .dir_name_buffer    times 32 db 0
 
 ; ========================================================================
@@ -2590,7 +2858,14 @@ fs_is_directory:
 ; CF = 0 on success, CF = 1 on error
 ; =======================================================================
 int_dirname_convert:
+    mov [.src_ptr], ax
+
     pusha
+    push es
+    push ax
+    mov ax, ds
+    mov es, ax
+    pop ax
     mov si, ax
     call string_string_length
     test ax, ax
@@ -2600,7 +2875,7 @@ int_dirname_convert:
     mov di, .dest_string
     xor cx, cx
     mov si, ax
-    mov si, [esp + 14]
+    mov si, [.src_ptr]
 
     push si
     xor bx, bx
@@ -2649,13 +2924,14 @@ int_dirname_convert:
     mov byte [di], 'R'
     inc di
     mov byte [di], 0
+    pop es
     popa
     mov ax, .dest_string
     clc
     ret
 
 .has_extension:
-    mov si, [esp + 14]
+    mov si, [.src_ptr]
     xor cx, cx
 
 .copy_loop:
@@ -2696,16 +2972,19 @@ int_dirname_convert:
     je .failure
     stosb
     mov byte [di], 0
+    pop es
     popa
     mov ax, .dest_string
     clc
     ret
 
 .failure:
+    pop es
     popa
     stc
     ret
 
+.src_ptr     dw 0
 .dest_string times 13 db 0
 
 ; ========================================================================
@@ -2714,6 +2993,14 @@ int_dirname_convert:
 ; OUT : CF = 0 if successful, CF = 1 if error
 ; ======================================================================
 fs_remove_directory:
+    push es
+    push ds
+    pop es
+    call fs_remove_directory_body
+    pop es
+    ret
+
+fs_remove_directory_body:
     pusha
 
     mov si, ax
@@ -2909,6 +3196,14 @@ fs_remove_directory:
 ;       Updates current_dir_cluster and appends to current_directory path
 ; =======================================================================
 fs_change_directory:
+    push es
+    push ds
+    pop es
+    call fs_change_directory_body
+    pop es
+    ret
+
+fs_change_directory_body:
     pusha
 
     ; Save uppercased name before 8.3 conversion
@@ -3053,6 +3348,14 @@ fs_change_directory:
 ; OUT : CF = 0 if successful, CF = 1 if already in the root
 ; =========================================================================
 fs_parent_directory:
+    push es
+    push ds
+    pop es
+    call fs_parent_directory_body
+    pop es
+    ret
+
+fs_parent_directory_body:
     pusha
 
     cmp word [current_dir_cluster], 0
@@ -3647,6 +3950,31 @@ fs_list_drives:
 .free_kb        dw 0
 .used_kb        dw 0
 
+; ==================================================================
+; FS_DIR_SLOT - where a drive's remembered directory is kept
+; IN : AL = drive letter
+; OUT: DI = slot: a cluster word followed by 64 bytes of path
+; ==================================================================
+fs_dir_slot:
+    push ax
+    push bx
+    sub al, 'A'
+    cmp al, FS_DIR_SLOTS
+    jb .in_range
+    xor al, al
+.in_range:
+    xor ah, ah
+    mov bx, 66
+    mul bx
+    mov di, drive_dirs
+    add di, ax
+    pop bx
+    pop ax
+    ret
+
+FS_DIR_SLOTS equ 4
+drive_dirs times FS_DIR_SLOTS * 66 db 0
+
 ; ========================================================================
 ; FS_CHANGE_DRIVE_LETTER - Switch drive by letter (AL = Char)
 ; IN: AL = Drive letter
@@ -3677,13 +4005,45 @@ fs_change_drive_letter:
     jmp .scan_loop
 
 .found:
-    mov bl, [si+1]
+    mov bl, [si]
+    cmp bl, [current_drive_char]
+    je .same_drive
+
+    push si
+    mov al, [current_drive_char]
+    call fs_dir_slot
+    mov ax, [current_dir_cluster]
+    mov [di], ax
+    add di, 2
+    push ds
+    pop es
+    mov si, current_directory
+    mov cx, 64
+    cld
+    rep movsb
+    pop si
+
+    mov bl, [si + 1]
     mov [current_disk], bl
     mov bl, [si]
     mov [current_drive_char], bl
 
-    mov byte [current_directory], 0
-    mov word [current_dir_cluster], 0
+    mov al, bl
+    call fs_dir_slot
+    mov ax, [di]
+    mov [current_dir_cluster], ax
+    add di, 2
+    push ds
+    pop es
+    push si
+    mov si, di
+    mov di, current_directory
+    mov cx, 64
+    cld
+    rep movsb
+    pop si
+
+.same_drive:
 
     call fs_reset_floppy
     call fs_update_geometry
@@ -3734,6 +4094,9 @@ fs_update_geometry:
     inc ax
     mov [Sides], ax
 
+    push es
+    mov ax, ds 
+    mov es, ax
     mov ah, 02h
     mov al, 1
     mov ch, 0
@@ -3742,6 +4105,7 @@ fs_update_geometry:
     mov dl, [current_disk]
     mov bx, disk_buffer
     int 13h
+    pop es
     jc .error
 
     call fs_layout_from_bpb

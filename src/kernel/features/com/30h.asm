@@ -1,5 +1,5 @@
 com_30h:
-    mov ax, 0x0005      ; AL=major(5), AH=minor(0)
-    xor bx, bx          ; BH=OEM, BL=revision
+    mov ax, 0x1E03  ; AL=major(3), AH=minor(30)
+    xor bx, bx
     xor cx, cx
     iret

@@ -6,11 +6,14 @@ com_41h:
 
     push dx
     push ds
+    push es
     mov dx, ax
     mov ax, KERNEL_DATA_SEG
     mov ds, ax
+    mov es, ax
     mov ax, dx
     call fs_remove_file
+    pop es
     pop ds
     pop dx
     jc .fail

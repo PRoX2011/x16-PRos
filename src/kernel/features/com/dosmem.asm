@@ -8,10 +8,11 @@ DOSMEM_ENV_SEG   equ DOSMEM_BASE
 DOSMEM_ENV_PARAS equ 0x0040
 
 DOSMEM_SLOTS     equ 24
-DOSMEM_ENT       equ 5
+DOSMEM_ENT       equ 7
 DM_START         equ 0
 DM_PARAS         equ 2
 DM_USED          equ 4
+DM_OWNER         equ 5
 
 dosmem_probe_top:
     push ax
@@ -54,35 +55,47 @@ dosmem_init:
     cld
     rep stosb
 
-    mov word [dosmem_table + DM_START], DOSMEM_ENV_SEG
+    ; --- slot 0: the environment block ---
+    mov ax, [dosmem_env_seg]
+    mov [dosmem_table + DM_START], ax
     mov word [dosmem_table + DM_PARAS], DOSMEM_ENV_PARAS
     mov byte [dosmem_table + DM_USED], 1
+    add ax, DOSMEM_ENV_PARAS
+    mov dx, ax
 
-    mov word [dosmem_table + DOSMEM_ENT + DM_START], EXE_PSP_SEG
-    mov ax, [dosmem_top_seg]
-    sub ax, EXE_PSP_SEG
-    mov bx, [dosmem_prog_paras]
-    test bx, bx
-    jz .whole_arena
-    cmp bx, ax
-    jae .whole_arena
-
+    ; --- slot 1: the program's own block ---
+    mov ax, [dosmem_prog_base]
+    mov [dosmem_table + DOSMEM_ENT + DM_START], ax
+    mov bx, [dosmem_top_seg]
+    sub bx, ax
+    mov cx, [dosmem_prog_paras]
+    test cx, cx
+    jz .prog_all
+    cmp cx, bx
+    jae .prog_all
+    mov bx, cx
+.prog_all:
     mov [dosmem_table + DOSMEM_ENT + DM_PARAS], bx
     mov byte [dosmem_table + DOSMEM_ENT + DM_USED], 1
+    add ax, bx
 
-    sub ax, bx
-    add bx, EXE_PSP_SEG
-    mov [dosmem_table + 2 * DOSMEM_ENT + DM_START], bx
-    mov [dosmem_table + 2 * DOSMEM_ENT + DM_PARAS], ax
+    ; --- slot 2: whatever is left is free ---
+    cmp ax, dx
+    jae .free_start
+    mov ax, dx
+.free_start:
+    mov bx, [dosmem_top_seg]
+    cmp ax, bx
+    jae .slots_ready
+    sub bx, ax
+    mov [dosmem_table + 2 * DOSMEM_ENT + DM_START], ax
+    mov [dosmem_table + 2 * DOSMEM_ENT + DM_PARAS], bx
     mov byte [dosmem_table + 2 * DOSMEM_ENT + DM_USED], 0
-    jmp .slots_ready
-
-.whole_arena:
-    mov [dosmem_table + DOSMEM_ENT + DM_PARAS], ax
-    mov byte [dosmem_table + DOSMEM_ENT + DM_USED], 1
 
 .slots_ready:
     mov word [dosmem_prog_paras], 0
+    mov word [dosmem_prog_base], EXE_PSP_SEG
+    mov word [dosmem_env_seg], DOSMEM_ENV_SEG
 
     pop es
     pop ds
@@ -244,6 +257,10 @@ dosmem_alloc:
 
 .take_whole:
     mov byte [si + DM_USED], 1
+    push ax
+    mov ax, [cs:dos_current_psp]
+    mov [si + DM_OWNER], ax
+    pop ax
     mov ax, [si + DM_START]
     pop ds
     pop di
@@ -399,10 +416,43 @@ dosmem_resize:
     stc
     ret
 
+; ==================================================================
+; DOSMEM_FREE_OWNER - release every block a process still holds
+;
+; IN : AX = the PSP whose memory should go
+; ==================================================================
+dosmem_free_owner:
+    pusha
+    push ds
+
+    mov bx, ax
+    mov ax, KERNEL_DATA_SEG
+    mov ds, ax
+
+    mov si, dosmem_table
+    mov cx, DOSMEM_SLOTS
+.scan:
+    cmp byte [si + DM_USED], 0
+    je .next
+    cmp [si + DM_OWNER], bx
+    jne .next
+    mov byte [si + DM_USED], 0
+    mov word [si + DM_OWNER], 0
+.next:
+    add si, DOSMEM_ENT
+    loop .scan
+
+    call dosmem_coalesce
+
+    pop ds
+    popa
+    ret
+
+
 section .data
 
 dosmem_table times DOSMEM_SLOTS * DOSMEM_ENT db 0
 dosmem_top_seg dw DOSMEM_TOP
 dosmem_prog_paras dw 0
-
-section .text
+dosmem_prog_base dw EXE_PSP_SEG
+dosmem_env_seg   dw DOSMEM_ENV_SEG

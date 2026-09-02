@@ -23,7 +23,7 @@ com_40h:
     jc .fail
 
     call dosfile_materialise
-    jc .full
+    jc .stream
 
     test cx, cx
     jz .truncate
@@ -35,17 +35,20 @@ com_40h:
     call dosfile_grow
     jnc .have_room
 
-    call dosfile_capacity
-    sub ax, [si + DF_POS]
-    sbb dx, [si + DF_POS + 2]
-    jb .full
-    test dx, dx
-    jnz .have_room
-    test ax, ax
-    jz .full
-    cmp ax, cx
-    jae .have_room
-    mov cx, ax
+    call dosfile_spill
+    jc .full
+    jmp .stream
+
+.to_stream:
+    test byte [si + DF_FLAGS], DFF_STREAM
+    jnz .stream
+    call dosfile_spill
+    jc .full
+
+.stream:
+    mov cx, [cs:dosf_count]
+    call dosfile_write_stream
+    jmp .ok
 
 .have_room:
     call dosfile_fill_gap
@@ -128,6 +131,7 @@ com_40h:
     mov ax, [cs:dosf_count]
 
 .ok:
+    call dosvars_sync_sft
     and word [bp+6], 0xFFFE
     pop es
     pop ds

@@ -63,11 +63,6 @@ DISK_BUFFER_OFF      equ 0xE000
 DISK_BUFFER_SIZE     equ 0x1C00
 KERNEL_WORK_END_OFF  equ DISK_BUFFER_OFF + DISK_BUFFER_SIZE  ; 0xFC00
 
-; Sector staging for file transfers. It has to live outside disk_buffer:
-; that holds the FAT while a file is being walked, and staging a sector
-; through it destroys the chain half way down a large file. Physical
-; 0x3E00, in the free low RAM below the boot sector, and 512 bytes from
-; there never cross a 64 KiB DMA boundary.
 FS_STAGE_SEG         equ KERNEL_WORK_SEG
 FS_STAGE_OFF         equ 0x3800
 
@@ -1063,6 +1058,19 @@ execute_com:
     mov [com_stack_save], sp
     mov [com_ss_save], ss
     mov byte [com_active], 1
+    mov ax, [program_seg_runtime]
+    mov [dos_current_psp], ax
+    mov [dosmem_prog_base], ax
+    mov word [dosmem_prog_paras], 0x1000
+    add ax, 0x1000
+    mov [dosmem_env_seg], ax
+
+    mov ax, [dosmem_top_seg]
+    mov [exe_mem_top], ax
+
+    mov ax, [program_seg_runtime]
+    mov si, [param_list]
+    call exe_build_psp
 
     call api_dos_init
 
@@ -1071,16 +1079,13 @@ execute_com:
     mov ds, ax
     mov es, ax
 
-    mov byte [ds:0x0000], COM_EXIT_OPCODE
-    mov byte [ds:0x0001], DOS_INT20_VECTOR
-
     ; Setup COM program stack
     cli
     mov ss, ax
     mov sp, COM_STACK_TOP
     sti
 
-    call DisableMouse
+    call mouse_dos_begin
 
     mov ah, 0x00
     mov al, 0x03

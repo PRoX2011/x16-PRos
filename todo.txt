@@ -1,7 +1,11 @@
-[ IN PROGRESS ] Implement all MS-DOS system calls for the compatibility layer (37/87)
+[ IN PROGRESS ] Implement all MS-DOS INT 0x21 system calls for the compatibility layer (71/93)
+
 [     DONE    ] Implement cooperative multitasking
 [     DONE    ] Add malloc, mfree
-[     TODO    ] GUI
+[     DONE    ] GUI
+[     DONE    ] RUN DOOM!
+[     DONE    ] Run Microsoft Windows 1x
+
 [     TODO    ] Midi driver
 [     TODO    ] VESA
 [     TODO    ] EMS
@@ -11,5 +15,7 @@
 [     TODO    ] I/O redirection and pipes (cmd > file, cmd1 | cmd2)
 [     TODO    ] Batch script support (.BAT / .SH style)
 [     TODO    ] System uptime counter and INT 0x23 syscall to query it
-[     DONE    ] RUN DOOM!
-[     TODO    ] Run Microsoft Windows
+[     TODO    ] Run Microsoft Windows 3x
+[     TODO    ] Run Wolf3D
+[     TODO    ] DPMI
+[     TODO    ] XMS

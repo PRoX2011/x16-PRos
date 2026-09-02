@@ -28,6 +28,7 @@ com_3Fh:
     mov es, [cs:dosf_caller_ds]
     mov di, [cs:dosf_caller_dx]
     call dosfile_read_stream
+
     jmp .ok
 
 .buffered:
@@ -105,6 +106,7 @@ com_3Fh:
     mov ax, 1
 
 .ok:
+    call dosvars_sync_sft
     and word [bp+6], 0xFFFE
     pop es
     pop ds
