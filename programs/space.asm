@@ -117,6 +117,7 @@ game_loop:
     ; Restore video mode on exit
     mov ax, 0x12
     int 0x10
+    popa
     ret
 
 game_over_screen:
