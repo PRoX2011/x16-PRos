@@ -2085,23 +2085,20 @@ cd_command:
     jmp .skip_empty_comp
 
 .not_dotdot_comp:
-    ; Auto-append .DIR if no extension
+    mov ax, .comp_buffer
+    call fs_change_directory
+    jnc .skip_empty_comp
+
     mov si, .comp_buffer
-    xor bx, bx
 .check_comp_dot:
     lodsb
     cmp al, 0
-    je .comp_check_dot_done
+    je .comp_no_ext
     cmp al, '.'
-    je .comp_has_dot
+    je .cd_rollback
     jmp .check_comp_dot
-.comp_has_dot:
-    mov bx, 1
-.comp_check_dot_done:
-    test bx, bx
-    jne .comp_has_ext
 
-    ; Append .DIR
+.comp_no_ext:
     mov si, .comp_buffer
     mov ax, si
     call string_string_length
@@ -2113,7 +2110,6 @@ cd_command:
     mov byte [si+3], 'R'
     mov byte [si+4], 0
 
-.comp_has_ext:
     mov ax, .comp_buffer
     call fs_change_directory
     jc .cd_rollback
