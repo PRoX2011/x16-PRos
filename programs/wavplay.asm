@@ -4,6 +4,9 @@
 ; Based on Leonardo Ono's playpcm.asm (https://github.com/leonardo-ono/Assembly8086SBHardwareLevelDspProgrammingTest/blob/master/playpcm2.asm)
 ; Ported and improved by PRoX2011
 ;
+; The file is streamed off the volume a chunk at a time (INT 0x22
+; function 0x15), so its size is not limited by free memory.
+;
 ; Usage: wavplay <filename.wav>
 ; ==================================================================
 
@@ -11,8 +14,8 @@
 [BITS 16]
 [ORG 8000h]
 
-WAV_LOAD_SEG  equ 0x3000
-WAV_LOAD_OFF  equ 0x0000
+WAV_BUF_SEG   equ 0x3000
+WAV_CHUNK     equ 0xF000		; bytes pulled off the volume at a time
 WAV_DATA_OFF  equ 44
 
 start:
@@ -22,27 +25,27 @@ start:
 		mov bl, 0x0E
 		int 0x21
 
-		mov ah, 0x08
-		mov si, warning_msg
-		int 0x21
-
 		mov ah, 0x01
 		mov si, loading_msg
 		int 0x21
 
-		; Load WAV file
-		mov ah, 0x10
+		; Open the file for streaming
+		mov ax, 0x1500
 		mov si, [filename_ptr]
-		mov cx, WAV_LOAD_OFF
-		mov dx, WAV_LOAD_SEG
 		int 0x22
 		jc .load_error
+		mov [handle], bx
 
-		mov ax, WAV_LOAD_SEG
+		call read_chunk
+		cmp ax, WAV_DATA_OFF
+		jbe .invalid_format
+
+		mov [buf_left], ax
+		sub word [buf_left], WAV_DATA_OFF
+
+		mov ax, WAV_BUF_SEG
 		mov es, ax
-
-		; Parse WAV header
-		mov si, WAV_LOAD_OFF
+		xor si, si
 
 		; Check "RIFF" signature
 		mov ax, [es:si]
@@ -82,17 +85,25 @@ start:
 
 		call sb_speaker_on
 
-		mov ax, WAV_LOAD_OFF
-		add ax, WAV_DATA_OFF
-		mov [curr_off], ax
-
-		mov word [sound_index], 0
+		mov word [curr_off], WAV_DATA_OFF
 
 	.play_loop:
 		mov ah, 1
 		int 16h
 		jnz .stop_playing
 
+		cmp word [buf_left], 0
+		jne .have_data
+
+		call read_chunk
+		cmp ax, 0
+		je .stop_playing
+		mov [buf_left], ax
+		mov word [curr_off], 0
+		mov ax, WAV_BUF_SEG
+		mov es, ax
+
+	.have_data:
 		mov bl, 10h
 		call sb_write_dsp
 
@@ -101,32 +112,30 @@ start:
 		call sb_write_dsp
 
 		inc word [curr_off]
-		jnz .no_seg_update
-		mov ax, es
-		add ax, 0x1000
-		mov es, ax
-	.no_seg_update:
+		dec word [buf_left]
 
 		mov cx, [delay_value]
 	.delay:
 		nop
 		loop .delay
 
-		inc word [sound_index]
-
-		mov ax, [sound_index]
-		mov dx, [sound_index+2]
-		cmp dx, [data_size+2]
-		ja .stop_playing
-		jb .play_loop
-		cmp ax, [data_size]
-		jb .play_loop
+		sub word [data_size], 1
+		sbb word [data_size+2], 0
+		mov ax, [data_size]
+		or ax, [data_size+2]
+		jnz .play_loop
 
 	.stop_playing:
+		mov ah, 1
+		int 16h
+		jz .no_key
 		mov ah, 0
 		int 16h
+	.no_key:
 
 		call sb_speaker_off
+
+		call close_file
 
 		mov ah, 0x02
 		mov si, done_msg
@@ -141,9 +150,46 @@ start:
 		ret
 
 	.invalid_format:
+		call close_file
 		mov ah, 0x04
 		mov si, format_error_msg
 		int 0x21
+		ret
+
+; ==================================================================
+; read_chunk - pull the next piece of the file into WAV_BUF_SEG:0000
+; OUT: AX = bytes read, 0 at end of file
+; ==================================================================
+read_chunk:
+		push bx
+		push cx
+		push dx
+		push di
+
+		mov ax, 0x1501
+		mov bx, [handle]
+		mov cx, WAV_CHUNK
+		mov dx, WAV_BUF_SEG
+		xor di, di
+		int 0x22
+		jnc .done
+		xor ax, ax
+
+	.done:
+		pop di
+		pop dx
+		pop cx
+		pop bx
+		ret
+
+close_file:
+		push ax
+		push bx
+		mov ax, 0x1504
+		mov bx, [handle]
+		int 0x22
+		pop bx
+		pop ax
 		ret
 
 ; ==================================================================
@@ -294,17 +340,13 @@ calculate_delay:
 
 
 filename_ptr   dw 0
-sound_index    dd 0
+handle         dw 0
+buf_left       dw 0
 data_size      dd 0
 sample_rate    dw 0
 delay_value    dw 0
 curr_off       dw 0
 
-warning_msg      db '+======================================================+', 10, 13
-                 db '|                  !! WARNING !!                       |', 10, 13
-                 db '|      wavplay only supports files < 448kib            |', 10, 13
-				 db '| if your file is larger, playback will not be correct |', 10, 13,
-				 db '+======================================================+', 10, 13, 10, 13, 0
 loading_msg      db '  Loading WAV file...', 10, 13, 0
 playing_msg      db '  Playing WAV file. ', 0
 any_key_msg      db 'Press any key to stop.', 10, 13, 0

@@ -4292,3 +4292,684 @@ MAX_DRIVES   equ 16
 
 drive_count db 0
 drives_table times (MAX_DRIVES * 3) db 0
+
+; ========================================================================
+; Streaming file read/write
+; ========================================================================
+
+FSS_SIZE   equ 0            ; file size in bytes
+FSS_POS    equ 4            ; where the next read or write starts
+FSS_FIRST  equ 8            ; first cluster of the chain
+FSS_CCLUS  equ 10           ; last cluster walked to
+FSS_CIDX   equ 12           ; its index in the chain
+FSS_ENT    equ 14
+
+FS_STREAMS equ 8            ; files that can be streamed at once
+
+FST_NAME   equ 0            ; 13 bytes, to update the directory entry on close
+FST_FLAGS  equ 13
+FST_DESC   equ 14
+FST_ENT    equ 28
+
+FSTF_USED  equ 0x01
+FSTF_DIRTY equ 0x02         ; the file was written and needs its entry updated
+
+FS_STREAM_SECTOR equ disk_buffer + 0x1200
+
+; ==================================================================
+; fs_stream_sector_of - which sector of a file a byte offset falls in.
+; IN : DX:AX = byte offset
+; OUT: AX = sector index
+; ==================================================================
+fs_stream_sector_of:
+    push bx
+    push cx
+    mov bx, dx
+    mov cl, 9
+    shr ax, cl
+    mov cl, 7
+    shl bx, cl
+    or ax, bx
+    pop cx
+    pop bx
+    ret
+
+fs_stream_cluster_at:
+    push bx
+    push cx
+
+    mov cx, ax
+    mov ax, [si + FSS_CCLUS]
+    mov bx, [si + FSS_CIDX]
+    test ax, ax
+    jz .from_start
+    cmp cx, bx
+    jae .walk
+.from_start:
+    mov ax, [si + FSS_FIRST]
+    xor bx, bx
+
+.walk:
+    test ax, ax
+    jz .bad
+    cmp bx, cx
+    je .found
+    call fs_fat_next_cluster
+    jc .bad
+    inc bx
+    jmp .walk
+
+.found:
+    mov [si + FSS_CCLUS], ax
+    mov [si + FSS_CIDX], bx
+    pop cx
+    pop bx
+    clc
+    ret
+
+.bad:
+    pop cx
+    pop bx
+    stc
+    ret
+
+; ==================================================================
+; fs_stream_last_cluster - the end of a file's chain
+;
+; IN : SI = stream descriptor
+;      DS = KERNEL_DATA_SEG, the FAT already in disk_buffer
+; OUT: AX = last cluster, or 0 when the file has none yet
+; ==================================================================
+fs_stream_last_cluster:
+    push bx
+    mov ax, [si + FSS_FIRST]
+    test ax, ax
+    jz .none
+.walk:
+    mov bx, ax
+    call fs_fat_next_cluster
+    jc .done
+    test ax, ax
+    jz .done
+    jmp .walk
+.done:
+    mov ax, bx
+.none:
+    pop bx
+    ret
+
+; ==================================================================
+; fs_stream_write_desc - write to a file straight on the volume
+; IN : SI = stream descriptor
+;      BX = bytes wanted
+;      CX = source offset, DX = source segment
+;      DS = KERNEL_DATA_SEG
+; OUT: AX = bytes actually written
+; ==================================================================
+fs_stream_write_desc:
+    push es
+    push di
+    mov [cs:.want], bx
+    mov [cs:.src_off], cx
+    mov [cs:.src_seg], dx
+    mov word [cs:.done], 0
+
+
+    push es
+    call fs_read_fat
+    pop es
+    jc .finish
+
+.next:
+    mov cx, [cs:.want]
+    sub cx, [cs:.done]
+    jz .finish
+
+    mov ax, [si + FSS_POS]
+    and ax, 0x01FF
+    mov [cs:.secoff], ax
+    mov bx, 512
+    sub bx, ax
+    cmp cx, bx
+    jbe .chunk_ready
+    mov cx, bx
+.chunk_ready:
+    mov [cs:.chunk], cx
+
+    mov ax, [si + FSS_POS]
+    mov dx, [si + FSS_POS + 2]
+    call fs_stream_sector_of
+    xor dx, dx
+    div word [fs_spc]
+    mov [cs:.secinclus], dx
+    mov [cs:.clusidx], ax
+
+    call fs_stream_cluster_at
+    jnc .have_cluster
+
+    call fs_stream_last_cluster
+    push es
+    call fs_extend_chain
+    pop es
+    jc .finish
+    cmp word [si + FSS_FIRST], 0
+    jne .chain_grown
+    mov [si + FSS_FIRST], ax
+.chain_grown:
+    mov word [si + FSS_CCLUS], 0
+    mov word [si + FSS_CIDX], 0
+    mov ax, [cs:.clusidx]
+    call fs_stream_cluster_at
+    jc .finish
+
+.have_cluster:
+    mov [cs:.cluster], ax
+
+    cmp word [cs:.chunk], 512
+    je .fill
+
+    mov ax, [si + FSS_POS]
+    mov dx, [si + FSS_POS + 2]
+    and ax, 0xFE00
+    cmp dx, [si + FSS_SIZE + 2]
+    ja .blank
+    jb .read_first
+    cmp ax, [si + FSS_SIZE]
+    jb .read_first
+
+.blank:
+    push es
+    push di
+    push cx
+    push ax
+    push ds
+    pop es
+    mov di, FS_STREAM_SECTOR
+    mov cx, 256
+    xor ax, ax
+    cld
+    rep stosw
+    pop ax
+    pop cx
+    pop di
+    pop es
+    jmp .fill
+
+.read_first:
+    mov ax, [cs:.cluster]
+    call fs_cluster_lba
+    add ax, [cs:.secinclus]
+    call fs_convert_l2hts
+    push es
+    push ds
+    pop es
+    mov bx, FS_STREAM_SECTOR
+    mov ah, 0x02
+    mov al, 0x01
+    stc
+    int 0x13
+    pop es
+
+.fill:
+    push ds
+    push si
+    push di
+    mov ax, [cs:.src_seg]
+    mov ds, ax
+    mov si, [cs:.src_off]
+    add si, [cs:.done]
+    mov ax, KERNEL_DATA_SEG
+    mov es, ax
+    mov di, FS_STREAM_SECTOR
+    add di, [cs:.secoff]
+    mov cx, [cs:.chunk]
+    cld
+    rep movsb
+    pop di
+    pop si
+    pop ds
+
+    mov ax, [cs:.cluster]
+    call fs_cluster_lba
+    add ax, [cs:.secinclus]
+    call fs_convert_l2hts
+    push es
+    push ds
+    pop es
+    mov bx, FS_STREAM_SECTOR
+    mov ah, 0x03
+    mov al, 0x01
+    stc
+    int 0x13
+    pop es
+    jc .finish
+
+    mov ax, [cs:.chunk]
+    add [si + FSS_POS], ax
+    adc word [si + FSS_POS + 2], 0
+    add [cs:.done], ax
+
+    mov ax, [si + FSS_POS]
+    mov dx, [si + FSS_POS + 2]
+    cmp dx, [si + FSS_SIZE + 2]
+    ja .longer
+    jb .next
+    cmp ax, [si + FSS_SIZE]
+    jbe .next
+.longer:
+    mov [si + FSS_SIZE], ax
+    mov [si + FSS_SIZE + 2], dx
+    jmp .next
+
+.finish:
+    mov ax, [cs:.done]
+    pop di
+    pop es
+    ret
+
+.want       dw 0
+.done       dw 0
+.chunk      dw 0
+.secoff     dw 0
+.secinclus  dw 0
+.clusidx    dw 0
+.cluster    dw 0
+.src_off    dw 0
+.src_seg    dw 0
+
+; ==================================================================
+; fs_stream_read_desc - read from a file straight off the volume
+; IN : SI = stream descriptor
+;      BX = bytes wanted
+;      CX = destination offset, DX = destination segment
+;      DS = KERNEL_DATA_SEG
+; OUT: AX = bytes actually read, 0 at the end of the file
+; ==================================================================
+fs_stream_read_desc:
+    push es
+    push di
+    mov [cs:.want], bx
+    mov word [cs:.done], 0
+    mov es, dx
+    mov di, cx
+
+    mov ax, [si + FSS_SIZE]
+    mov dx, [si + FSS_SIZE + 2]
+    sub ax, [si + FSS_POS]
+    sbb dx, [si + FSS_POS + 2]
+    jb .finish
+    test dx, dx
+    jnz .clamped
+    cmp ax, [cs:.want]
+    jae .clamped
+    mov [cs:.want], ax
+.clamped:
+    cmp word [cs:.want], 0
+    je .finish
+
+    cmp word [si + FSS_CCLUS], 0
+    je .need_fat
+    mov ax, [si + FSS_POS]
+    mov dx, [si + FSS_POS + 2]
+    call fs_stream_sector_of
+    xor dx, dx
+    div word [fs_spc]
+    cmp ax, [si + FSS_CIDX]
+    jne .need_fat
+    mov ax, [si + FSS_POS]
+    mov dx, [si + FSS_POS + 2]
+    add ax, [cs:.want]
+    adc dx, 0
+    sub ax, 1
+    sbb dx, 0
+    call fs_stream_sector_of
+    xor dx, dx
+    div word [fs_spc]
+    cmp ax, [si + FSS_CIDX]
+    je .next
+
+.need_fat:
+    push es
+    call fs_read_fat
+    pop es
+    jc .finish
+
+.next:
+    mov cx, [cs:.want]
+    sub cx, [cs:.done]
+    jz .finish
+
+    mov ax, [si + FSS_POS]
+    mov dx, [si + FSS_POS + 2]
+    mov bx, ax
+    and bx, 0x01FF
+    mov [cs:.secoff], bx
+    call fs_stream_sector_of
+    xor dx, dx
+    div word [fs_spc]
+    mov [cs:.secinclus], dx
+
+    call fs_stream_cluster_at
+    jc .finish
+
+    push cx
+    call fs_cluster_lba
+    add ax, [cs:.secinclus]
+    call fs_convert_l2hts
+    push es
+    push ds
+    pop es
+    mov bx, FS_STREAM_SECTOR
+    mov byte [cs:.retries], 5
+    pusha
+
+.attempt:
+    popa
+    pusha
+    mov ah, 0x02
+    mov al, 0x01
+    stc
+    int 0x13
+    jnc .sector_ok
+    dec byte [cs:.retries]
+    jz .sector_fail
+    call fs_reset_floppy
+    jmp .attempt
+
+.sector_fail:
+    popa
+    pop es
+    pop cx
+    jmp .finish
+
+.sector_ok:
+    popa
+    pop es
+    pop cx
+
+    mov ax, 512
+    sub ax, [cs:.secoff]
+    cmp ax, cx
+    jbe .have_chunk
+    mov ax, cx
+.have_chunk:
+    mov [cs:.chunk], ax
+
+    mov ax, di
+    mov cl, 4
+    shr ax, cl
+    and di, 0x000F
+    mov bx, es
+    add bx, ax
+    mov es, bx
+
+    push si
+    mov cx, [cs:.chunk]
+    mov si, FS_STREAM_SECTOR
+    add si, [cs:.secoff]
+    cld
+    rep movsb
+    pop si
+
+    mov cx, [cs:.chunk]
+    add [si + FSS_POS], cx
+    adc word [si + FSS_POS + 2], 0
+    add [cs:.done], cx
+    jmp .next
+
+.finish:
+    mov ax, [cs:.done]
+    pop di
+    pop es
+    ret
+
+.want       dw 0
+.done       dw 0
+.chunk      dw 0
+.secoff     dw 0
+.secinclus  dw 0
+.retries    db 0
+
+; ========================================================================
+; fs_stream_open - open a file for streaming
+; IN : AX = file name
+; OUT: AX = handle
+;      BX = size low
+;      DX = size high
+;      CF = 1 if the file is missing or every handle is taken
+; ========================================================================
+fs_stream_open:
+    push cx
+    push si
+    push di
+    push es
+
+    mov [cs:.name], ax
+    call fs_get_file_size
+    jc .refuse
+    mov [cs:.size_lo], bx
+    mov [cs:.size_hi], dx
+    mov [cs:.first], cx
+
+    call fs_stream_free
+    jc .refuse
+
+    push ax
+    push ds
+    pop es
+    mov di, si
+    mov cx, 13
+    xor al, al
+    cld
+    rep stosb
+
+    mov di, si
+    push si
+    mov si, [cs:.name]
+    mov cx, 12
+.copy:
+    lodsb
+    test al, al
+    jz .named
+    stosb
+    loop .copy
+.named:
+    pop si
+    pop ax
+
+    mov byte [si + FST_FLAGS], FSTF_USED
+    mov bx, [cs:.size_lo]
+    mov [si + FST_DESC + FSS_SIZE], bx
+    mov dx, [cs:.size_hi]
+    mov [si + FST_DESC + FSS_SIZE + 2], dx
+    mov word [si + FST_DESC + FSS_POS], 0
+    mov word [si + FST_DESC + FSS_POS + 2], 0
+    mov cx, [cs:.first]
+    mov [si + FST_DESC + FSS_FIRST], cx
+    mov word [si + FST_DESC + FSS_CCLUS], 0
+    mov word [si + FST_DESC + FSS_CIDX], 0
+
+    pop es
+    pop di
+    pop si
+    pop cx
+    clc
+    ret
+
+.refuse:
+    pop es
+    pop di
+    pop si
+    pop cx
+    xor ax, ax
+    stc
+    ret
+
+.name    dw 0
+.size_lo dw 0
+.size_hi dw 0
+.first   dw 0
+
+; ========================================================================
+; fs_stream_read - read the next bytes of an open stream
+; IN : AX = handle
+;      BX = bytes wanted
+;      CX = destination offset
+;      DX = destination segment
+; OUT: AX = bytes actually read, 0 at the end of the file
+;      CF = 1 if the handle is not open
+; ========================================================================
+fs_stream_read:
+    push si
+    call fs_stream_entry
+    jc .bad
+    add si, FST_DESC
+    call fs_stream_read_desc
+    pop si
+    clc
+    ret
+.bad:
+    pop si
+    xor ax, ax
+    stc
+    ret
+
+; ========================================================================
+; fs_stream_write - write the next bytes of an open stream
+; IN : AX = handle
+;      BX = bytes wanted
+;      CX = source offset
+;      DX = source segment
+; OUT: AX = bytes actually written
+;      CF = 1 if the handle is not open
+; ========================================================================
+fs_stream_write:
+    push si
+    call fs_stream_entry
+    jc .bad
+    or byte [si + FST_FLAGS], FSTF_DIRTY
+    add si, FST_DESC
+    call fs_stream_write_desc
+    pop si
+    clc
+    ret
+.bad:
+    pop si
+    xor ax, ax
+    stc
+    ret
+
+; ========================================================================
+; fs_stream_seek - move the read/write position of an open stream
+; IN : AX = handle
+;      BX = position low
+;      DX = position high
+; OUT: CF = 1 if the handle is not open
+; ========================================================================
+fs_stream_seek:
+    push si
+    call fs_stream_entry
+    jc .bad
+    mov [si + FST_DESC + FSS_POS], bx
+    mov [si + FST_DESC + FSS_POS + 2], dx
+    mov word [si + FST_DESC + FSS_CCLUS], 0
+    mov word [si + FST_DESC + FSS_CIDX], 0
+    pop si
+    clc
+    ret
+.bad:
+    pop si
+    stc
+    ret
+
+; ========================================================================
+; fs_stream_close - release a handle, updating the directory entry when
+; the file was written to
+; IN : AX = handle
+; OUT: CF = 1 if the handle is not open or the entry could not be written
+; ========================================================================
+fs_stream_close:
+    push bx
+    push cx
+    push dx
+    push si
+    call fs_stream_entry
+    jc .bad
+
+    test byte [si + FST_FLAGS], FSTF_DIRTY
+    jz .clean
+    mov bx, [si + FST_DESC + FSS_FIRST]
+    mov cx, [si + FST_DESC + FSS_SIZE]
+    mov dx, [si + FST_DESC + FSS_SIZE + 2]
+    mov ax, si
+    call fs_set_file_info
+    jmp .drop
+.clean:
+    clc
+.drop:
+    mov byte [si + FST_FLAGS], 0
+
+.bad:
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    ret
+
+; ========================================================================
+; fs_stream_free - find a table entry that is not in use
+; OUT: SI = entry
+;      AX = handle
+;      CF = 1 when every handle is taken
+; ========================================================================
+fs_stream_free:
+    push cx
+    mov si, fs_stream_table
+    mov ax, 1
+    mov cx, FS_STREAMS
+.scan:
+    test byte [si + FST_FLAGS], FSTF_USED
+    jz .hit
+    add si, FST_ENT
+    inc ax
+    loop .scan
+    pop cx
+    xor ax, ax
+    stc
+    ret
+.hit:
+    pop cx
+    clc
+    ret
+
+; ========================================================================
+; fs_stream_entry - turn a handle into a table entry
+; IN : AX = handle
+; OUT: SI = entry
+;      CF = 1 if the handle is not open
+; ========================================================================
+fs_stream_entry:
+    push ax
+    push dx
+    test ax, ax
+    jz .bad
+    cmp ax, FS_STREAMS
+    ja .bad
+    dec ax
+    mov si, FST_ENT
+    mul si
+    mov si, fs_stream_table
+    add si, ax
+    test byte [si + FST_FLAGS], FSTF_USED
+    jz .bad
+    pop dx
+    pop ax
+    clc
+    ret
+.bad:
+    pop dx
+    pop ax
+    stc
+    ret
+
+fs_stream_table times FS_STREAMS * FST_ENT db 0

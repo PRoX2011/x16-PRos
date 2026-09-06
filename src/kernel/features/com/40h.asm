@@ -55,8 +55,15 @@ com_40h:
     je .stream_truncate
 
 .stream:
-    mov cx, [cs:dosf_count]
-    call dosfile_write_stream
+    mov bx, [cs:dosf_count]
+    mov cx, [cs:dosf_caller_dx]
+    mov dx, [cs:dosf_caller_ds]
+    add si, DF_STREAM
+    call fs_stream_write_desc
+    sub si, DF_STREAM
+    test ax, ax
+    jz .ok
+    or byte [si + DF_FLAGS], DFF_DIRTY
     jmp .ok
 
 .stream_truncate:

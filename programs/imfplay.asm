@@ -13,6 +13,8 @@
 [BITS 16]
 [ORG 8000h]
 
+IMF_BUF_SEG equ 0x3000
+IMF_CHUNK   equ 0xF000
 
 
 start:
@@ -22,16 +24,15 @@ start:
 		mov si, loading_msg
 		int 0x21
 
-		mov ah, 0x04
+		mov ax, 0x1500
 		mov si, [filename_ptr]
 		int 0x22
 		jc .not_found
+		mov [handle], bx
 
-		mov ah, 0x10
-        mov si, [filename_ptr]
-        mov cx, 43008
-        mov dx, 0x2000
-        int 22h
+		call read_chunk
+		cmp ax, 2
+		jb .not_found
 
 		mov ah, 0x01
 		mov si, playing_msg
@@ -45,22 +46,18 @@ start:
 		call start_fast_clock
 
 		; imf type-1: first word is the data length
-		mov ax, 0x2000
-		mov es, ax
-		mov si, 43008
-		mov dx, [es:si]
-		mov [music_length], dx
-
-		; if imf is type-1 then index starts at 2
-		mov ax, 43008
-		add ax, 2
-		mov [curr_off], ax
-		mov ax, 0x2000
-		mov [curr_seg], ax
+		call get_byte
+		mov cl, al
+		call get_byte
+		mov ch, al
+		mov [music_length], cx
 
 		mov word [bytes_read], 0
 
 	.next_note:
+		cmp byte [at_eof], 0
+		jne .exit
+
 		; select opl2 register through port 388h
 		call get_byte
 		mov bl, al ; opl2 register
@@ -105,24 +102,85 @@ start:
 		jmp .exit
 
 	.exit:
+		call close_file
 		call stop_fast_clock
 		call reset_all_registers
 
 		mov ax, 4c00h
 		int 21h
 
+; ==================================================================
+; get_byte - next byte of the file, refilling the buffer as needed
+; OUT: AL = byte, 0 once the file runs out (at_eof is set)
+; ==================================================================
 get_byte:
-		push ds
 		push si
-		mov ds, [cs:curr_seg]
-		mov si, [cs:curr_off]
-		mov al, [si]
-		inc word [cs:curr_off]
-		jnz .ok
-		add word [cs:curr_seg], 0x1000
-	.ok:
+		push es
+
+		cmp word [buf_left], 0
+		jne .have
+		call read_chunk
+		test ax, ax
+		jz .eof
+
+	.have:
+		mov ax, IMF_BUF_SEG
+		mov es, ax
+		mov si, [curr_off]
+		mov al, [es:si]
+		inc word [curr_off]
+		dec word [buf_left]
+		pop es
 		pop si
-		pop ds
+		ret
+
+	.eof:
+		mov byte [at_eof], 1
+		xor al, al
+		pop es
+		pop si
+		ret
+
+; ==================================================================
+; read_chunk - pull the next piece of the file into IMF_BUF_SEG:0000
+; OUT: AX = bytes read, 0 at end of file
+; ==================================================================
+read_chunk:
+		push bx
+		push cx
+		push dx
+		push di
+
+		mov ax, 0x1501
+		mov bx, [handle]
+		mov cx, IMF_CHUNK
+		mov dx, IMF_BUF_SEG
+		xor di, di
+		int 0x22
+		jnc .ok
+		xor ax, ax
+	.ok:
+		mov [buf_left], ax
+		mov word [curr_off], 0
+
+		pop di
+		pop dx
+		pop cx
+		pop bx
+		ret
+
+close_file:
+		push ax
+		push bx
+		mov bx, [handle]
+		test bx, bx
+		jz .none
+		mov ax, 0x1504
+		int 0x22
+		mov word [handle], 0
+	.none:
+		pop bx
+		pop ax
 		ret
 
 reset_all_registers:
@@ -216,9 +274,11 @@ delay:
 last_time    dw 0
 music_length dw 0
 filename_ptr dw 0
-curr_seg     dw 0
+handle       dw 0
+buf_left     dw 0
 curr_off     dw 0
 bytes_read   dw 0
+at_eof       db 0
 
 loading_msg  db '  Loading IMF file...', 10, 13, 0
 playing_msg  db '  Playing IMF file. ', 0

@@ -25,9 +25,12 @@ com_3Fh:
     test byte [si + DF_FLAGS], DFF_BUF
     jnz .buffered
 
-    mov es, [cs:dosf_caller_ds]
-    mov di, [cs:dosf_caller_dx]
-    call dosfile_read_stream
+    mov bx, [cs:dosf_count]
+    mov cx, [cs:dosf_caller_dx]
+    mov dx, [cs:dosf_caller_ds]
+    add si, DF_STREAM
+    call fs_stream_read_desc
+    sub si, DF_STREAM
 
     jmp .ok
 

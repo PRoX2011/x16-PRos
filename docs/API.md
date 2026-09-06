@@ -362,6 +362,24 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Notes**: Converts the filename to uppercase and FAT12’s 11-character format. Reads the root directory and FAT to
   locate and load file sectors.
 
+### Function 0x11: List Drives
+
+- **Description**: Prints a table of the available drives - letter, type, size, and used space — directly to the screen.
+- **Input**:
+    - `AH` = 0x11
+- **Output**: None (the table is written to the screen)
+- **Preserves**: All registers
+
+### Function 0x12: Change Drive
+
+- **Description**: Switches the current drive.
+- **Input**:
+    - `AH` = 0x12
+    - `SI` = Pointer to a drive letter (the first character is used, e.g. `"C"`)
+- **Output**: Carry flag set if no such drive exists
+- **Preserves**: All registers
+- **Notes**: The current directory is reset to the root of the new drive.
+
 ### Function 0x13: Write Huge File
 
 - **Description**: Writes a large file from an arbitrary segment:offset in memory to the current directory. Supports
@@ -386,6 +404,64 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Description**: When called, saves the current drive letter into the AL register.
 - **Input**: `AH` = 0x14
 - **Output**: `AL` = current drive letter
+
+### Function 0x15: Streaming File Access
+
+#### AL = 0x00: Open
+
+- **Input**:
+    - `AH` = 0x15
+    - `AL` = 0x00
+    - `SI` = Pointer to null-terminated filename (8.3 format)
+- **Output**:
+    - `BX` = Handle (1..8)
+    - `DX` = File size low word
+    - `CX` = File size high word
+    - Carry flag set on error
+- **Error Handling**: Sets CF if the file does not exist in the current directory or all eight handles are already open
+
+#### AL = 0x01: Read
+
+- **Input**:
+    - `AH` = 0x15, `AL` = 0x01
+    - `BX` = Handle
+    - `CX` = Bytes wanted
+    - `DX` = Destination segment
+    - `DI` = Destination offset
+- **Output**:
+    - `AX` = Bytes actually read, 0 at the end of the file
+    - Carry flag set if the handle is not open
+
+#### AL = 0x02: Write
+
+- **Input**:
+    - `AH` = 0x15
+    - `AL` = 0x02
+    - `BX` = Handle
+    - `CX` = Bytes to write
+    - `DX` = Source segment
+    - `DI` = Source offset
+- **Output**:
+    - `AX` = Bytes actually written
+    - Carry flag set if the handle is not open
+
+#### AL = 0x03: Seek
+
+- **Input**:
+    - `AH` = 0x15
+    - `AL` = 0x03
+    - `BX` = Handle
+    - `DX` = Position low word
+    - `CX` = Position high word
+- **Output**: Carry flag set if the handle is not open
+
+#### AL = 0x04: Close
+
+- **Input**:
+    - `AH` = 0x15
+    - `AL` = 0x04
+    - `BX` = Handle
+- **Output**: Carry flag set if the handle is not open or the directory entry could not be written
 
 ---
 

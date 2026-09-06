@@ -10,21 +10,21 @@ DOSF_SLOTS       equ 15
 DOSF_FIRST       equ 5
 DOSF_MAXPARAS    equ DOSMEM_TOP - DOSMEM_BASE
 DOSF_NEWPARAS    equ 0x0400
-DOSF_SECTOR      equ disk_buffer + 0x1200
 DOSF_SPARE_SEG   equ 0x1800
 DOSF_SPARE_PARAS equ 0x0800
 
 DF_NAME          equ 0
 DF_SEG           equ 13
 DF_PARAS         equ 15
-DF_SIZE          equ 17
-DF_POS           equ 21
-DF_FLAGS         equ 25
-DF_FIRST         equ 26
-DF_CCLUS         equ 28
-DF_CIDX          equ 30
-DF_TIME          equ 32
-DF_DATE          equ 34
+DF_FLAGS         equ 17
+DF_TIME          equ 18
+DF_DATE          equ 20
+DF_STREAM        equ 22          ; an fs stream descriptor lives here
+DF_SIZE          equ DF_STREAM + FSS_SIZE
+DF_POS           equ DF_STREAM + FSS_POS
+DF_FIRST         equ DF_STREAM + FSS_FIRST
+DF_CCLUS         equ DF_STREAM + FSS_CCLUS
+DF_CIDX          equ DF_STREAM + FSS_CIDX
 DF_ENT           equ 36
 
 DFF_USED         equ 0x01
@@ -396,88 +396,6 @@ dosfile_grow:
 .left_hi    dw 0
 
 ; ==================================================================
-; dosfile_sector_of - which sector of a file a byte offset falls in.
-; IN : DX:AX = byte offset
-; OUT: AX = sector index
-; ==================================================================
-dosfile_sector_of:
-    push bx
-    push cx
-    mov bx, dx
-    mov cl, 9
-    shr ax, cl
-    mov cl, 7
-    shl bx, cl
-    or ax, bx
-    pop cx
-    pop bx
-    ret
-
-dosfile_cluster_at:
-    push bx
-    push cx
-
-    mov cx, ax
-    mov ax, [si + DF_CCLUS]
-    mov bx, [si + DF_CIDX]
-    test ax, ax
-    jz .from_start
-    cmp cx, bx
-    jae .walk
-.from_start:
-    mov ax, [si + DF_FIRST]
-    xor bx, bx
-
-.walk:
-    test ax, ax
-    jz .bad
-    cmp bx, cx
-    je .found
-    call fs_fat_next_cluster
-    jc .bad
-    inc bx
-    jmp .walk
-
-.found:
-    mov [si + DF_CCLUS], ax
-    mov [si + DF_CIDX], bx
-    pop cx
-    pop bx
-    clc
-    ret
-
-.bad:
-    pop cx
-    pop bx
-    stc
-    ret
-
-; ==================================================================
-; dosfile_last_cluster - the end of a file's chain
-;
-; IN : SI = slot
-;      DS = KERNEL_DATA_SEG, the FAT already in disk_buffer
-; OUT: AX = last cluster, or 0 when the file has none yet
-; ==================================================================
-dosfile_last_cluster:
-    push bx
-    mov ax, [si + DF_FIRST]
-    test ax, ax
-    jz .none
-.walk:
-    mov bx, ax
-    call fs_fat_next_cluster
-    jc .done
-    test ax, ax
-    jz .done
-    jmp .walk
-.done:
-    mov ax, bx
-.none:
-    pop bx
-    ret
-
-; ==================================================================
 ; dosfile_spill - put a buffered file on the volume and let go of it
 ;
 ; IN : SI = slot
@@ -539,324 +457,6 @@ dosfile_spill:
     popa
     stc
     ret
-
-; ==================================================================
-; dosfile_write_stream - write to a file that is not held in RAM
-;
-; IN : SI = slot
-;      CX = bytes wanted
-;      DS = KERNEL_DATA_SEG, the data at [cs:dosf_caller_ds]:[cs:dosf_caller_dx]
-; OUT: AX = bytes actually written
-; ==================================================================
-dosfile_write_stream:
-    mov [cs:.want], cx
-    mov word [cs:.done], 0
-
-    push es
-    call fs_read_fat
-    pop es
-    jc .finish
-
-.next:
-    mov cx, [cs:.want]
-    sub cx, [cs:.done]
-    jz .finish
-
-    mov ax, [si + DF_POS]
-    and ax, 0x01FF
-    mov [cs:.secoff], ax
-    mov bx, 512
-    sub bx, ax
-    cmp cx, bx
-    jbe .chunk_ready
-    mov cx, bx
-.chunk_ready:
-    mov [cs:.chunk], cx
-
-    mov ax, [si + DF_POS]
-    mov dx, [si + DF_POS + 2]
-    call dosfile_sector_of
-    xor dx, dx
-    div word [fs_spc]
-    mov [cs:.secinclus], dx
-    mov [cs:.clusidx], ax
-
-    call dosfile_cluster_at
-    jnc .have_cluster
-
-    call dosfile_last_cluster
-    push es
-    call fs_extend_chain
-    pop es
-    jc .finish
-    cmp word [si + DF_FIRST], 0
-    jne .chain_grown
-    mov [si + DF_FIRST], ax
-.chain_grown:
-    mov word [si + DF_CCLUS], 0
-    mov word [si + DF_CIDX], 0
-    mov ax, [cs:.clusidx]
-    call dosfile_cluster_at
-    jc .finish
-
-.have_cluster:
-    mov [cs:.cluster], ax
-
-    cmp word [cs:.chunk], 512
-    je .fill
-
-    mov ax, [si + DF_POS]
-    mov dx, [si + DF_POS + 2]
-    and ax, 0xFE00
-    cmp dx, [si + DF_SIZE + 2]
-    ja .blank
-    jb .read_first
-    cmp ax, [si + DF_SIZE]
-    jb .read_first
-
-.blank:
-    push es
-    push di
-    push cx
-    push ax
-    push ds
-    pop es
-    mov di, DOSF_SECTOR
-    mov cx, 256
-    xor ax, ax
-    cld
-    rep stosw
-    pop ax
-    pop cx
-    pop di
-    pop es
-    jmp .fill
-
-.read_first:
-    mov ax, [cs:.cluster]
-    call fs_cluster_lba
-    add ax, [cs:.secinclus]
-    call fs_convert_l2hts
-    push es
-    push ds
-    pop es
-    mov bx, DOSF_SECTOR
-    mov ah, 0x02
-    mov al, 0x01
-    stc
-    int 0x13
-    pop es
-
-.fill:
-    push ds
-    push si
-    push di
-    mov ax, [cs:dosf_caller_ds]
-    mov ds, ax
-    mov si, [cs:dosf_caller_dx]
-    add si, [cs:.done]
-    mov ax, KERNEL_DATA_SEG
-    mov es, ax
-    mov di, DOSF_SECTOR
-    add di, [cs:.secoff]
-    mov cx, [cs:.chunk]
-    cld
-    rep movsb
-    pop di
-    pop si
-    pop ds
-
-    mov ax, [cs:.cluster]
-    call fs_cluster_lba
-    add ax, [cs:.secinclus]
-    call fs_convert_l2hts
-    push es
-    push ds
-    pop es
-    mov bx, DOSF_SECTOR
-    mov ah, 0x03
-    mov al, 0x01
-    stc
-    int 0x13
-    pop es
-    jc .finish
-
-    or byte [si + DF_FLAGS], DFF_DIRTY
-
-    mov ax, [cs:.chunk]
-    add [si + DF_POS], ax
-    adc word [si + DF_POS + 2], 0
-    add [cs:.done], ax
-
-    mov ax, [si + DF_POS]
-    mov dx, [si + DF_POS + 2]
-    cmp dx, [si + DF_SIZE + 2]
-    ja .longer
-    jb .next
-    cmp ax, [si + DF_SIZE]
-    jbe .next
-.longer:
-    mov [si + DF_SIZE], ax
-    mov [si + DF_SIZE + 2], dx
-    jmp .next
-
-.finish:
-    mov ax, [cs:.done]
-    ret
-
-.want       dw 0
-.done       dw 0
-.chunk      dw 0
-.secoff     dw 0
-.secinclus  dw 0
-.clusidx    dw 0
-.cluster    dw 0
-
-; ==================================================================
-; dosfile_read_stream - read from a file that is not held in RAM.
-;
-; IN : SI = slot, CX = bytes wanted, ES:DI = destination,
-;      DS = KERNEL_DATA_SEG
-; OUT: AX = bytes actually read, ES:DI left past the last byte
-; ==================================================================
-dosfile_read_stream:
-    mov [cs:.want], cx
-    mov word [cs:.done], 0
-
-    mov ax, [si + DF_SIZE]
-    mov dx, [si + DF_SIZE + 2]
-    sub ax, [si + DF_POS]
-    sbb dx, [si + DF_POS + 2]
-    jb .finish
-    test dx, dx
-    jnz .clamped
-    cmp ax, cx
-    jae .clamped
-    mov [cs:.want], ax
-.clamped:
-    cmp word [cs:.want], 0
-    je .finish
-
-    cmp word [si + DF_CCLUS], 0
-    je .need_fat
-    mov ax, [si + DF_POS]
-    mov dx, [si + DF_POS + 2]
-    call dosfile_sector_of
-    xor dx, dx
-    div word [fs_spc]
-    cmp ax, [si + DF_CIDX]
-    jne .need_fat
-    mov ax, [si + DF_POS]
-    mov dx, [si + DF_POS + 2]
-    add ax, [cs:.want]
-    adc dx, 0
-    sub ax, 1
-    sbb dx, 0
-    call dosfile_sector_of
-    xor dx, dx
-    div word [fs_spc]
-    cmp ax, [si + DF_CIDX]
-    je .next
-
-.need_fat:
-    push es
-    call fs_read_fat
-    pop es
-    jc .finish
-
-.next:
-    mov cx, [cs:.want]
-    sub cx, [cs:.done]
-    jz .finish
-
-    mov ax, [si + DF_POS]
-    mov dx, [si + DF_POS + 2]
-    mov bx, ax
-    and bx, 0x01FF
-    mov [cs:.secoff], bx
-    call dosfile_sector_of
-    xor dx, dx
-    div word [fs_spc]
-    mov [cs:.secinclus], dx
-
-    call dosfile_cluster_at
-    jc .finish
-
-    push cx
-    call fs_cluster_lba
-    add ax, [cs:.secinclus]
-    call fs_convert_l2hts
-    push es
-    push ds
-    pop es
-    mov bx, DOSF_SECTOR
-    mov byte [cs:.retries], 5
-    pusha
-
-.attempt:
-    popa
-    pusha
-    mov ah, 0x02
-    mov al, 0x01
-    stc
-    int 0x13
-    jnc .sector_ok
-    dec byte [cs:.retries]
-    jz .sector_fail
-    call fs_reset_floppy
-    jmp .attempt
-
-.sector_fail:
-    popa
-    pop es
-    pop cx
-    jmp .finish
-
-.sector_ok:
-    popa
-    pop es
-    pop cx
-
-    mov ax, 512
-    sub ax, [cs:.secoff]
-    cmp ax, cx
-    jbe .have_chunk
-    mov ax, cx
-.have_chunk:
-    mov [cs:.chunk], ax
-
-    mov ax, di
-    mov cl, 4
-    shr ax, cl
-    and di, 0x000F
-    mov bx, es
-    add bx, ax
-    mov es, bx
-
-    push si
-    mov cx, [cs:.chunk]
-    mov si, DOSF_SECTOR
-    add si, [cs:.secoff]
-    cld
-    rep movsb
-    pop si
-
-    mov cx, [cs:.chunk]
-    add [si + DF_POS], cx
-    adc word [si + DF_POS + 2], 0
-    add [cs:.done], cx
-    jmp .next
-
-.finish:
-    mov ax, [cs:.done]
-    ret
-
-.want       dw 0
-.done       dw 0
-.chunk      dw 0
-.secoff     dw 0
-.secinclus  dw 0
-.retries    db 0
 
 ; ==================================================================
 ; dosfile_materialise - move a streamed file into a RAM buffer.
@@ -1174,7 +774,10 @@ dosfile_open:
     mov al, [.newflags]
     mov [si + DF_FLAGS], al
 
+    cmp byte [cs:dosfile_nobuf], 0
+    jne .leave_on_volume
     call dosfile_materialise
+.leave_on_volume:
     call dosvars_sync_sft
     call path_restore
 
@@ -1226,6 +829,21 @@ dosfile_open:
 .ftime      dw 0
 .fdate      dw 0
 .buf_paras  dw 0
+
+; ==================================================================
+; dosfile_open_stream - open a file and leave it on the volume
+; IN : DS:DX = path
+; OUT: AX = handle
+;      CF = 1 on failure (AX = DOS error code)
+; ==================================================================
+dosfile_open_stream:
+    mov byte [cs:dosfile_nobuf], 1
+    xor al, al
+    call dosfile_open
+    mov byte [cs:dosfile_nobuf], 0
+    ret
+
+dosfile_nobuf db 0
 
 ; ==================================================================
 ; dosfile_close_slot - flush a dirty buffer back to disk and release it.

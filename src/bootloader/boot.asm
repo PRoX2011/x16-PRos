@@ -145,6 +145,7 @@ main:
     mov sp, 0xFFFF
     sti
 
+    or dl, BYTE [bsDriveNumber]
     mov BYTE [bsDriveNumber], dl
     mov si, msgLoading
     call Print
@@ -218,10 +219,8 @@ LOAD_IMAGE:
     jmp .DONE
 
 .ODD_CLUSTER:
-    shr dx, 1
-    shr dx, 1
-    shr dx, 1
-    shr dx, 1
+    mov cl, 4
+    shr dx, cl
 
 .DONE:
     mov WORD [cluster], dx
