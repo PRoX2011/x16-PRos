@@ -6,11 +6,12 @@ load_and_apply_theme:
     pusha
 
     call save_current_dir
-    
+
     mov al, 'A'
     call fs_change_drive_letter
 
-    call fs_parent_directory
+    mov byte [current_directory], 0
+    mov word [current_dir_cluster], 0
 
     mov ax, conf_dir_name
     call fs_change_directory

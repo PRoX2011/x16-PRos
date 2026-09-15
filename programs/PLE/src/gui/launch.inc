@@ -72,8 +72,7 @@ close_window:
     xor ah, ah
     mov bx, ax
     mov bl, [w_task + bx]
-    mov ah, 0x32
-    int 0x23
+    call wm_ask_close
     xor bh, bh
     mov bl, [close_slot]
     cmp bl, MAX_WIN
@@ -82,6 +81,92 @@ close_window:
 .skip:
     call full_repaint
     popa
+    ret
+
+; ========================================================================
+; CLOSE_ALL_WINDOWS - shut every hosted program down before quitting
+; IN : nothing
+; OUT : nothing
+; ========================================================================
+close_all_windows:
+    pusha
+    xor bx, bx
+.ask:
+    cmp bx, MAX_WIN
+    jae .wait
+    cmp byte [w_open + bx], 0
+    je .ask_next
+    push bx
+    mov bl, [w_task + bx]
+    call wm_ask_close
+    pop bx
+.ask_next:
+    inc bx
+    jmp .ask
+
+.wait:
+    mov cx, QUIT_WAIT_TICKS
+.spin:
+    call windows_alive
+    jnc .done
+    push cx
+    mov ah, 0x14
+    mov cx, 1
+    int 0x23
+    pop cx
+    loop .spin
+
+    xor bx, bx
+.kill:
+    cmp bx, MAX_WIN
+    jae .done
+    cmp byte [w_open + bx], 0
+    je .kill_next
+    push bx
+    mov bl, [w_task + bx]
+    xor bh, bh
+    mov ah, 0x18
+    int 0x23
+    pop bx
+.kill_next:
+    inc bx
+    jmp .kill
+.done:
+    popa
+    ret
+
+; ========================================================================
+; WINDOWS_ALIVE - is any hosted program still running?
+; IN : nothing
+; OUT : CF = 1 while at least one of them still holds a task slot
+; ========================================================================
+windows_alive:
+    pusha
+    xor bx, bx
+.slot:
+    cmp bx, MAX_WIN
+    jae .none
+    cmp byte [w_open + bx], 0
+    je .next
+    push bx
+    mov bl, [w_task + bx]
+    xor bh, bh
+    mov ah, 0x17
+    int 0x23
+    pop bx
+    jc .next
+    test al, al
+    jnz .alive
+.next:
+    inc bx
+    jmp .slot
+.alive:
+    popa
+    stc
+    ret
+.none:
+    popa
+    clc
     ret
 
 reap_dead_windows:
@@ -109,6 +194,7 @@ reap_dead_windows:
     inc word [.i]
     jmp .rl
 .fin:
+    call wm_sweep
     cmp byte [.changed], 0
     je .ret
     call full_repaint

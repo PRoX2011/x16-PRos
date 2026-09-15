@@ -1,19 +1,3 @@
-%define CAL_CW        22
-%define CAL_CH        16
-%define CAL_W         (7 * CAL_CW + 8)
-%define CAL_X         (640 - CAL_W - 2)
-%define CAL_Y         MENUBAR_H
-%define CAL_HDR_H     18
-%define CAL_WD_Y      (CAL_Y + CAL_HDR_H)
-%define CAL_DAY_Y     (CAL_WD_Y + CAL_CH)
-%define CAL_H         (CAL_HDR_H + CAL_CH * 7 + 4)
-%define CAL_GX        (CAL_X + 4)
-%define CAL_BTN_W     14
-%define CAL_BTN_H     14
-%define CAL_BTN_Y     (CAL_Y + 2)
-%define CAL_PREV_X    (CAL_X + 4)
-%define CAL_NEXT_X    (CAL_X + CAL_W - 4 - CAL_BTN_W)
-
 ; ========================================================================
 ; CAL_READ_TODAY - Reads the RTC into the "today" fields
 ; IN : nothing

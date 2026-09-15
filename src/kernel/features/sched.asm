@@ -106,12 +106,6 @@ sched_task_create_from_ple:
     mov word [bx + TASK_PARAS], PLE_MAX_PARAS
     mov byte [bx + TASK_PARENT], 0xFF             ; no parent by default
 
-    push bx
-    xor bh, bh
-    mov bl, [.id_tmp]
-    mov byte [task_win_flags + bx], 0
-    pop bx
-
     ; ----- build initial stack frame in task's stack segment -----
     ; Layout (from epilogue's perspective, low -> high addresses):
     ;   SP+0   ES     (popped first)

@@ -298,6 +298,7 @@ menu_handle_press:
     cmp al, 0xFF
     je .dismiss
     mov [bg_style], al
+    call apply_wallpaper
     mov byte [wp_menu_open], 0
     mov byte [menu_open], 0
     call full_repaint

@@ -6,6 +6,99 @@
 %ifndef GRAFX_INC
 %define GRAFX_INC
 
+GFX_CLIP_MAX equ 6
+
+gfx_clipn  db 0
+gfx_clip_l times GFX_CLIP_MAX dw 0
+gfx_clip_t times GFX_CLIP_MAX dw 0
+gfx_clip_r times GFX_CLIP_MAX dw 0
+gfx_clip_b times GFX_CLIP_MAX dw 0
+
+; ========================================================================
+; gfx_clip_reset - drop every clip rectangle
+; IN:  nothing
+; OUT: nothing (all registers and flags preserved)
+; ========================================================================
+gfx_clip_reset:
+    mov byte [gfx_clipn], 0
+    ret
+
+; ========================================================================
+; gfx_clip_add - add one rectangle to the clip list
+; IN:  CX = x
+;      DX = y
+;      SI = width
+;      DI = height
+; OUT: nothing (all registers preserved); an empty rectangle and anything
+;      past GFX_CLIP_MAX are ignored
+; ========================================================================
+gfx_clip_add:
+    pusha
+    test si, si
+    jle .done
+    test di, di
+    jle .done
+    mov al, [gfx_clipn]
+    cmp al, GFX_CLIP_MAX
+    jae .done
+    xor ah, ah
+    add ax, ax
+    mov bx, ax
+    mov [gfx_clip_l + bx], cx
+    mov [gfx_clip_t + bx], dx
+    add si, cx
+    dec si
+    mov [gfx_clip_r + bx], si
+    add di, dx
+    dec di
+    mov [gfx_clip_b + bx], di
+    inc byte [gfx_clipn]
+.done:
+    popa
+    ret
+
+; ========================================================================
+; gfx_clip_test - may a point be drawn?
+; IN:  CX = x
+;      DX = y
+; OUT: CF = 1 when the point lies outside every clip rectangle
+; ========================================================================
+gfx_clip_test:
+    push ax
+    push bx
+    push si
+    xor si, si
+    xor bx, bx
+.probe:
+    mov al, [gfx_clipn]
+    xor ah, ah
+    cmp bx, ax
+    jae .visible
+    cmp cx, [gfx_clip_l + si]
+    jl .next
+    cmp cx, [gfx_clip_r + si]
+    jg .next
+    cmp dx, [gfx_clip_t + si]
+    jl .next
+    cmp dx, [gfx_clip_b + si]
+    jle .hidden
+.next:
+    add si, 2
+    inc bx
+    jmp .probe
+.visible:
+    pop si
+    pop bx
+    pop ax
+    stc
+    ret
+.hidden:
+    pop si
+    pop bx
+    pop ax
+    clc
+    ret
+
 ; ========================================================================
 ; gfx_pixel - plot a single pixel
 ; IN:  CX = x
@@ -14,6 +107,25 @@
 ; OUT: nothing (all registers preserved)
 ; ========================================================================
 gfx_pixel:
+    pushf
+    cmp byte [gfx_clipn], 0
+    je .raw
+    call gfx_clip_test
+    jc .raw
+    popf
+    ret
+.raw:
+    popf
+    jmp gfx_pixel_raw
+
+; ========================================================================
+; gfx_pixel_raw - plot a pixel with the clip list ignored
+; IN:  CX = x
+;      DX = y
+;      AL = colour (0..15)
+; OUT: nothing (all registers preserved)
+; ========================================================================
+gfx_pixel_raw:
     mov [gfx_px_col], al
     pusha
     push es
@@ -152,6 +264,103 @@ gfx_hl_putmask:
 ; OUT: nothing (all registers preserved)
 ; ========================================================================
 gfx_hline:
+    pushf
+    cmp byte [gfx_clipn], 0
+    je .raw
+    popf
+    jmp gfx_hline_split
+.raw:
+    popf
+    jmp gfx_hline_raw
+
+; ========================================================================
+; gfx_hline_split - draw a span only where the clip list allows
+; IN:  CX = x1
+;      BX = x2
+;      DX = y
+;      AL = colour (0..15)
+; OUT: nothing (all registers preserved).
+; ========================================================================
+gfx_hline_split:
+    pushf
+    pusha
+    cmp cx, bx
+    jle .ordered
+    xchg cx, bx
+.ordered:
+    mov [.col], al
+    mov [.x], cx
+    mov [.x2], bx
+    mov [.y], dx
+
+.pass:
+    mov ax, [.x]
+    cmp ax, [.x2]
+    jg .done
+    mov ax, [.x2]
+    mov [.run], ax
+
+    xor si, si
+    xor di, di
+.probe:
+    mov al, [gfx_clipn]
+    xor ah, ah
+    cmp di, ax
+    jae .emit
+    mov ax, [.y]
+    cmp ax, [gfx_clip_t + si]
+    jl .next
+    cmp ax, [gfx_clip_b + si]
+    jg .next
+    mov ax, [.x]
+    cmp ax, [gfx_clip_l + si]
+    jl .ahead
+    cmp ax, [gfx_clip_r + si]
+    jg .next
+    mov ax, [gfx_clip_r + si]
+    inc ax
+    mov [.x], ax
+    jmp .pass
+.ahead:
+    mov ax, [gfx_clip_l + si]
+    dec ax
+    cmp ax, [.run]
+    jge .next
+    mov [.run], ax
+.next:
+    add si, 2
+    inc di
+    jmp .probe
+
+.emit:
+    mov cx, [.x]
+    mov bx, [.run]
+    mov dx, [.y]
+    mov al, [.col]
+    call gfx_hline_raw
+    mov ax, [.run]
+    inc ax
+    mov [.x], ax
+    jmp .pass
+.done:
+    popa
+    popf
+    ret
+.col db 0
+.x   dw 0
+.x2  dw 0
+.y   dw 0
+.run dw 0
+
+; ========================================================================
+; gfx_hline_raw - horizontal span with the clip list ignored
+; IN:  CX = x1
+;      BX = x2
+;      DX = y
+;      AL = colour (0..15)
+; OUT: nothing (all registers preserved)
+; ========================================================================
+gfx_hline_raw:
     mov [gfx_hl_col], al
     pusha
     push es

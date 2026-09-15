@@ -8,6 +8,11 @@
 %ifndef SURF_INC
 %define SURF_INC
 
+%include "wm.inc"
+
+SURF_CLIP_MAX equ GFX_CLIP_MAX
+SURF_NO_RUN   equ 0xFFFF
+
 surf_windowed db 0
 surf_close    db 0
 surf_dirty    db 0
@@ -19,6 +24,7 @@ surf_cl       dw 0
 surf_ct       dw 0
 surf_cr       dw 639
 surf_cb       dw 479
+surf_clipn    dw 0
 
 ; ========================================================================
 ; surf_sync - query the WM for this task's window and update the surface
@@ -27,29 +33,45 @@ surf_cb       dw 479
 ;      [surf_close]    = 1 if the WM asked us to close
 ;      [surf_dirty]    = 1 if the WM wants a repaint this frame
 ;      surface origin/size in [surf_ox]/[surf_oy]/[surf_w]/[surf_h]
+;      the windows covering ours loaded into the grafx clip list
 ;
 ; NOTE: Recomended to call once per frame.
 ; ========================================================================
 surf_sync:
     pusha
-    mov ah, 0x31
+    push es
+    call wm_locate
+    jc .fullscreen
+
+    mov ah, 0x15
     int 0x23
-    test al, 0x01
+    mov bl, al
+    call wm_entry
+    mov di, ax
+    mov al, [es:di + WM_E_FLAGS]
+    test al, WM_F_WINDOWED
     jz .fullscreen
+
     mov byte [surf_windowed], 1
-    test al, 0x02
+    test al, WM_F_CLOSE
     jz .nclose
     mov byte [surf_close], 1
 .nclose:
     mov byte [surf_dirty], 0
-    test al, 0x04
+    test al, WM_F_DIRTY
     jz .ndirty
     mov byte [surf_dirty], 1
+    ; taking the repaint request also consumes it
+    and byte [es:di + WM_E_FLAGS], ~WM_F_DIRTY & 0xFF
 .ndirty:
-    mov [surf_ox], cx
-    mov [surf_oy], dx
-    mov [surf_w], si
-    mov [surf_h], di
+    mov ax, [es:di + WM_E_X]
+    mov [surf_ox], ax
+    mov ax, [es:di + WM_E_Y]
+    mov [surf_oy], ax
+    mov ax, [es:di + WM_E_W]
+    mov [surf_w], ax
+    mov ax, [es:di + WM_E_H]
+    mov [surf_h], ax
     jmp .clip
 .fullscreen:
     mov byte [surf_windowed], 0
@@ -68,8 +90,51 @@ surf_sync:
     add ax, [surf_h]
     dec ax
     mov [surf_cb], ax
+
+    call gfx_clip_reset
+    mov word [surf_clipn], 0
+    cmp byte [surf_windowed], 0
+    je .done
+    call surf_clip_fetch
+.done:
+    pop es
     popa
     ret
+
+; ========================================================================
+; surf_clip_fetch - load the windows stacked above ours into the clip list
+; IN:  ES:DI = this task's entry in the manager's block
+; OUT: [surf_clipn] = rectangle count, the same rectangles handed to the
+;      grafx clip list so every surf primitive stays out of them
+; ========================================================================
+surf_clip_fetch:
+    pusha
+    mov al, [es:di + WM_E_CLIPN]
+    xor ah, ah
+    cmp ax, SURF_CLIP_MAX
+    jbe .have
+    mov ax, SURF_CLIP_MAX
+.have:
+    mov [surf_clipn], ax
+    mov bx, di
+    add bx, WM_E_CLIP
+    mov word [.i], 0
+.add:
+    mov ax, [.i]
+    cmp ax, [surf_clipn]
+    jae .done
+    mov cx, [es:bx]
+    mov dx, [es:bx + 2]
+    mov si, [es:bx + 4]
+    mov di, [es:bx + 6]
+    call gfx_clip_add
+    add bx, 8
+    inc word [.i]
+    jmp .add
+.done:
+    popa
+    ret
+.i dw 0
 
 ; ========================================================================
 ; surf_clear - fill the whole surface with colour
@@ -84,11 +149,11 @@ surf_clear:
     popa
     ret
 .win:
-    mov cx, [surf_ox]
-    mov dx, [surf_oy]
+    xor cx, cx
+    xor dx, dx
     mov si, [surf_w]
     mov di, [surf_h]
-    call gfx_fill_rect
+    call surf_fill_rect
     popa
     ret
 
@@ -214,6 +279,246 @@ surf_pixel:
     call surf_hline
     popa
     ret
+
+; ========================================================================
+; surf_vline - vertical span in surface-relative coords, clipped
+; IN:  CX = x
+;      DX = y1
+;      BX = y2
+;      AL = colour (0..15)
+; OUT: nothing (all registers preserved)
+; ========================================================================
+surf_vline:
+    pusha
+    mov [.col], al
+    mov [.x], cx
+    cmp dx, bx
+    jle .ord
+    xchg dx, bx
+.ord:
+    mov [.y], dx
+    mov [.y2], bx
+.row:
+    mov ax, [.y]
+    cmp ax, [.y2]
+    jg .done
+    mov cx, [.x]
+    mov bx, cx
+    mov dx, [.y]
+    mov al, [.col]
+    call surf_hline
+    inc word [.y]
+    jmp .row
+.done:
+    popa
+    ret
+.col db 0
+.x   dw 0
+.y   dw 0
+.y2  dw 0
+
+; ========================================================================
+; surf_line - straight line between two surface-relative points, clipped
+; IN:  CX = x1
+;      DX = y1
+;      SI = x2
+;      DI = y2
+;      AL = colour (0..15)
+; OUT: nothing (all registers preserved)
+; ========================================================================
+surf_line:
+    pusha
+    mov [.col], al
+    mov [.x0], cx
+    mov [.y0], dx
+    mov [.x1], si
+    mov [.y1], di
+
+    mov ax, [.x1]
+    sub ax, [.x0]
+    mov bx, 1
+    test ax, ax
+    jns .xpos
+    neg ax
+    mov bx, -1
+.xpos:
+    mov [.adx], ax
+    mov [.sx], bx
+
+    mov ax, [.y1]
+    sub ax, [.y0]
+    mov bx, 1
+    test ax, ax
+    jns .ypos
+    neg ax
+    mov bx, -1
+.ypos:
+    neg ax
+    mov [.ady], ax
+    mov [.sy], bx
+
+    mov ax, [.adx]
+    add ax, [.ady]
+    mov [.err], ax
+.step:
+    mov cx, [.x0]
+    mov dx, [.y0]
+    mov al, [.col]
+    call surf_pixel
+
+    mov ax, [.x0]
+    cmp ax, [.x1]
+    jne .move
+    mov ax, [.y0]
+    cmp ax, [.y1]
+    je .done
+.move:
+    mov ax, [.err]
+    add ax, ax
+    mov [.e2], ax
+    cmp ax, [.ady]
+    jl .skipx
+    mov ax, [.err]
+    add ax, [.ady]
+    mov [.err], ax
+    mov ax, [.x0]
+    add ax, [.sx]
+    mov [.x0], ax
+.skipx:
+    mov ax, [.e2]
+    cmp ax, [.adx]
+    jg .skipy
+    mov ax, [.err]
+    add ax, [.adx]
+    mov [.err], ax
+    mov ax, [.y0]
+    add ax, [.sy]
+    mov [.y0], ax
+.skipy:
+    jmp .step
+.done:
+    popa
+    ret
+.col db 0
+.x0  dw 0
+.y0  dw 0
+.x1  dw 0
+.y1  dw 0
+.adx dw 0
+.ady dw 0
+.sx  dw 0
+.sy  dw 0
+.err dw 0
+.e2  dw 0
+
+; ========================================================================
+; surf_visible - is any part of a rectangle actually on screen?
+; IN:  CX = x
+;      DX = y
+;      SI = width
+;      DI = height (surface-relative)
+; OUT: CF = 1 when at least part of the rectangle can be drawn
+; ========================================================================
+surf_visible:
+    pusha
+    add cx, [surf_ox]
+    add dx, [surf_oy]
+    mov ax, cx
+    add ax, si
+    dec ax
+    mov si, ax
+    mov ax, dx
+    add ax, di
+    dec ax
+    mov di, ax
+
+    cmp cx, [surf_cl]
+    jge .l_ok
+    mov cx, [surf_cl]
+.l_ok:
+    cmp si, [surf_cr]
+    jle .r_ok
+    mov si, [surf_cr]
+.r_ok:
+    cmp dx, [surf_ct]
+    jge .t_ok
+    mov dx, [surf_ct]
+.t_ok:
+    cmp di, [surf_cb]
+    jle .b_ok
+    mov di, [surf_cb]
+.b_ok:
+    cmp cx, si
+    jg .hidden
+    cmp dx, di
+    jg .hidden
+
+    xor bx, bx
+    xor bp, bp
+.probe:
+    mov al, [gfx_clipn]
+    xor ah, ah
+    cmp bp, ax
+    jae .visible
+    cmp cx, [gfx_clip_l + bx]
+    jl .next
+    cmp si, [gfx_clip_r + bx]
+    jg .next
+    cmp dx, [gfx_clip_t + bx]
+    jl .next
+    cmp di, [gfx_clip_b + bx]
+    jle .hidden
+.next:
+    add bx, 2
+    inc bp
+    jmp .probe
+.visible:
+    popa
+    stc
+    ret
+.hidden:
+    popa
+    clc
+    ret
+
+; ========================================================================
+; surf_begin_paint - hide the mouse pointer while the surface is redrawn
+; IN:  nothing
+; OUT: nothing (all registers preserved)
+; ========================================================================
+surf_begin_paint:
+    push ax
+    push bx
+    push cx
+    mov ah, 0x20
+    int 0x23
+    mov [surf_cursor_on], ch
+    test ch, ch
+    jz .done
+    mov ah, 0x22
+    int 0x23
+.done:
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+; ========================================================================
+; surf_end_paint - bring the mouse pointer back after surf_begin_paint
+; IN:  nothing
+; OUT: nothing (all registers preserved)
+; ========================================================================
+surf_end_paint:
+    push ax
+    cmp byte [surf_cursor_on], 0
+    je .done
+    mov ah, 0x23
+    int 0x23
+.done:
+    pop ax
+    ret
+
+surf_cursor_on db 0
 
 ; ========================================================================
 ; surf_fill_rect - filled rectangle in surface-relative coords, clipped
@@ -379,6 +684,7 @@ surf_print:
     pop es
     mov [.gbyte], al
     mov word [.c], 0
+    mov word [.run], SURF_NO_RUN
 .col:
     cmp word [.c], 8
     jae .nextrow
@@ -386,17 +692,19 @@ surf_print:
     mov ah, 0x80
     shr ah, cl
     test [.gbyte], ah
-    jz .nextcol
-    mov cx, [.penx]
-    add cx, [.c]
-    mov dx, [.peny]
-    add dx, [.r]
-    mov al, [.color]
-    call surf_pixel
+    jz .gap
+    cmp word [.run], SURF_NO_RUN
+    jne .nextcol
+    mov ax, [.c]
+    mov [.run], ax
+    jmp .nextcol
+.gap:
+    call .flush
 .nextcol:
     inc word [.c]
     jmp .col
 .nextrow:
+    call .flush
     inc word [.r]
     jmp .row
 .advance:
@@ -404,6 +712,21 @@ surf_print:
     jmp .ch
 .done:
     popa
+    ret
+.flush:
+    cmp word [.run], SURF_NO_RUN
+    je .flush_ret
+    mov cx, [.penx]
+    add cx, [.run]
+    mov bx, [.penx]
+    add bx, [.c]
+    dec bx
+    mov dx, [.peny]
+    add dx, [.r]
+    mov al, [.color]
+    call surf_hline
+    mov word [.run], SURF_NO_RUN
+.flush_ret:
     ret
 .color db 0
 .penx  dw 0
@@ -413,6 +736,7 @@ surf_print:
 .gbyte db 0
 .r     dw 0
 .c     dw 0
+.run   dw 0
 
 ; ========================================================================
 ; surf_font_get - resolve the active 8x16 font once and cache it

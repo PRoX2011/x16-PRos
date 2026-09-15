@@ -17,6 +17,10 @@ PLE_LOGO          "logo/gui.raw"
 %define MIN_WW      140
 %define MIN_WH      80
 %define MAX_WIN     5
+%define QUIT_WAIT_TICKS 40
+
+%define MAX_OVERLAY 2
+%define MAX_CLIP    (MAX_WIN - 1 + MAX_OVERLAY)
 %define IW          32
 %define IH          26
 %define ICON_X0     24
@@ -67,7 +71,23 @@ PLE_LOGO          "logo/gui.raw"
 %define WPMENU_Y   (MENU_Y + WP_ITEM*MENU_IH)
 %define WPMENU_H   (WPMENU_N * WPMENU_IH)
 
-%define BG_STYLE_COUNT 4
+%define CAL_CW        22
+%define CAL_CH        16
+%define CAL_W         (7 * CAL_CW + 8)
+%define CAL_X         (640 - CAL_W - 2)
+%define CAL_Y         MENUBAR_H
+%define CAL_HDR_H     18
+%define CAL_WD_Y      (CAL_Y + CAL_HDR_H)
+%define CAL_DAY_Y     (CAL_WD_Y + CAL_CH)
+%define CAL_H         (CAL_HDR_H + CAL_CH * 7 + 4)
+%define CAL_GX        (CAL_X + 4)
+%define CAL_BTN_W     14
+%define CAL_BTN_H     14
+%define CAL_BTN_Y     (CAL_Y + 2)
+%define CAL_PREV_X    (CAL_X + 4)
+%define CAL_NEXT_X    (CAL_X + CAL_W - 4 - CAL_BTN_W)
+
+%define BG_STYLE_COUNT 8
 
 start:
     push cs
@@ -103,6 +123,7 @@ start:
     mov al, 0
     int 0x23
 
+    call wm_create
     call load_gui_configs
     call enumerate_ple
     call cache_logos
@@ -281,6 +302,7 @@ start:
 .skip_reap:
     call tick_clock
     call menu_tick
+    call sync_overlay_clip
     call update_cursor
     mov ah, 0x13
     int 0x23
@@ -407,21 +429,8 @@ start:
     jmp .after_edge
 
 gui_quit:
-    xor bx, bx
-.qk:
-    cmp bx, MAX_WIN
-    jae .qk_done
-    cmp byte [w_open + bx], 0
-    je .qk_next
-    push bx
-    mov bl, [w_task + bx]
-    mov ah, 0x32
-    int 0x23
-    pop bx
-.qk_next:
-    inc bx
-    jmp .qk
-.qk_done:
+    call close_all_windows
+    call wm_release
     mov ah, 0x26
     mov al, 0
     int 0x23
@@ -432,6 +441,8 @@ gui_quit:
     int 0x21
     retf
 
+%include "wm.inc"
+%include "wmblock.inc"
 %include "windows.inc"
 %include "launch.inc"
 %include "bar.inc"

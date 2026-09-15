@@ -158,7 +158,7 @@ mode (640x480, 16 colors).
 - **Output**: None
 - **Preserves**: All registers
 - **Error Handling**: No errors reported
-- **Notes**: Internally calls `set_video_mode` followed by `load_and_apply_theme`. If the theme file is missing or unreadable, the screen falls back to default VGA colors.
+- **Notes**: Blanks the screen through the VGA registers, homes the cursor, and reloads the palette with `load_and_apply_theme`. It does **not** set the video mode, so a program that changed the mode has to restore it itself. If the theme file is missing or unreadable the palette is left at the VGA default.
 
 ## Color Palette
 
