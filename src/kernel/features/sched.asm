@@ -108,10 +108,10 @@ sched_task_create_from_ple:
 
     ; ----- build initial stack frame in task's stack segment -----
     ; Layout (from epilogue's perspective, low -> high addresses):
-    ;   SP+0   ES     (popped first)
+    ;   SP+0   ES     (popped first) (kernel data segment)
     ;   SP+2   DS
     ;   SP+4   DI     (popa: DI first)
-    ;   SP+6   SI
+    ;   SP+6   SI      (pointer to args)
     ;   SP+8   BP
     ;   SP+10  SP-phantom
     ;   SP+12  BX
@@ -134,11 +134,16 @@ sched_task_create_from_ple:
     sub di, 30                            ; new SP for the saved frame
 
     mov ax, [ple_entry_cs]                ; DS/ES initial value for the task
+    push ax
+    mov ax, KERNEL_DATA_SEG
     mov [es:di + 0],  ax                  ; ES
+    pop ax
     mov [es:di + 2],  ax                  ; DS
     xor ax, ax
     mov [es:di + 4],  ax                  ; DI
+    mov ax, [ple_param_ptr]               ; ptr to params
     mov [es:di + 6],  ax                  ; SI
+    xor ax, ax
     mov [es:di + 8],  ax                  ; BP
     mov [es:di + 10], ax                  ; phantom SP
     mov [es:di + 12], ax                  ; BX
