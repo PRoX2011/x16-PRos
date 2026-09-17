@@ -39,6 +39,7 @@ com_4Bh:
     mov [dosmem_env_seg], ax
     add ax, DOSMEM_ENV_PARAS
     mov [exe_psp_seg], ax
+    mov [cs:exec_nest_psp], ax
 
     add ax, 0x10 + EXEC_HEAP_GAP
     mov [exe_load_seg], ax
@@ -47,10 +48,16 @@ com_4Bh:
     mov ax, [program_seg_runtime]
     mov [exe_parent_psp], ax
 
+    mov [cs:exec_ret_ss], ss
+    mov [cs:exec_ret_sp], sp
+    mov [cs:exec_ret_bp], bp
+    mov byte [cs:exec_nest_active], 1
+
     mov byte [exe_nested], 1
     mov ax, [.name]
     call exe_execute
 
+    mov byte [cs:exec_nest_active], 0
     mov byte [exe_nested], 0
     mov word [exe_psp_seg], EXE_PSP_SEG
     mov word [exe_load_seg], EXE_LOAD_SEG
@@ -72,6 +79,30 @@ com_4Bh:
     iret
 
 .name    dw 0
+
+exec_resume:
+    mov ax, KERNEL_DATA_SEG
+    mov ds, ax
+    mov es, ax
+    mov bp, [cs:exec_ret_bp]
+
+    mov byte [exe_nested], 0
+    mov word [exe_psp_seg], EXE_PSP_SEG
+    mov word [exe_load_seg], EXE_LOAD_SEG
+
+    pop di
+    pop si
+    pop es
+    pop ds
+    and word [bp+6], 0xFFFE
+    pop bp
+    iret
+
+exec_nest_psp    dw 0
+exec_ret_ss      dw 0
+exec_ret_sp      dw 0
+exec_ret_bp      dw 0
+exec_nest_active db 0
 
 com_exec_blk_seg dw 0
 com_exec_blk_off dw 0

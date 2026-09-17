@@ -125,21 +125,34 @@ dos_terminate_task:
 
     mov es, [cs:dos_current_psp]
 
-    push es
-    mov es, [es:0x16]
-    mov ax, [es:0x2E]
-    mov [cs:dos_term_sp], ax
-    mov ax, [es:0x30]
-    mov [cs:dos_term_ss], ax
-    pop es
+    mov word [cs:dos_term_ss], 0
+    mov word [cs:dos_term_sp], 0
+
+    mov ax, [es:0x0C]
+    mov bx, cs
+    cmp ax, bx
+    je .no_way_back
+    test ax, ax
+    jz .no_way_back
+    mov [cs:dos_term_addr + 2], ax
+    mov ax, [es:0x0A]
+    mov [cs:dos_term_addr], ax
+    jmp .have_term_addr
+
+.no_way_back:
+    cmp byte [cs:exec_nest_active], 0
+    jne dos_terminate_nested
 
     xor ax, ax
     mov ds, ax
-
     mov ax, [0x22 * 4]
     mov [cs:dos_term_addr], ax
     mov ax, [0x22 * 4 + 2]
     mov [cs:dos_term_addr + 2], ax
+
+.have_term_addr:
+    xor ax, ax
+    mov ds, ax
 
     mov ax, [es:0x16]
     mov [cs:dos_current_psp], ax
@@ -186,6 +199,32 @@ dos_entry_sp  dw 0
 dos_entry_ss  dw 0
 
 ; ==================================================================
+; DOS_TERMINATE_NESTED - end a child that INT 0x21 AH=4Bh started
+; ==================================================================
+dos_terminate_nested:
+    cli
+
+    push ax
+    mov ax, [cs:dos_current_psp]
+    call dosmem_free_owner
+    pop ax
+
+    mov es, [cs:dos_current_psp]
+    mov ax, [es:0x16]
+    test ax, ax
+    jnz .have_parent
+    mov ax, EXE_PSP_SEG
+.have_parent:
+    mov [cs:dos_current_psp], ax
+    call dosvars_stamp_psp
+
+    mov byte [cs:exec_nest_active], 0
+    mov ss, [cs:exec_ret_ss]
+    mov sp, [cs:exec_ret_sp]
+    sti
+    jmp exec_resume
+
+; ==================================================================
 ; INT 20h - Terminate program.
 ; The same ending as AH = 4Ch, so it goes there.
 ; ==================================================================
@@ -195,6 +234,15 @@ int20_handler:
     jmp dos_terminate
 
 dos_terminate:
+    cmp byte [cs:exec_nest_active], 0
+    je .not_nested
+    push ax
+    mov ax, [cs:dos_current_psp]
+    cmp ax, [cs:exec_nest_psp]
+    pop ax
+    je dos_terminate_nested
+
+.not_nested:
     push ds
     push ax
     mov ds, [cs:dos_current_psp]
