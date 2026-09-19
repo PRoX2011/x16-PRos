@@ -1,16 +1,118 @@
 ----------------------- Key changes x16-PRos v1.0 ----------------------
 
-This is one of the biggest updates in this episode. A lot of bugs 
-have been fixed, a lot of lines of code have been written and now,
-finally, I can present to you a stable release of x16-PRos,
-which is ready to replace MS-DOS
+This is the biggest release in the history of the project. It took me
+almost a half of the year. x16-PRos now has a graphical interface, cooperative 
+multitasking, its own assembler, and a MS-DOS compatibility layer that 
+runs programs like Windows 1.01, Windows 2.03, DOOM, 
+Turbo C and GW-BASIC. 
+Thanks to everyone who stayed / supported / helped :)
                                         -- PRoX
 
 =======================================================================================
 
-1. Cooperative multitasking
+1. Graphical user interface
+1) GUI.PLE - a small window manager
+   - Runs as an PLE program and contains desktop with 
+     program icons, menu bar, popup menus, calendar widget
+2) Windows
+   - Drag, close, maximize
+   - Free resize by pulling the bottom right corner
+3) Appearance
+   - Wallpaper patterns
+   - Rounded icon corners, adjustable gap between an icon and its label
+   - All of it is configured from GUI Settings, and stored in
+     CONF.DIR/GUI.DIR (IC_ROUND.CFG, NAME_GAP.CFG, WALLPAP.CFG)
+4) Windowed programs (PLE.DIR/GUI.DIR)
+   - CALC.PLE     - calculator
+   - CLOCK.PLE    - clock
+   - EYES.PLE     - the eyes that follow the cursor
+   - SETTINGS.PLE - GUI settings
+   - HELLO.PLE    - "hello world" (GUI program example to start from)
+5) The same windowed programs run full screen from the terminal, with
+   no GUI running at all.
+
+=======================================================================================
+
+2. Drawing libraries for programs
+1) programs/lib/grafx.inc - 2D primitives for VGA 0x12
+   (640x480x16): pixels, lines, rectangles, circles, ellipses
+2) programs/lib/surf.inc - a drawing surface that works either full
+   screen or inside a GUI window. 
+   There is also buttons, text labels, menus and sliders for GUI programs
+3) programs/lib/wm.inc - layout of the block the window manager and
+   its clients share
+
+=======================================================================================
+
+3. MS-DOS compatibility layer and new emulated MS-DOS calls
+
+This is where most of the work went.
+
+1) File handle layer (src/kernel/features/com/dosfile.asm)
+   - MS-DOS handles on top of the x16-PRos file system functions, with seeking
+     and streamed reads and writes
+   - 3Ch create
+   - 3Dh open
+   - 3Eh close
+   - 3Fh read
+   - 40h write
+   - 42h seek
+   - 43h get/set attributes
+   - 45h/46h duplicate handle
+   - 5Ah temporary file
+   - 5Bh create new file
+   - 68h commit file
+2) DOS memory arena (src/kernel/features/com/dosmem.asm)
+   - Real MCB chain, so programs can allocate and resize blocks
+   - 48h allocate
+   - 49h free
+   - 4Ah resize
+3) DOS variables (src/kernel/features/com/dosvars.asm)
+   - List of Lists (52h)
+   - InDOS flag (34h)
+   - swappable data area (5Dh)
+   - MS-DOS drive tables
+4) Directory searching (src/kernel/features/com/find.inc)
+   - 4Eh FindFirst
+   - 4Fh FindNext with wildcards
+   - 47h get current directory path
+5) EXEC (INT 0x21; AH = 4Bh)
+6) INT 33h mouse services (src/kernel/features/com/int33h)
+   - The mouse is handed over to the DOS program while it runs and
+     taken back when it exits
+7) Other new calls
+   - 26h/55h create PSP
+   - 29h parse filename into FCB
+   - 2Bh set date
+   - 2Dh set time
+   - 33h Ctrl+Break handling
+   - 44h IOCTL (rewritten)
+   - 50h/51h set/get current PSP
+   - 56h rename or move
+   - 57h file date and time
+   - 59h extended error information
+   - 62h get PSP
+8) EXE loader fixes and improvements
+9) Program exit now takes the return address from the PSP
+
+=======================================================================================
+
+5. PRASM
+
+Programs for x16-PRos can now be written inside x16-PRos.
+
+1) PRASM.BIN (programs/prasm.asm) - two-pass assembler with NASM-like
+   syntax
+   - 40 instructions, not counting the conditional jumps, labels and etc.
+2) Documentation in DOCS.DIR, in English and in Russian (PRASM.TXT)
+3) Example sources in ASM.DIR: HELLO.ASM, DATE.ASM, TIME.ASM
+   Pull requests with more examples are welcome
+
+=======================================================================================
+
+6. Cooperative multitasking
 1) Task scheduler (src/kernel/features/sched.asm)
-   - Four task slots
+   - Eight task slots
    - Task states: free / ready / running / sleeping
    - Background and foreground tasks live side by side
    - Each task keeps its own SS:SP, base segment and wake-up tick
@@ -18,10 +120,12 @@ which is ready to replace MS-DOS
    - A task gives up the CPU with INT 0x23 AH=0x13, or whenever it
      waits for a key or goes to sleep
 3) Sleeping tasks wake up on the BIOS tick counter (~55 ms per tick)
+4) bg <file> runs a PLE program in the background and gives the
+   terminal straight back to you
 
 =======================================================================================
 
-2. Kernel memory allocator
+7. Kernel memory allocator
 1) New first-fit allocator (src/kernel/features/memory.asm)
    - Manages the heap from segment 0x3000 up to 0xA000
    - Up to 32 live allocations tracked at once
@@ -31,7 +135,7 @@ which is ready to replace MS-DOS
 
 =======================================================================================
 
-3. New system API - INT 0x23
+8. New system API - INT 0x23
 1) Brand new interrupt for everything the new subsystems expose
    (src/kernel/features/api/api_sys.asm)
 2) Memory calls
@@ -50,70 +154,142 @@ which is ready to replace MS-DOS
    - 0x17 Query a task slot (state, flags, base segment)
    - 0x18 Kill a task by id
    - 0x19 Copy a task's name into your buffer
-4) Mouse calls (0x20 - 0x25)
-   - Get state, get text cell, hide / show cursor,
-     enable / disable, drag-select on / off
+   - 0x34 Reparent a task
+4) Mouse calls (0x20 - 0x26)
+   - get state
+   - get text cell
+   - hide / show cursor
+   - enable / disable
+   - drag-select on / off
+   - set cursor shape
 
 =======================================================================================
 
-4. New programs
-1) PS.BIN - lists the active tasks
-2) KILL.BIN - terminates task by its id
-3) CLOCK.PLE - background clock
+9. FAT12 volumes with multi-sector clusters
+Until now the file system only really understood the 1.44 MB floppy
+layout. That is gone.
+
+1) The layout is read from the BPB of the mounted volume
+2) Clusters larger than one sector are handled everywhere - reading,
+   writing, directory walking, free space
+3) Sector runs are moved a track at a time (fs_sector_run), which is
+   what real hardware wants
+4) Files grow one cluster at a time (fs_extend_chain) instead of being
+   written in one shot
+5) Every drive remembers its own current directory, so switching
+   between A: and C: does not throw you back to the root
+6) cd can enter a directory without the .DIR extension
 
 =======================================================================================
 
-5. PLE header flags
-1) PLE_HEADER now takes an optional 4th argument with flags
+10. Streaming file access - INT 0x22; AH = 0x15
+1) Up to 8 open handles, files of any size, no need to fit the whole
+   file in memory first
+   - AL = 0x00 open
+   - AL = 0x01 read
+   - AL = 0x02 write
+   - AL = 0x03 seek
+   - AL = 0x04 close
+2) The DOS compatibility layer sits on top of this
+3) WAVPLAY and IMFPLAY now stream their files, so the length of a
+   track is no longer limited by free RAM
+
+=======================================================================================
+
+11. SETUP really formats the target disk
+1) The installer no longer clones the floppy sector by sector. It
+   formats the chosen disk as FAT12 with a cluster size that suits its
+   capacity, then copies the whole directory tree onto it
+2) Files that cannot be copied are counted and reported at the end
+   instead of silently disappearing
+
+=======================================================================================
+
+12. PLE format updates
+1) PLE_HEADER takes an optional 4th argument with flags
    - PLE_FLAG_NO_SPLASH (0x01) - skip the splash screen entirely
    - PLE_FLAG_NO_WAIT   (0x02) - show the splash but don't wait for a key
 2) The flags byte lives at offset 0x03 of the PLE header, right after
    the 'PLE' magic
 3) Background launches always skip the splash, no matter the flags
-4) ple.inc and the PLE README updated to document all of this
+4) Loading and running are now separate steps (ple_load / ple_run_loaded),
+   so a program can be loaded from one directory and run from another
+5) PLE programs get their command line in ES:SI
+   (ES = kernel data segment, SI = pointer to the parameter list)
+6) ple.inc and the PLE README updated to document all of this
 
 =======================================================================================
 
-6. BMP renderer improvements
+13. New programs
+1) PS.BIN       - lists the active tasks
+2) KILL.BIN     - terminates a task by its id
+3) PRASM.BIN    - the native assembler
+4) GUI.PLE      - the window manager
+5) CLOCK.PLE    - background clock for the terminal
+6) GUI programs (CALC.PLE, CLOCK.PLE, EYES.PLE, SETTINGS.PLE, HELLO.PLE)
 
 =======================================================================================
 
-7. Paint update
-1) Paint now talks to the mouse through the INT 0x23 calls instead of
-   poking the driver directly
+14. Mouse driver
+1) The cursor changes color depending on what is behind it, so it is
+   always visible
+2) Cursor shape switching (arrow / resize) through INT 0x23; AH = 0x26
+3) The mouse is handed over to DOS programs and taken back afterwards
+4) Fixed cursor trails, the black square around the cursor, and the
+   8 pixel snapping on the X axis
 
 =======================================================================================
 
-8. Tooling
-1) scripts/image2bmp.py
-   - New --stretch flag: force an exact size and ignore aspect ratio
-   - Default canvas changed to 320x240
+15. Documentation
+1) Built-in documentation updated: README, QUICKST, COMMANDS,
+   PROGRAMS, FILESYS, CONFIGS, LIMITS
+2) Russian documentation added (DOCS.DIR/RU)
+3) PRASM.TXT added in both languages
+4) docs/API.md extended with INT 0x23 and the new INT 0x22 calls
+5) README.md updated to be more readable
 
 =======================================================================================
 
-9. Themes and fonts in the TUI
-1) The TUI library now renders with the active system font instead of
-   always falling back to the BIOS ROM font, so dialogs and menus match
-   the rest of the OS
-   - font_init reads the font hooked at INT 43h by the kernel and only
-     drops back to the 8x16 ROM font when nothing custom is installed
+16. Build system
+1) Kernel size guard raised to 57344 bytes (0xE000), with a warning
+   2 KiB before the ceiling
+2) added HDD.img
+   - Anything dropped into assets/hdd_img ends up on that disk. DOOM
+     ships there, so you can try it right after SETUP
+3) New directories on the system disk: 
+   - PLE.DIR/GUI.DIR,
+   - CONF.DIR/GUI.DIR
+   - ASM.DIR
+   - DOCS.DIR/EN(RU).DIR
+5) Fixed the build on the distributions where it was failing
 
 =======================================================================================
 
-10. Proper multi-disk detection
-1) The kernel now enumerates every hard disk
-2) SETUP uses the same enumeration, so the installer can target any of
-   the detected hard disks, not just the first two
+17. Bug fixes
+1) Installing on a disk larger than 32 MiB produced a system that
+   would not boot
+   - The loader now carries on in the next segment. It also keeps the
+     full 10-bit cylinder number, and reads one FAT copy instead of two
+   - SETUP sizes the FAT from the cluster count the layout really
+     yields, and no longer trips over a BIOS reporting 256 heads
+2) A system installed on a hard disk came up without its theme, font
+   and time zone
+   - Those four config loaders switched to A: unconditionally. They
+     now read from the drive the system was booted from
+3) CAT no longer breaks the shell
+4) INT 0x20 exit from BIN programs no longer hangs the system
+5) INT 0x22 string pre-copy no longer overflows into kernel code
+6) SS == DS is no longer assumed where it does not hold
+7) SPACE game restores the registers correctly on exit
+8) Theme and font lookup from subdirectories fixed
 
 =======================================================================================
 
-11. Bug fixes
-1) CAT no longer breaks the shell
-   - The file print loop retargeted ES to walk the loaded file and never
-     restored it, so after CAT every typed command landed in the wrong
-     segment and the shell silently did nothing
-2) INT 0x20 exit from BIN programs no longer hangs the system
-3) INT 0x22 string pre-copy no longer overflows into kernel code
+18. New font DOTS.FNT
+
+=======================================================================================
+
+19. cls now clears through VRAM instead of INT 0x10
 
 =======================================================================================
 
