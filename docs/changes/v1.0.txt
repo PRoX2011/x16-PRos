@@ -293,4 +293,26 @@ layout. That is gone.
 
 =======================================================================================
 
+20. Proper multi-disk detection
+1) The kernel now enumerates every hard disk
+2) SETUP uses the same enumeration, so the installer can target any of
+   the detected hard disks, not just the first two
+
+=======================================================================================
+
+21. Themes and fonts in the TUI
+1) The TUI library now renders with the active system font instead of
+   always falling back to the BIOS ROM font, so dialogs and menus match
+   the rest of the OS
+   - font_init reads the font hooked at INT 43h by the kernel and only
+     drops back to the 8x16 ROM font when nothing custom is installed
+
+=======================================================================================
+
+22. Paint update
+1) Paint now talks to the mouse through the INT 0x23 calls instead of
+   poking the driver directly
+
+=======================================================================================
+
 Copyright (C) 2024-2026 PRoX2011
