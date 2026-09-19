@@ -460,6 +460,8 @@ save_image:
     mov al, 1
     mov ah, 0x24                ; enable mouse
     int 0x23
+    mov ah, 0x23
+    int 0x23
     jmp programLoop
 
 ; ==================================================================
