@@ -69,7 +69,7 @@ PrintDone:
 
 absoluteSector db 0x00
 absoluteHead db 0x00
-absoluteTrack db 0x00
+absoluteTrack dw 0x0000
 
 ClusterLBA:
     sub ax, 0x0002
@@ -87,7 +87,7 @@ LBACHS:
     xor dx, dx
     div WORD [bpbHeadsPerCylinder]
     mov BYTE [absoluteHead], dl
-    mov BYTE [absoluteTrack], al
+    mov WORD [absoluteTrack], ax
     ret
 
 ReadSectors:
@@ -98,12 +98,15 @@ ReadSectors:
     push bx
     push cx
     call LBACHS
-    mov ah, 0x02
-    mov al, 0x01
-    mov ch, BYTE [absoluteTrack]
-    mov cl, BYTE [absoluteSector]
+    mov ax, WORD [absoluteTrack]
+    mov cl, 6
+    shl ah, cl
+    mov ch, al
+    mov cl, ah
+    or cl, BYTE [absoluteSector]
     mov dh, BYTE [absoluteHead]
     mov dl, BYTE [bsDriveNumber]
+    mov ax, 0x0201
     int 0x13
     jnc .SUCCESS
     xor ax, ax
@@ -123,11 +126,8 @@ ReadSectors:
     add bx, WORD [bpbBytesPerSector]
     jnc .NEXT
     mov dx, es
-    cmp dx, 0x2000
-    jne .WRAP_FAIL
-    jmp FAILURE
-.WRAP_FAIL:
-    int 0x18
+    add dh, 0x10
+    mov es, dx
 .NEXT:
     inc ax
     loop .MAIN
@@ -183,10 +183,7 @@ LOAD_ROOT:
 LOAD_FAT:
     mov dx, WORD [di + 0x001A]
     mov WORD [cluster], dx
-    xor ax, ax
-    mov al, BYTE [bpbNumberOfFATs]
-    mul WORD [bpbSectorsPerFAT]
-    mov cx, ax
+    mov cx, WORD [bpbSectorsPerFAT]
     mov ax, WORD [bpbReservedSectors]
     mov bx, 0x0200
     call ReadSectors

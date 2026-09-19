@@ -268,10 +268,14 @@ install_probe_one:
 
     mov al, [.r_dh]
     inc al
+    jnz .heads_ok
+    mov al, 255
+.heads_ok:
     mov [bx+6], al
 
     mov al, [.r_cl]
     and al, 0x3F
+    jz .leave
     mov [bx+7], al
 
     push dx
@@ -982,15 +986,11 @@ install_format_target:
     jmp .fail
 
 .have_spc:
-    add ax, 2
-    mov bx, 3
-    mul bx
-    shr ax, 1
-    add ax, 511
-    mov cl, 9
-    shr ax, cl
+    call install_fat_secs
     mov [install_fmt_spf], ax
 
+.recheck:
+    mov ax, [install_fmt_spf]
     shl ax, 1
     add ax, 1 + INSTALL_ROOT_SECS
     mov [install_fmt_data], ax
@@ -1003,6 +1003,13 @@ install_format_target:
     div word [install_fmt_spc]
     cmp ax, INSTALL_FAT12_MAX
     ja .bigger
+
+    call install_fat_secs
+    cmp ax, [install_fmt_spf]
+    jbe .sizing_done
+    mov [install_fmt_spf], ax
+    jmp .recheck
+.sizing_done:
 
     mov ax, [install_src_heads]
     mov [install_chs_heads], ax
@@ -1503,6 +1510,23 @@ install_make_name:
 .term:
     mov byte [di], 0
     popa
+    ret
+
+install_fat_secs:
+    push bx
+    push cx
+    push dx
+    add ax, 2
+    mov bx, 3
+    mul bx
+    inc ax
+    shr ax, 1
+    add ax, 511
+    mov cl, 9
+    shr ax, cl
+    pop dx
+    pop cx
+    pop bx
     ret
 
 ; ==================================================================
