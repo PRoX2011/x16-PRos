@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to x16-PRos! This document provides guidelines for developing programs and contributing to the operating system.
 
+[link to **Russian** file](docs/RU/CONTRIBUTING.RU.md)
+
 ---
 
 ## Coding Standards
