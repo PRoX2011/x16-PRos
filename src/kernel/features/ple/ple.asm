@@ -206,6 +206,7 @@ ple_load:
 ; =======================================================================
 ple_execute:
     mov [ple_exec_flags], bl
+    mov [ple_param_ptr], si
     call ple_load
     jc .load_failed
     mov bl, [ple_exec_flags]
@@ -528,3 +529,4 @@ ple_pix_color        db 0
 ple_logo_row_buf     times 64 db 0
 ple_exec_flags       db 0
 ple_hdr_flags        db 0
+ple_param_ptr        dw 0

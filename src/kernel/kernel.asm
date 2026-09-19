@@ -861,9 +861,13 @@ get_cmd:
 
 .load_ple_program:
     ; Try to load PLE from current directory (only if file exists here)
+    mov si, [param_list]
+    mov [ple_param_ptr], si
+
     mov ax, command
     call fs_file_exists
     jc .try_ple_dir
+
     mov ax, command
     mov bl, 0x01                  ; show splash
     call ple_execute
