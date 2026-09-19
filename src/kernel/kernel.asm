@@ -2599,6 +2599,7 @@ saved_disk           db 0
 saved_drive_char     db 0
 autocomplete_enabled db 0
 boot_drive           db 0
+sys_drive_char       db 'A'
 current_dir_cluster  dw 0
 saved_dir_cluster    dw 0
 

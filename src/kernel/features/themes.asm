@@ -7,7 +7,7 @@ load_and_apply_theme:
 
     call save_current_dir
 
-    mov al, 'A'
+    mov al, [sys_drive_char]
     call fs_change_drive_letter
 
     mov byte [current_directory], 0

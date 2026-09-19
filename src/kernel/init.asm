@@ -47,9 +47,11 @@ init_disks:
 .boot_floppy:
     add al, 'A'
 .boot_select:
+    mov [sys_drive_char], al
     call fs_change_drive_letter
     jnc .boot_ready
     mov al, 'A'
+    mov [sys_drive_char], al
     call fs_change_drive_letter
 .boot_ready:
     call log_clear_on_boot

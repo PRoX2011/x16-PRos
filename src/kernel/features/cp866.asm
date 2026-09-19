@@ -32,7 +32,7 @@ font_load_from_cfg:
 
     call save_current_dir
 
-    mov al, 'A'
+    mov al, [sys_drive_char]
     call fs_change_drive_letter
 
     mov byte [current_directory], 0
@@ -126,7 +126,7 @@ font_load_core:
 
     call save_current_dir
 
-    mov al, 'A'
+    mov al, [sys_drive_char]
     call fs_change_drive_letter
 
     mov byte [current_directory], 0
