@@ -6,16 +6,19 @@
 ;
 ;   PLE_HEADER entry, "My program", "Author"
 ;   PLE_HEADER entry, "My program", "Author", PLE_FLAG_NO_SPLASH
+;   PLE_HEADER entry, "My program", "Author", 0, 16384   ; 16 KiB stack
 ;   PLE_LOGO   "logo.raw"             ; 4096 bytes (64x64, 1bpp-byte)
 ;
-;   PLE_CODE                          ; opens relative segment 0 (code+data)
-;   entry:
-;       mov ah, 0x09
-;       mov dx, hello
+;   entry:                            ; segment 0 opens here
+;       mov ah, 0x01
+;       mov si, hello
 ;       int 0x21
 ;       retf
 ;
-;   hello db 'Hello from PLE!', 13, 10, '$'
+;   hello db 'Hello from PLE!', 13, 10, 0
+;
+;   PLE_SEGMENT tables                ; a second segment, up to 64 KiB
+;   big_table times 40000 db 0
 ;
 ;   PLE_END
 ;
@@ -31,17 +34,36 @@
 PLE_FLAG_NO_SPLASH equ 0x01
 PLE_FLAG_NO_WAIT   equ 0x02
 
-; ----- PLE_HEADER entry_label, "description", "author" [, flags] -----
-%macro PLE_HEADER 3-4 0
+%define PLE_DEFAULT_STACK 8192
+%define PLE_FULL_SEGMENT  0xFFFF
+
+; ----- PLE_SEG(name) -----
+; Paragraphs from segment 0 to the named segment, known at assembly time.
+;   mov ax, cs
+;   add ax, PLE_SEG(tables)
+;   mov es, ax
+%define PLE_SEG(name) (__ple_par_ %+ name)
+
+; ----- PLE_LOAD_SEG sreg, name -----
+; Loads a segment register with the named segment. Clobbers AX.
+%macro PLE_LOAD_SEG 2
+    mov ax, cs
+    add ax, PLE_SEG(%2)
+    mov %1, ax
+%endmacro
+
+; ----- PLE_HEADER entry_label, "description", "author" [, flags [, stack]] -----
+%macro PLE_HEADER 3-5 0, PLE_DEFAULT_STACK
+%define __ple_stack_bytes (%5)
 SECTION .plehdr progbits start=0
 __ple_hdr_start:
     db 'P','L','E',%4                 ; +0x00 magic 'PLE' + flags byte
     dw 1                              ; +0x04 version
-    dw 0                              ; +0x06 entry segment (relative 0)
+    dw 0                              ; +0x06 entry segment (always 0)
     dw %1                             ; +0x08 entry IP
-    dw 0                              ; +0x0A stack segment (relative 0)
-    dw 0xFFFE                         ; +0x0C stack SP
-    dw __ple_seg_count                ; +0x0E instruction count
+    dw __ple_stack_seg                ; +0x0A stack rel-seg id
+    dw __ple_stack_sp                 ; +0x0C stack SP
+    dw __ple_seg_count                ; +0x0E load-table entry count
 __ple_desc_start:                     ; +0x10 description (32 B)
     db %2, 0
     times 32 - ($ - __ple_desc_start) db 0
@@ -67,43 +89,70 @@ __ple_tbl_start:
 
     SECTION .pleseg_code progbits follows=.pletbl vstart=0 align=16
 __ple_code_start:
+%assign __ple_nseg 1
+%xdefine __ple_last_sect .pleseg_code
+%xdefine __ple_last_name code
+__ple_par_code equ 0
+%endmacro
+
+; ----- __PLE_CLOSE_SEG -----
+; Ends the segment that is open and writes its load-table entry.
+%macro __PLE_CLOSE_SEG 0
+    align 16
+__ple_len %+ __ple_nseg equ ($ - $$)
+%if (__ple_len %+ __ple_nseg) > 0x10000
+    %error "a PLE segment cannot be larger than 64 KiB"
+%endif
+    SECTION .pletbl
+        dw __ple_nseg - 1                        ; rel-seg id
+        dd section. %+ __ple_last_sect %+ .start ; file offset
+        dw __ple_len %+ __ple_nseg               ; size in bytes
 %endmacro
 
 ; ----- PLE_CODE -----
+; Kept for older sources. Segment 0 is already open after PLE_LOGO.
 %macro PLE_CODE 0
     SECTION .pleseg_code
 %endmacro
 
+; ----- PLE_SEGMENT name -----
+; Opens another segment. Segments are written one after another, each one
+; ends where the next begins.
+%macro PLE_SEGMENT 1
+    __PLE_CLOSE_SEG
+__ple_par_ %+ %1 equ __ple_par_ %+ __ple_last_name + ((__ple_len %+ __ple_nseg) >> 4)
+    %assign __ple_nseg __ple_nseg + 1
+    SECTION .pleseg_ %+ %1 progbits follows=__ple_last_sect vstart=0 align=16
+    %xdefine __ple_last_sect .pleseg_ %+ %1
+    %xdefine __ple_last_name %1
+%endmacro
+
 ; ----- PLE_DATA -----
 %macro PLE_DATA 0
-%define __ple_has_data
-    SECTION .pleseg_code
-__ple_code_end:
-    SECTION .pleseg_data progbits follows=.pleseg_code vstart=0 align=16
-__ple_data_start:
+    PLE_SEGMENT data
 %endmacro
 
 ; ----- PLE_END -----
 %macro PLE_END 0
-    %ifdef __ple_has_data
-        SECTION .pleseg_data
-__ple_data_end:
-    %else
-        SECTION .pleseg_code
-__ple_code_end:
-    %endif
+    __PLE_CLOSE_SEG
 
-    ; Fill the load instruction table.
-    SECTION .pletbl
-        dw 0                                     ; rel seg 0 (code)
-        dd section..pleseg_code.start
-        dw __ple_code_end - __ple_code_start
-    %ifdef __ple_has_data
-        dw 1                                     ; rel seg 1 (data)
-        dd section..pleseg_data.start
-        dw __ple_data_end - __ple_data_start
-        __ple_seg_count equ 2
-    %else
-        __ple_seg_count equ 1
+%if __ple_stack_bytes == PLE_FULL_SEGMENT
+    %if __ple_nseg != 1
+        %error "PLE_FULL_SEGMENT leaves no room for extra segments"
     %endif
+__ple_stack_seg equ 0
+__ple_stack_sp  equ 0xFFFE
+__ple_seg_count equ __ple_nseg
+%else
+__ple_stack_seg equ __ple_nseg
+__ple_stack_sp  equ ((__ple_stack_bytes) + 15) & ~15
+    %if __ple_stack_sp > 0xFFFE
+        %error "PLE stack does not fit in one 64 KiB segment"
+    %endif
+    SECTION .pletbl
+        dw __ple_nseg
+        dd section. %+ __ple_last_sect %+ .start + (__ple_len %+ __ple_nseg)
+        dw 0
+__ple_seg_count equ __ple_nseg + 1
+%endif
 %endmacro

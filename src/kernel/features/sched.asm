@@ -103,7 +103,8 @@ sched_task_create_from_ple:
     mov [bx + TASK_FLAGS], al
     mov ax, [ple_base_seg]
     mov [bx + TASK_BASE_SEG], ax
-    mov word [bx + TASK_PARAS], PLE_MAX_PARAS
+    mov ax, [ple_arena_size]
+    mov [bx + TASK_PARAS], ax
     mov byte [bx + TASK_PARENT], 0xFF             ; no parent by default
 
     ; ----- build initial stack frame in task's stack segment -----

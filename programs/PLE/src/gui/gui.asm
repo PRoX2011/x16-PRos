@@ -7,7 +7,7 @@
 
 %include "ple.inc"
 
-PLE_HEADER start, "x16-PRos GUI", "PRoX-dev"
+PLE_HEADER start, "x16-PRos GUI", "PRoX-dev", 0, PLE_FULL_SEGMENT
 PLE_LOGO          "logo/gui.raw"
 
 %define MENUBAR_H   18
