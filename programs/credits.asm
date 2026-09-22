@@ -1,6 +1,6 @@
 ; ==================================================================
 ; x16-PRos -- CREDITS. Contributors and sponsors list.
-; Copyright (C) 2025 PRoX2011
+; Copyright (C) 2026 PRoX2011
 ; ==================================================================
 
 [BITS 16]
@@ -131,6 +131,12 @@ name_saeta         db 'Saeta', 0
 name_loxsete       db 'Loxsete', 0
 name_leoono        db 'Leo-ono', 0
 name_andrey        db 'Andrey', 0
+name_desvor58      db 'desvor58', 0
+name_tayowrld      db 'tayowrld', 0
+name_dexoron       db 'dexoron', 0
+name_sibunut       db 'sibunut', 0
+name_chiefexb      db 'chiefexb', 0
+name_dsign1k       db 'Dsign1k', 0
 name_yaroslav      db 'Yaroslav', 0
 name_greenbushy    db 'Green_Bushy', 0
 name_tanushqn      db 'tanushqn', 0
@@ -139,6 +145,13 @@ name_klasterk      db 'KlasterK', 0
 name_petruchiorus  db 'PetruCHIOrus', 0 
 name_sdkam         db 'sdkam', 0
 name_kraniov       db 'kraniov', 0
+name_anarh1st47    db 'anarh1st47', 0
+name_eduard        db 'Eduard', 0
+name_relya         db 'relya', 0
+name_vokichhh      db 'Vokichhh', 0
+name_ayano4ka1338  db 'ayano4ka1338', 0
+name_nortyashka    db 'Nortyashka', 0
+name_qqq           db 'QQQ', 0
 
 entries:
     dw name_hanakbe,      role_contributor
@@ -149,6 +162,13 @@ entries:
     dw name_loxsete,      role_contributor
     dw name_leoono,       role_contributor
     dw name_andrey,       role_contributor
+    dw name_desvor58,     role_contributor
+    dw name_tayowrld,     role_contributor
+    dw name_dexoron,      role_contributor
+    dw name_sibunut,      role_contributor
+    dw name_chiefexb,     role_contributor
+    dw name_dsign1k,      role_contributor
+    dw name_anarh1st47,   role_sponsor
     dw name_yaroslav,     role_sponsor
     dw name_greenbushy,   role_sponsor
     dw name_tanushqn,     role_sponsor
@@ -157,6 +177,12 @@ entries:
     dw name_petruchiorus, role_sponsor
     dw name_kraniov,      role_sponsor
     dw name_klasterk,     role_sponsor
+    dw name_eduard,       role_sponsor
+    dw name_relya,        role_sponsor
+    dw name_vokichhh,     role_sponsor
+    dw name_ayano4ka1338, role_sponsor
+    dw name_nortyashka,   role_sponsor
+    dw name_qqq,          role_sponsor
 entries_end:
 
 entries_count equ (entries_end - entries) / ENTRY_SIZE
