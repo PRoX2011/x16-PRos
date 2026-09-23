@@ -152,6 +152,7 @@ int23_handler:
 .exec_ple:
     call copy_caller_string_si_23
     mov ax, si
+    mov word [ple_param_ptr], ple_no_params
     mov bl, 0x01
     call ple_execute
     jmp .done
@@ -159,6 +160,7 @@ int23_handler:
 .exec_ple_bg:
     call copy_caller_string_si_23
     mov ax, si
+    mov word [ple_param_ptr], ple_no_params
     call ple_execute_bg
     jc .exec_ple_bg_fail
     mov bp, sp

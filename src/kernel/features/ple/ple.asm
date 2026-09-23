@@ -282,11 +282,11 @@ ple_load:
 ; PLE_EXECUTE - foreground launch.
 ; IN : AX = pointer to filename
 ;      BL = launch flags (bit 0 = show splash + wait for key; 0 = silent)
+;      [ple_param_ptr] = command line for the program, set by the caller
 ; OUT : CF = 1 on load failure, otherwise 0.
 ; =======================================================================
 ple_execute:
     mov [ple_exec_flags], bl
-    mov [ple_param_ptr], si
     call ple_load
     jc .load_failed
     mov bl, [ple_exec_flags]
@@ -611,4 +611,5 @@ ple_pix_color        db 0
 ple_logo_row_buf     times 64 db 0
 ple_exec_flags       db 0
 ple_hdr_flags        db 0
-ple_param_ptr        dw 0
+ple_param_ptr        dw ple_no_params
+ple_no_params        db 0

@@ -2241,6 +2241,7 @@ bg_command:
     jc .not_found
 
     mov ax, [.fname_ptr]
+    mov word [ple_param_ptr], ple_no_params
     call ple_execute_bg
     jc .launch_failed
 
