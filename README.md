@@ -14,8 +14,6 @@
 
 **A minimalistic 16-bit operating system written in NASM for x86 architecture**
 
-[Website](https://x16-pros.prosdev.org/) • [API Documentation](docs/API.md) • [Configs Documentation](docs/CONFIGURATION.md)
-
 <div style="display: flex; flex-direction: row; gap: 20px">
   <img src="docs/screenshots/terminal.png" width=45%>
   <img src="docs/screenshots/gui.png" width=45%>
@@ -32,29 +30,22 @@
 
 Also it`s a platform for low-level programming enthusiasts to explore development for x86 operating systems.
 
-> [!IMPORTANT]
-> The project needs contributors. Now only I, PRoX2011, is working on the kernel, but I can’t do everything alone. I would like to ask you how to help the project.
-> - Programs
-> - Development of a compatibility layer with MS DOS
-> - Improved documentation and instructions
->
-> If you help - thank you so much
+- **[API](docs/API.md)** - x16-PRos system calls
+- **[Programs package](docs/PROGRAMS.md)** - every bundled program, with screenshots
+- **[Configuration](docs/CONFIGURATION.md)** - config files and what each of them changes
+- **[Contributing](CONTRIBUTING.md)** - coding standards, program templates and how to send changes
+
+---
 
 <div style="display: flex; flex-direction: row; gap: 20px">
-  <img src="docs/screenshots/setup.png" width=45%>
+  <img src="docs/screenshots/programs/SETUP.png" width=45%>
   <img src="docs/screenshots/file_managment.png" width=45%>
 </div>
 <br>
 <div style="display: flex; flex-direction: row; gap: 20px">
-  <img src="docs/screenshots/view_comand.png" width=45%>
-  <img src="docs/screenshots/password_screen.png" width=45%>
+  <img src="docs/screenshots/doom.png" width=45%>
+  <img src="docs/screenshots/hexedit.png" width=45%>
 </div>
-
----
-
-Developing this project requires a lot of time and effort. The project is completely open source. Everything is being done out of pure passion, so if you like it, I'd like to ask you to support me (PRoX2011) financially using this link: [support me](https://dalink.to/proxdev)
-
-Thanks to everyone who supported me financially. All your nicknames will appear in the project's sponsors list.
 
 ---
 
@@ -77,204 +68,7 @@ Thanks to everyone who supported me financially. All your nicknames will appear 
 
 ---
 
-
-## 🖥️ PRos Terminal
-
-The system includes a powerful terminal - **PRos Terminal**. It not only allows you to launch programs but also offers a wide range of built-in commands and utilities.
-
-> [!NOTE]
-> To run a program, enter the name of the executable file (`.BIN`, `.PLE`, `.COM` or `.EXE`) with or without an extension. Programs will be launched from any directory if its `.BIN` file is placed in the `BIN/` (or for `.PLE` programs in `PLE/`) directory, and if the program file is not found there, the system will try to find the program in the current, working directory
-
-<div style="display: flex; flex-direction: row; gap: 20px">
-  <img src="docs/screenshots/dir.png" width=45%>
-  <img src="docs/screenshots/fetch.png" width=45%>
-</div>
-<br>
-<div style="display: flex; flex-direction: row; gap: 20px">
-  <img src="docs/screenshots/help_menu.png" width=45%>
-  <img src="docs/screenshots/cpu_comand.png" width=45%>
-</div>
-
-#### Basic Commands
-| Command | Description |
-|---------|-------------|
-| `help` | Display categorized command reference with navigation |
-| `info` | Show system information and OS details |
-| `cls` | Clear terminal screen |
-| `ver` | Display PRos terminal version |
-| `exit` | Exit to bootloader |
-
-#### System Information
-| Command | Description |
-|---------|-------------|
-| `cpu` | Display detailed CPU information (family, model, cores, cache) |
-| `date` | Show current date (DD/MM/YY format) |
-| `time` | Show current time (HH:MM:SS format, UTC) |
-
-#### File Operations
-| Command | Syntax | Description |
-|---------|--------|-------------|
-| `dir` | `dir` | List files in current directory with size info |
-| `cat` | `cat <filename>` | Display file contents |
-| `size` | `size <filename>` | Show file size in bytes |
-| `del` | `del <filename>` | Delete a file (kernel.bin protected) |
-| `copy` | `copy <source> <dest>` | Copy file (root directory only) |
-| `ren` | `ren <old> <new>` | Rename file (root directory only) |
-| `touch` | `touch <filename>` | Create empty file |
-| `write` | `write <file> <text>` | Write text to file |
-| `bg` | `bg <file>` | Run `.PLE` program in the background |
-
-#### Directory Operations
-| Command | Syntax | Description |
-|---------|--------|-------------|
-| `cd` | `cd <dirname>` | Change directory (use `..` for parent, `/` for root) |
-| `mkdir` | `mkdir <dirname>` | Create new directory |
-| `deldir` | `deldir <dirname>` | Delete empty directory |
-
-#### Media & Display
-| Command | Syntax | Description |
-|---------|--------|-------------|
-| `view` | `view <file> [-upscale] [-stretch]` | Display BMP image with optional 2x scaling |
-
-#### Power Management
-| Command | Description |
-|---------|-------------|
-| `shut` | Shutdown system via APM |
-| `reboot` | Restart system |
-
-
----
-
-## 📦 Standard Software Package
-
-x16-PRos includes a comprehensive collection of built-in applications:
-
-<table>
-<tr>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/writer.png" width="100%"><br>
-    <b>WRITER.BIN</b><br>
-    Simple editor for text files
-  </td>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/hexedit.png" width="100%"><br>
-    <b>HEXEDIT.BIN</b><br>
-    Hex editor
-  </td>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/launch.png" width="100%"><br>
-    <b>LAUNCH.BIN</b><br>
-    TUI program launcher
-  </td>
-</tr>
-<tr>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/mine.png" width="100%"><br>
-    <b>MINE.BIN</b><br>
-    Minesweeper game
-  </td>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/piano.png" width="100%"><br>
-    <b>PIANO.BIN</b><br>
-    Simple piano to play melodies using PC Speaker
-  </td>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/bchart.png" width="100%"><br>
-    <b>BCHART.BIN</b><br>
-    Barchart software for creating simple diagrams
-  </td>
-</tr>
-<tr>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/space.png" width="100%"><br>
-    <b>SPACE.BIN</b><br>
-    Space arcade game
-  </td>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/calc.png" width="100%"><br>
-    <b>CALC.BIN</b><br>
-    Simple calculator
-  </td>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/memory.png" width="100%"><br>
-    <b>MEMORY.BIN</b><br>
-    Memory viewer
-  </td>
-</tr>
-<tr>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/paint.png" width="100%"><br>
-    <b>PAINT.BIN</b><br>
-    Paint program
-  </td>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/pong.png" width="100%"><br>
-    <b>PONG.BIN</b><br>
-    Pong game
-  </td>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/fetch.png" width="100%"><br>
-    <b>FETCH.BIN</b><br>
-    Print system fetch (I use PRos btw)
-  </td>
-</tr>
-<tr>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/imfplay.png" width="100%"><br>
-    <b>IMFPLAY.BIN</b><br>
-    IMF music player
-  </td>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/clock.png" width="100%"><br>
-    <b>CLOCK.BIN</b><br>
-    Clock application
-  </td>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/procentc.png" width="100%"><br>
-    <b>PROCENTC.BIN</b><br>
-    Percentages calculator
-  </td>
-</tr>
-<tr>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/tetris.png" width="100%"><br>
-    <b>TETRIS.BIN</b><br>
-    Tetris game
-  </td>
-  <td width="33%" align="center">
-    <img src="docs/screenshots/mandel.png" width="100%"><br>
-    <b>MANDEL.BIN</b><br>
-    Mandelbrot-Menge
-  </td>
-    <td width="33%" align="center">
-    <img src="docs/screenshots/brainf.png" width="100%"><br>
-    <b>BRAINF.BIN</b><br>
-    Brainfuck interpreter
-  </td>
-</tr>
-<tr>
-  </td>
-    <td width="33%" align="center">
-    <img src="docs/screenshots/settings.png" width="100%"><br>
-    <b>SETTINGS.BIN</b><br>
-    x16-PRos system settings
-  </td>
-<td width="33%" align="center">
-    <br>
-    <b>And MUCH more...</b><br>
-    SNAKE.BIN, CREDITS.BIN, AUTOEXEC.BIN, GREP.BIN, HEAD, TAIL, THEME.BIN, CHARS.BIN, WAVPLAY.BIN, FDISK.BIN, ED.BIN, HELLO.COM, FRACTAL.COM, CALENDAR.BIN
-  </td>
-</tr>
-</table>
-
-**Developing Your Own Programs**
-
-You can create custom programs using NASM and the PRos API.
-
----
-
-
-## 🛠️ Building and Running
+## Building and Running
 
 ### Dependencies
 
