@@ -23,7 +23,6 @@
 
 </div>
 
-
 ## Overview
 
 **x16-PRos** is a lightweight real-mode multitasking operating system designed for the x86 architecture and written entirely in NASM. It features CLI, TUI and GUI interfaces, supports the FAT12 file system, and includes a large standard software suite.
