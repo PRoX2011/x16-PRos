@@ -2337,7 +2337,7 @@ info db 10, 13
      db '  Support project:  DALink (https://dalink.to/PRoXdev)', 10, 13
      db '  Source code:      GitHub (https://github.com/PRoX2011/x16-PRos)', 10, 13
      db '  License:          MIT', 10, 13
-     db '  OS version:       1.0-dev', 10, 13
+     db '  OS version:       1.0', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.3', 10, 13, 0
