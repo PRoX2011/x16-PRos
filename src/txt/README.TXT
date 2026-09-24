@@ -1,25 +1,29 @@
 ===========================================================================
-                        x16-PRos Operating System
-                            Version 0.9.0
+                       x16-PRos Operating System
+                           Version 1.0.0
 ===========================================================================
 
-Welcome to x16-PRos - a minimalistic 16-bit operating system written
-in NASM assembly for x86 architecture.
+Welcome to x16-PRos!
 
-DOCUMENTATION INDEX:
-  QUICKST.TXT  - Quick start guide for new users
-  FILESYS.TXT  - File system and supported formats
-  CONFIGS.TXT  - Configuration files reference
-  PROGRAMS.TXT - Built-in programs and applications
-  COMMANDS.TXT - Terminal commands reference
-  LIMITS.TXT   - System limitations and restrictions
-  NAMEING.TXT  - File naming rules and conventions
-  SECURITY.TXT - Password protection and encryption
-  STARTUP.TXT  - Boot process and AUTOEXEC
+This is a 16-bit operating system written in assembly from scratch.
 
-For latest updates visit: https://x16-pros.prosdev.org/
-GitHub: https://github.com/PRoX2011/x16-PRos
+You can edit text, draw pictures, play games, listen to music and much more.
+
+Idk what else can I say :)
+
+DOCUMENTATION:
+  QUICKST.TXT  - Start here if you are new
+  COMMANDS.TXT - All terminal commands explained
+  PROGRAMS.TXT - Programs and games included with the OS
+  FILESYS.TXT  - How files and folders work
+  CONFIGS.TXT  - How to configure the system
+  LIMITS.TXT   - System limits good to know about
+  EDMAN.TXT    - Manual for the ED text editor
+
+Website: https://x16-pros.prosdev.org/
+GitHub:  https://github.com/PRoX2011/x16-PRos
 
 License: MIT
-Author: PRoX2011
+Author:  PRoX2011
+
 ===========================================================================

@@ -1,38 +1,54 @@
 ===========================================================================
-                            QUICK START GUIDE
+                          QUICK START GUIDE
 ===========================================================================
 
-FIRST BOOT:
-  1. System will run SETUP.BIN automatically
-  2. Enter your username (max 31 characters)
-  3. Create a password (will be encrypted)
-  4. Choose a color theme
-  5. System will reboot
+Welcome! This guide will help you get started with x16-PRos.
 
-LOGGING IN:
-  - Enter your password when prompted
-  - Password is case-sensitive
-  - Wrong password will restart login process
+LOOKING AROUND
+-------------------------------------------
+Once you are in the terminal, try these commands:
 
-BASIC COMMANDS:
-  help     - Show all available commands
-  dir      - List files in current directory
-  cd DIR   - Change to directory DIR
-  cat FILE - Display file contents
-  cls      - Clear screen
-  exit     - Exit to bootloader
+  help    Show a list of all commands
+  dir     See what files are in the current directory
+  cd ..   Go to the parent directory
+  cd BIN  Go into the BIN directory
+  cls     Clear the screen
 
-RUNNING PROGRAMS:
-  - Type program name with or without extension
-  - Example: CALC or CALC.BIN
-  - Programs in BIN/ folder run from any directory
-  - Other programs run from current directory only
+RUNNING PROGRAMS
+-------------------------------------------
+To run a program, just type its name. You can skip the
+extension if you want:
 
-GETTING HELP:
-  - Type 'help' for command categories
-  - Use arrow keys to navigate help pages
-  - Press ESC to exit help
+  CALC        runs the calculator
+  CALC.BIN    same thing
 
-See COMMANDS.TXT for complete command reference
+Programs in the BIN and PLE directories can be started from anywhere.
+Programs in other directories only work when you are in that
+directory.
+
+VIEWING IMAGES
+-------------------------------------------
+To view a BMP image:
+
+  view BMP/LOGO.BMP
+
+You can add -upscale to zoom 2x, or -stretch to fill the
+whole screen.
+
+WHAT TO TRY NEXT
+-------------------------------------------
+  PAINT       Draw pictures and save them as BMP
+  WRITER      Edit and create text files
+  SNAKE       A classic snake game
+  TETRIS      The original block puzzle
+  MINE        Minesweeper with mouse support
+  FETCH       See your system info
+  PIANO       Play music with your keyboard
+  SETTINGS    Change timezone and other options
+
+For the full list of programs, see PROGRAMS.TXT.
+For all terminal commands, see COMMANDS.TXT.
+
+Have fun!
 
 ===========================================================================

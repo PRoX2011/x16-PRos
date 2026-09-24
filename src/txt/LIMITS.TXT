@@ -2,23 +2,33 @@
                           SYSTEM LIMITATIONS
 ===========================================================================
 
-FILE SYSTEM LIMITATIONS:
-  Filename length:           8 characters
-  File extension length:     3 characters
-  Total path length:         Limited by FAT12
-  Files per directory:       224 (root), varies (subdirs)
-  Maximum disk size:         32 MB (FAT12 limit)
+These are the limits of x16-PRos that are good to know
+about when using the system.
 
-FILENAME RESTRICTIONS:
-  Format: 8.3 (name.ext)
-  Forbidden characters: \ / : * ? " < > | (space)
-  Case insensitive (stored as uppercase)
-  No Unicode support (ASCII only)
+FILE SYSTEM
+-------------------------------------------
+  File name length:        8 characters max
+  File extension:          3 characters max
+  Root directory:          Up to 224 files
+  Total disk size:         Up to 32 MB (FAT12 limit)
+  Characters not allowed
+  in file names:           \ / : * ? " < > | and space
+  Unicode:                 Not supported (ASCII only)
 
-STRING LIMITATIONS:
-  Username (USER.CFG):       31 characters
-  Password:                  63 characters (encrypted)
-  Command prompt:            63 characters
-  Command line input:        127 characters
+TEXT AND INPUT
+-------------------------------------------
+  Username:                Up to 31 characters
+  Password:                Up to 63 characters
+  Command prompt:          Up to 63 characters
+  Command line input:      Up to 127 characters
+
+GRAPHICS
+-------------------------------------------
+  BMP image display:       Up to 320x240, 256 colors
+
+MULTITASKING
+-------------------------------------------
+  Background tasks (.PLE): Limited by available memory
+  Use PS to see running tasks, KILL to stop them.
 
 ===========================================================================

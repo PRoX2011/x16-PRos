@@ -2,7 +2,7 @@
 ; x16-PRos - PS/2 mouse driver
 ; Copyright (C) 2025 PRoX2011
 ;
-; Driver version: 0.2
+; Driver version: 0.4.1
 ;
 ; Compatible with video modes:
 ;   - 0x12  (VGA, 640x480, 16 colors, planar)
@@ -99,9 +99,23 @@ MouseCallback:
     mov dx, 479 - HCURSOR
 
 .update_pos:
+    mov bh, [ButtonStatus]
     mov [ButtonStatus], bl
+
+    push ax
+    push dx
+    sub ax, [MouseX]
+    sub dx, [MouseY]
+    mov [m33_dx], ax
+    mov [m33_dy], dx
+    add [m33_mickx], ax
+    add [m33_micky], dx
+    pop dx
+    pop ax
+
     mov [MouseX], ax
     mov [MouseY], dx
+    call m33_edges
 
 
     mov ax, [MouseX]
@@ -170,6 +184,7 @@ MouseCallback:
     cmp byte [CursorVisible], 0
     je .silent_exit
     call SaveBackground
+    call PickCursorColor
     mov si, mousebmp
     mov al, 0x0F
     call DrawCursor
@@ -339,8 +354,80 @@ DrawSelection:
 .base_off dw 0
 .width    dw 0
 
+cursor_arm_vga:
+    push ax
+    push dx
+    mov dx, 0x3CE
+    mov al, 0x01
+    out dx, al
+    inc dx
+    xor al, al
+    out dx, al
+    dec dx
+    mov al, 0x03
+    out dx, al
+    inc dx
+    xor al, al
+    out dx, al
+    dec dx
+    mov al, 0x05
+    out dx, al
+    inc dx
+    xor al, al
+    out dx, al
+    dec dx
+    mov al, 0x08
+    out dx, al
+    inc dx
+    mov al, 0xFF
+    out dx, al
+    pop dx
+    pop ax
+    ret
+
+PickCursorColor:
+    pusha
+    mov si, BackgroundBuffer
+    xor di, di
+    xor bx, bx
+.plane:
+    xor bp, bp
+    mov cx, HCURSOR * 2
+.byte:
+    mov al, [si]
+    inc si
+    mov dl, 8
+.bit:
+    shl al, 1
+    adc bp, 0
+    dec dl
+    jnz .bit
+    dec cx
+    jnz .byte
+
+    mov ax, bx
+    and ax, 1
+    jz .weigh
+    add di, bp
+.weigh:
+    add di, bp
+    inc bx
+    cmp bx, 4
+    jl .plane
+
+    cmp di, HCURSOR * 16 * 3
+    jb .dark
+    mov byte [CursorColor], 0
+    popa
+    ret
+.dark:
+    mov byte [CursorColor], 15
+    popa
+    ret
+
 SaveBackground:
     pusha
+    call cursor_arm_vga
     mov ax, 0xA000
     mov es, ax
     mov ax, [MouseY]
@@ -355,7 +442,7 @@ SaveBackground:
     out dx, al
     inc dx
     mov di, BackgroundBuffer
-    mov bx, 0
+    xor bx, bx
 .save_plane:
     mov al, bl
     out dx, al
@@ -364,7 +451,9 @@ SaveBackground:
 .save_row:
     mov al, [es:si]
     mov [di], al
-    inc di
+    mov al, [es:si+1]
+    mov [di+1], al
+    add di, 2
     add si, 80
     loop .save_row
     pop si
@@ -376,6 +465,7 @@ SaveBackground:
 
 RestoreBackground:
     pusha
+    call cursor_arm_vga
     mov ax, 0xA000
     mov es, ax
     mov ax, [MouseY]
@@ -390,7 +480,7 @@ RestoreBackground:
     out dx, al
     inc dx
     mov si, BackgroundBuffer
-    mov bx, 0
+    xor bx, bx
 .restore_plane:
     mov al, 1
     mov cl, bl
@@ -401,18 +491,27 @@ RestoreBackground:
 .restore_row:
     mov al, [si]
     mov [es:di], al
-    inc si
+    mov al, [si+1]
+    mov [es:di+1], al
+    add si, 2
     add di, 80
     loop .restore_row
     pop di
     inc bx
     cmp bx, 4
     jl .restore_plane
+    mov dx, 0x3C4
+    mov al, 2
+    out dx, al
+    inc dx
+    mov al, 0x0F
+    out dx, al
     popa
     ret
 
 DrawCursor:
     pusha
+    call cursor_arm_vga
     mov ax, 0xA000
     mov es, ax
     mov ax, [MouseY]
@@ -422,46 +521,126 @@ DrawCursor:
     shr bx, 3
     add ax, bx
     mov di, ax
+    mov ax, [MouseX]
+    and ax, 7
+    mov cx, 8
+    sub cx, ax
+    mov [.shcnt], cl
+    xor bx, bx
+.draw_plane:
     mov dx, 0x3C4
     mov al, 2
     out dx, al
     inc dx
-    mov si, mousebmp
-    mov bx, 0
-.draw_plane:
     mov al, 1
     mov cl, bl
     shl al, cl
     out dx, al
+    mov dx, 0x3CE
+    mov al, 4
+    out dx, al
+    inc dx
+    mov al, bl
+    out dx, al
+    mov al, [CursorColor]
+    mov cl, bl
+    shr al, cl
+    and al, 1
+    mov [.planebit], al
+    mov si, [CursorPtr]
     push di
-    push si
     mov cx, HCURSOR
 .draw_row:
-    mov ah, [es:di]
+    push cx
     mov al, [si]
-    or ah, al
-    mov [es:di], ah
+    xor ah, ah
+    mov cl, [.shcnt]
+    shl ax, cl
+    cmp byte [.planebit], 0
+    je .clear_row
+    mov dl, [es:di]
+    or dl, ah
+    mov [es:di], dl
+    mov dl, [es:di+1]
+    or dl, al
+    mov [es:di+1], dl
+    jmp .row_done
+.clear_row:
+    not ax
+    mov dl, [es:di]
+    and dl, ah
+    mov [es:di], dl
+    mov dl, [es:di+1]
+    and dl, al
+    mov [es:di+1], dl
+.row_done:
     inc si
     add di, 80
+    pop cx
     loop .draw_row
-    pop si
     pop di
     inc bx
     cmp bx, 4
     jl .draw_plane
+    mov dx, 0x3C4
+    mov al, 2
+    out dx, al
+    inc dx
+    mov al, 0x0F
+    out dx, al
     popa
     ret
+.shcnt   db 0
+.planebit db 0
 
 HideCursor:
     call RestoreBackground
     ret
 
-; ShowCursor -- Re-display the cursor at the current MouseX/MouseY by
-; re-saving the background under it and drawing the sprite. Use this
-; after manually calling HideCursor and toggling CursorVisible back to 1.
+; ==================================================================
+; MOUSE_DOS_BEGIN - hand the mouse to a DOS program.
+; ==================================================================
+mouse_dos_begin:
+    push ds
+    push es
+    push cs
+    pop ds
+    push cs
+    pop es
+    cmp byte [CursorVisible], 0
+    je .already_hidden
+    call HideCursor
+    mov byte [CursorVisible], 0
+.already_hidden:
+    mov byte [SelEnabled], 0
+    call m33_reset_state
+    call DisableMouse
+    pop es
+    pop ds
+    ret
+
+; ==================================================================
+; MOUSE_DOS_END - take the mouse back once the program has exited
+; ==================================================================
+mouse_dos_end:
+    push ds
+    push es
+    push cs
+    pop ds
+    push cs
+    pop es
+    mov byte [SelEnabled], 1
+    mov byte [CursorVisible], 1
+    call m33_reset_state
+    call EnableMouse
+    pop es
+    pop ds
+    ret
+
 ShowCursor:
     pusha
     call SaveBackground
+    call PickCursorColor
     mov si, mousebmp
     mov al, 0x0F
     call DrawCursor
@@ -508,8 +687,10 @@ MouseY       dw 0
 MouseCol     dw 0
 MouseRow     dw 0
 
-PrevLMB      db 0
+PrevLMB       db 0
 CursorVisible db 1
+CursorPtr     dw mousebmp
+CursorColor   db 15
 
 SelStartRow  dw 0
 SelStartCol  dw 0
@@ -534,5 +715,18 @@ mousebmp:
     db 0b10001110
     db 0b00000110
 
+resizebmp:
+    db 0b00000011
+    db 0b00000011
+    db 0b00000011
+    db 0b00000011
+    db 0b00000011
+    db 0b00000011
+    db 0b00000011
+    db 0b11111111
+    db 0b11111111
+    db 0b00000000
+    db 0b00000000
+
 section .bss
-BackgroundBuffer resb 44
+BackgroundBuffer resb 88

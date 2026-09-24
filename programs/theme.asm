@@ -155,6 +155,10 @@ start:
     mov ch, BOX_Y + BOX_H
     mov bl, ATTR_OK_MSG
     call font_print_string
+
+    call tui_init
+    call draw_screen
+    
     jmp .main_loop
 
 .apply_fail:

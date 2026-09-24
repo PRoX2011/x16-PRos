@@ -136,7 +136,7 @@ start:
     jmp .main_loop
 
 .exit:
-    mov ax, 0x0012
+    mov ax, 0x12
     int 0x10
     ret
 

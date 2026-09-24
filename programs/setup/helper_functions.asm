@@ -37,7 +37,12 @@ string_get_cursor_pos:
 string_input_string:
     pusha
     mov di, ax
-    mov cx, 0
+    mov [.maxlen], cx
+    cmp word [.maxlen], 0
+    jne .have_max
+    mov word [.maxlen], 255
+.have_max:
+    xor cx, cx
 
     call string_get_cursor_pos
     mov word [.cursor_col], dx
@@ -49,7 +54,7 @@ string_input_string:
     je .done_read
     cmp al, 0x08
     je .handle_backspace
-    cmp cx, 255
+    cmp cx, [.maxlen]
     jge .read_loop
     stosb
     mov ah, 0x0E
@@ -81,6 +86,7 @@ string_input_string:
     ret
 
 .cursor_col dw 0
+.maxlen     dw 0
 
 string_string_length:
     pusha

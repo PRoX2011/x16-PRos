@@ -317,14 +317,17 @@ display_bmp:
 .skip_palette:
     call bmp_calc_padding
 
+    ; Signed centering offsets: (VGA - size) / 2.
+    ; Negative values are intentional — they shift the image so it
+    ; is centered on screen; off-screen rows/cols are clipped below.
     mov ax, VGA_WIDTH
     sub ax, [bmp_width]
-    shr ax, 1
+    sar ax, 1
     mov [x_offset], ax
 
     mov ax, VGA_HEIGHT
     sub ax, [bmp_height]
-    shr ax, 1
+    sar ax, 1
     mov [y_offset], ax
 
     ; Advance past header + palette
@@ -347,22 +350,50 @@ display_bmp:
     mov di, _bmpSingleLine
     call bmp_copy_row
 
-    ; Write line buffer directly to VGA memory
+    ; Write line buffer to VGA memory only if row is on screen
     pop dx
     push dx
+    cmp dx, VGA_HEIGHT
+    jae .skip_draw           ; off-screen row (>=200 or wrapped negative)
 
     mov ax, dx
     mov bx, VGA_WIDTH
     mul bx                   ; AX = y * 320
-    add ax, [x_offset]
-    mov di, ax
 
-    mov ax, VGA_SEG
-    mov es, ax
+    ; Clip horizontally. x_offset is signed.
     mov si, _bmpSingleLine
     mov cx, [bmp_width]
+    mov bx, [x_offset]
+    test bx, bx
+    jns .x_pos
+    ; Negative x_offset: skip |bx| leading source pixels, target starts at row base
+    neg bx
+    cmp bx, cx
+    jae .skip_draw           ; whole row off-screen to the left
+    add si, bx
+    sub cx, bx
+    mov di, ax
+    ; Clip to VGA_WIDTH
+    cmp cx, VGA_WIDTH
+    jbe .have_di
+    mov cx, VGA_WIDTH
+    jmp .have_di
+.x_pos:
+    add ax, bx
+    mov di, ax
+    ; Clip right edge: max pixels = VGA_WIDTH - x_offset
+    mov ax, VGA_WIDTH
+    sub ax, bx
+    jbe .skip_draw           ; x_offset >= VGA_WIDTH, nothing fits
+    cmp cx, ax
+    jbe .have_di
+    mov cx, ax
+.have_di:
+    mov ax, VGA_SEG
+    mov es, ax
     rep movsb                ; write row to screen
 
+.skip_draw:
     pop dx
     pop cx
     dec dx

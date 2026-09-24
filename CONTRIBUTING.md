@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to x16-PRos! This document provides guidelines for developing programs and contributing to the operating system.
 
+[link to **Russian** file](docs/RU/CONTRIBUTING.RU.md)
+
 ---
 
 ## Coding Standards
@@ -92,15 +94,7 @@ mov dx, ax
 
 ### Program Structure
 
-All programs must:
-
-1. Be written in NASM assembly
-2. Use `ORG 0x8000` as the load address
-3. Call PRos kernel API functions (see [API.md](docs/API.md))
-4. End with `ret` to return control to the terminal
-5. Be compiled to `.BIN` format
-
-**Minimal Program Template:**
+**Minimal `.BIN` Program Template:**
 
 ```nasm
 [BITS 16]

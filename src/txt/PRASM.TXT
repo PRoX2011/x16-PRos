@@ -1,0 +1,187 @@
+===========================================================================
+                   PRASM - NATIVE ASSEMBLER FOR x16-PRos
+===========================================================================
+
+OVERVIEW
+-------------------------------------------
+  PRASM is a two-pass assembler that runs inside x16-PRos itself.
+  PRASM.BIN lives in BIN.DIR. Example sources are in ASM.DIR.
+
+USAGE
+-------------------------------------------
+  prasm <source.asm>
+    Assemble source.asm. The output name is derived by replacing the
+    source extension with .BIN.
+
+  prasm <source.asm> <output.bin>
+    Assemble source.asm into a chosen output file name.
+
+SYNTAX
+-------------------------------------------
+  One instruction per line. 
+
+  ";" starts a comment that runs to the end of the line.
+
+  Labels end with ":" and may be used before they are defined
+
+  Mnemonics, register names and label names are case-insensitive.
+  Labels are limited to 15 characters.
+
+  Numbers:
+    123            decimal
+    0x1F or 0X1F   hexadecimal
+    -5             negative decimal
+    'A'            character literal
+
+  Strings ("db" only):
+    db "Hello, World!", 10, 13, 0
+
+REGISTERS
+-------------------------------------------
+  AX CX DX BX SP BP SI DI
+  AL CL DL BL AH CH DH BH
+
+MEMORY OPERANDS (MOV only)
+-------------------------------------------
+  MOV is the only instruction that can address memory. Supported forms:
+
+    mov ax, [label]      mov [label], ax
+    mov al, [0x1234]     mov [0x1234], al
+    mov ax, [bx]         mov [bx], ax
+    mov ax, [si]         mov [si], ax
+    mov ax, [di]         mov [di], ax
+
+  There is no [bx+si]-style combined addressing and no displacement
+  inside brackets ([bx+4] is not supported).
+
+DIRECTIVES
+-------------------------------------------
+  ORG <value>
+    Set the address counter used for label values. Must be a plain
+    number. Defaults to 0x8000.
+
+  NAME EQU <value>
+    Define a named constant. <value> may be a number, a character
+    literal, or a label/EQU name that is already defined above this
+    line. Redefining a name is an error.
+
+        WIDTH equ 40
+        mov cx, WIDTH
+
+  DB <item>, <item>, ...
+    Emit bytes. Each item is a number or a quoted string.
+
+        db "Hello", 10, 0
+        db 1, 2, 0x0A
+
+  DW <item>, <item>, ...
+    Emit words (16-bit, low byte first). Each item is a number or a
+    label.
+
+        dw start, 0x1234
+
+  RESB <count>
+    Emit <count> zero bytes. <count> must already be known (a number
+    or an already-defined label/EQU).
+
+  TIMES <count> <instruction>
+    Repeat one instruction <count> times. Works with any instruction,
+    including DB with multiple items. <count> must already be known.
+
+        times 4 nop
+        times 3 db 0xAA, 0x55
+        times WIDTH db 0
+
+INSTRUCTIONS WITH AN OPERAND
+-------------------------------------------
+  MOV  dst, src             reg,reg / reg,imm / reg,[mem] / [mem],reg
+  ADD  dst, src             reg,reg / reg,imm
+  OR   dst, src             reg,reg / reg,imm
+  AND  dst, src             reg,reg / reg,imm
+  SUB  dst, src             reg,reg / reg,imm
+  XOR  dst, src             reg,reg / reg,imm
+  CMP  dst, src             reg,reg / reg,imm
+  TEST dst, src             reg,reg / reg,imm
+
+  INC  reg                  8-bit or 16-bit register
+  DEC  reg                  8-bit or 16-bit register
+  PUSH reg16                16-bit register only
+  POP  reg16                16-bit register only
+
+  SHL  reg, imm/CL          shift left
+  SHR  reg, imm/CL          shift right (unsigned)
+  SAR  reg, imm/CL          shift right (signed)
+
+  MUL  reg                  unsigned multiply, AL/AX x reg
+  IMUL reg                  signed multiply, AL/AX x reg
+  DIV  reg                  unsigned divide, AX(:DX) / reg
+  IDIV reg                  signed divide, AX(:DX) / reg
+
+  INT  imm8                 software interrupt
+
+  JMP  label                unconditional near jump
+  CALL label                near call
+
+  LOOP  label               dec CX, jump if CX <> 0 (short, +/-127)
+  JCXZ  label               jump if CX = 0          (short, +/-127)
+
+  JO JNO JB/JC JAE/JNB/JNC 
+  JE/JZ JNE/JNZ JBE JA JS 
+  JNS JP JNP JL JGE JLE JG  conditional jumps       (short, +/-127)
+
+  REP   <string op>         repeat while CX <> 0
+  REPE / REPZ  <string op>  repeat while CX <> 0 and ZF = 1
+  REPNE / REPNZ <string op> repeat while CX <> 0 and ZF = 0
+
+  ORG   value               set the address counter
+  NAME EQU value            define a constant
+  DB    item, ...           emit bytes / strings
+  DW    item, ...           emit words
+  RESB  count               emit zero bytes
+  TIMES count <instr>       repeat an instruction
+
+INSTRUCTIONS WITHOUT AN OPERAND
+-------------------------------------------
+  NOP                       no operation
+  RET                       near return
+  RETF                      far return
+  IRET                      return from interrupt
+  HLT                       halt the CPU
+
+  CLD / STD                 clear / set the direction flag
+  CLI / STI                 clear / set the interrupt flag
+  CLC / STC                 clear / set the carry flag
+
+  PUSHA / POPA              push/pop all general registers
+  CBW                       AL sign-extended into AH
+  CWD                       AX sign-extended into DX:AX
+
+  LODSB / LODSW             load byte/word from [SI], advance SI
+  STOSB / STOSW             store byte/word to [DI], advance DI
+  MOVSB / MOVSW             move byte/word [SI] -> [DI], advance both
+  CMPSB / CMPSW             compare bytes/words at [SI] and [DI]
+  SCASB / SCASW             compare AL/AX against byte/word at [DI]
+
+ERROR MESSAGES
+-------------------------------------------
+  Every error is reported as "Error, line N: <message>":
+
+  Syntax error              the line does not parse
+  Bad character             an unexpected character was found
+  Bad number                malformed decimal/hex literal
+  Bad string                unterminated quoted string
+  Name too long             label/identifier over 15 characters
+  Unknown instruction       mnemonic not recognised
+  Duplicate label           label or EQU name defined twice
+  Too many labels           more than 220 labels/constants
+  Undefined label           label used before it is ever defined
+  Operand size mismatch     mixed 8-bit and 16-bit operands
+  Bad memory operand        unsupported [ ... ] form
+  Jump out of range         short jump target more than +/-127 away
+  Output too big            generated code exceeds the output limit
+
+LIMITS
+-------------------------------------------
+  Source file               up to 15872 bytes
+  Labels + EQUs             up to 220 entries
+  Output file               up to 23 KiB

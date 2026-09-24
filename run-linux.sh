@@ -27,4 +27,6 @@ qemu-system-x86_64 \
     -device adlib,audiodev=snd0 \
     -audiodev pa,id=snd0 \
     -drive format=raw,file=disk_img/FLOPPY2.img,if=floppy,index=1 \
+    -drive format=raw,file=disk_img/HDD.img,if=ide,index=0,media=disk \
+    -boot order=a \
     -parallel file:lpt/output.txt

@@ -11,8 +11,9 @@ x16-PRos uses configuration files stored in `CONF.DIR` (except `SYSTEM.CFG`, whi
 | `USER.CFG` | Username | Plain text, max 31 chars |
 | `PASSWORD.CFG` | Encrypted password | XOR-encrypted payload |
 | `PROMPT.CFG` | Shell prompt template | Max 63 chars |
-| `THEME.CFG` | Terminal color palette | 16 lines of RGB values |
+| `THEME.CFG` | Terminal color palette | 16 lines of `index, r, g, b` |
 | `TIMEZONE.CFG` | Timezone offset | Integer hours from UTC |
+| `FONT.CFG` | Active font filename | Plain text, max 15 chars |
 
 ---
 
@@ -29,12 +30,14 @@ Default fallback prompt:
 ### Supported placeholders
 
 - `$username` - value from `USER.CFG`
+- `%XX` - raw byte from a two-digit hex code, e.g. `%0A` (line feed) or `%20` (space).
+  An invalid hex sequence is emitted as a literal `%`.
 
 ### How to edit
 
 1. Open/create `PROMPT.CFG` in `CONF.DIR`
 2. Write plain text template (no null byte)
-3. Keep length <= 63 characters
+3. Keep length <= 63 characters (the kernel truncates longer prompts)
 4. Reboot the OS
 
 ---
@@ -45,14 +48,18 @@ Controls startup logo and sound.
 
 ### Keys
 
-- `LOGO=<path>`  
-  Path to BMP logo, e.g. `LOGO=BMP/LOGO.BMP`
+- `LOGO=<path>`
+  Path to BMP logo, e.g. `LOGO=BMP/LOGO.BMP`. Default: `BMP/LOGO.BMP`
 
-- `LOGO_STRETCH=TRUE|FALSE`  
-  Stretch logo to full screen
+- `LOGO_STRETCH=TRUE|FALSE`
+  Stretch logo to full screen. Default: `FALSE`
 
-- `START_SOUND=TRUE|FALSE`  
-  Enable/disable startup melody
+- `START_SOUND=TRUE|FALSE`
+  Enable/disable startup melody. Default: `TRUE`
+
+Boolean values are matched on the first character only and are case-insensitive:
+`T`/`t` means true, anything else means false. Lines beginning with `#` are treated as
+comments and skipped.
 
 Example:
 
@@ -69,7 +76,6 @@ START_SOUND=TRUE
 Stores the username used in prompt and user-facing UI.
 
 - Plain text
-- Recommended max: 31 characters
 
 ---
 
@@ -98,10 +104,18 @@ Controls first-boot setup behavior.
 
 Defines terminal palette.
 
-- 16 lines
-- Each line is one RGB entry for a palette index
+- Exactly 16 lines, one per palette index
+- Each line has the form `index, r, g, b`
+  - `index` - palette slot `0`-`15`
+  - `r`, `g`, `b` - decimal color components, `0`-`255`
+  - Separators are commas; surrounding spaces/tabs are allowed
 
-Use `THEME.BIN` for easier theme switching when available.
+Example line:
+
+```text
+0, 0, 0, 0
+1, 0, 0, 170
+```
 
 ---
 
@@ -109,4 +123,17 @@ Use `THEME.BIN` for easier theme switching when available.
 
 Defines timezone offset
 
-Write an integer to the file to change your time zone. For example `5` for UTC+5 or `-3` for UTC-3
+Write a signed integer (hours from UTC) to the file to change your time zone. For example
+`5` for UTC+5 or `-3` for UTC-3.
+
+---
+
+## FONT.CFG
+
+Stores the filename of the active console font.
+
+- Plain text, first line only
+- Max 15 characters (longer names are trimmed)
+- The font is loaded from `FONTS.DIR/<name>`
+- If the file is missing or empty, the kernel falls back to `FONTS.DIR/DEFAULT.FNT`
+- A font file must be exactly 4096 bytes (256 CP866 glyphs x 8x16 pixels)

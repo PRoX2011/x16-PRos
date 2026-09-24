@@ -3,13 +3,16 @@
 ; Copyright (C) 2026 PRoX2011
 ; ==================================================================
 
-PLE_BASE_SEG        equ 0x3000       ; whole file is loaded here; segments
-                                     ; live at PLE_BASE_SEG + (foff >> 4)
-PLE_TEMP_SEG        equ PLE_BASE_SEG ; alias used by splash / logo readers
+PLE_PEEK_BYTES      equ 16
 
 ; PLE header field offsets
-PLE_OFF_MAGIC       equ 0x00
+PLE_OFF_MAGIC       equ 0x00          ; 'P','L','E' (3 bytes)
+PLE_OFF_FLAGS       equ 0x03          ; flags byte (see PLE_HF_* below)
 PLE_OFF_VERSION     equ 0x04
+
+; Header flag bits
+PLE_HF_NO_SPLASH    equ 0x01
+PLE_HF_NO_WAIT      equ 0x02
 PLE_OFF_ENTRY_SEG   equ 0x06
 PLE_OFF_ENTRY_IP    equ 0x08
 PLE_OFF_STACK_SEG   equ 0x0A
@@ -27,19 +30,126 @@ PLE_INSN_SIZE       equ 6
 PLE_INSN_SIZE_BYTES equ 8
 
 ; =======================================================================
-; PLE_EXECUTE - Loads and executes a PLE file
-; IN : AX = pointer to filename
-; OUT : CF = 1 on error, otherwise does not return until program ends
+; PLE_ARENA_PARAS - work out how much memory a PLE file needs without
+; loading it, so the arena can be sized before it is taken
+; IN : [ple_filename] = pointer to the file name
+; OUT : BX = paragraphs to allocate
+;       CF = 1 if the file could not be opened, or needs more
+;            memory than the heap could ever hand out
 ; =======================================================================
-ple_execute:
+ple_arena_paras:
     push ax
+    push cx
+    push dx
+    push si
+    push di
 
+    mov word [.sp], 0xFFFE
+
+    mov ax, [ple_filename]
+    call fs_stream_open
+    jc .fail
+    mov si, ax
+    mov [.size_lo], bx
+    mov [.size_hi], dx
+
+    mov ax, si
+    mov bx, PLE_PEEK_BYTES
+    mov cx, ple_hdr_peek
+    mov dx, ds
+    call fs_stream_read
+    mov di, ax
+
+    mov ax, si
+    call fs_stream_close
+
+    cmp di, PLE_PEEK_BYTES
+    jb .have_sp
+    cmp word [ple_hdr_peek + PLE_OFF_MAGIC], 0x4C50
+    jne .have_sp
+    cmp byte [ple_hdr_peek + PLE_OFF_MAGIC + 2], 'E'
+    jne .have_sp
+    cmp word [ple_hdr_peek + PLE_OFF_VERSION], 1
+    jne .have_sp
+    mov ax, [ple_hdr_peek + PLE_OFF_STACK_SP]
+    test ax, ax
+    jz .have_sp
+    mov [.sp], ax
+
+.have_sp:
+    mov bx, [.size_lo]
+    mov dx, [.size_hi]
+    add bx, 15
+    adc dx, 0
+    shr bx, 4
+    mov ax, dx
+    shl ax, 12
+    or bx, ax
+    shr dx, 4
+    jnz .fail
+
+    mov ax, [.sp]
+    shr ax, 4
+    inc ax
+    add bx, ax
+    jc .fail
+    cmp bx, HEAP_TOTAL_PARAS
+    ja .fail
+.done:
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop ax
+    clc
+    ret
+
+.fail:
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop ax
+    stc
+    ret
+.size_lo dw 0
+.size_hi dw 0
+.sp      dw 0
+
+; =======================================================================
+; PLE_LOAD - allocates memory, loads file, validates the header, and
+; resolves entry/stack segment ids into absolute segments.
+; IN : AX = pointer to filename
+; OUT : CF = 0 on success, with ple_base_seg / ple_entry_cs / ple_entry_ip
+;            / ple_stack_ss / ple_stack_sp / ple_filename filled in.
+;       CF = 1 on any failure. On error the arena (if allocated) is freed
+;            and a red diagnostic message is printed.
+; =======================================================================
+ple_load:
+    mov [ple_filename], ax
+
+    call ple_arena_paras
+    jc .alloc_failed
+    mov [ple_arena_size], bx
+    call mem_alloc
+    jc .alloc_failed
+    mov [ple_base_seg], ax
+
+    mov ax, [ple_filename]
     xor cx, cx
-    mov dx, PLE_TEMP_SEG
+    mov dx, [ple_base_seg]
     call fs_load_huge_file
     jnc .loaded
 
-    pop ax
+    mov ax, [ple_base_seg]
+    call mem_free
+    mov si, ple_load_failed_msg
+    call print_string_red
+    call print_newline
+    stc
+    ret
+
+.alloc_failed:
     mov si, ple_load_failed_msg
     call print_string_red
     call print_newline
@@ -47,20 +157,21 @@ ple_execute:
     ret
 
 .loaded:
-    pop ax
-    mov [ple_filename], ax
-
     push es
     push ds
 
-    mov bx, PLE_BASE_SEG
+    mov bx, [ple_base_seg]
     mov es, bx
 
-    ; ---- Magic 'PLE',0 ----
-    cmp word [es:PLE_OFF_MAGIC],     0x4C50    ; 'P','L'
+    ; ---- Magic 'PLE' (byte at +3 is the flags byte) ----
+    cmp word [es:PLE_OFF_MAGIC], 0x4C50        ; 'P','L'
     jne .bad_sig
-    cmp word [es:PLE_OFF_MAGIC + 2], 0x0045    ; 'E', 0
+    cmp byte [es:PLE_OFF_MAGIC + 2], 'E'
     jne .bad_sig
+
+    ; ---- Header flags ----
+    mov al, [es:PLE_OFF_FLAGS]
+    mov [ple_hdr_flags], al
 
     ; ---- Version ----
     cmp word [es:PLE_OFF_VERSION], 1
@@ -79,7 +190,7 @@ ple_execute:
     ; ---- Instruction count ----
     mov bx, [es:PLE_OFF_INSN_COUNT]
     test bx, bx
-    jz  .bad_table
+    jz .bad_table
     mov [ple_insn_count], bx
 
     mov word [ple_entry_cs], 0
@@ -98,8 +209,8 @@ ple_execute:
 
     shl ax, 12
     shr di, 4
-    or  di, ax
-    add di, PLE_BASE_SEG
+    or di, ax
+    add di, [ple_base_seg]
 
     cmp bx, [ple_entry_seg_id]
     jne .not_entry
@@ -114,61 +225,20 @@ ple_execute:
     loop .lookup_loop
 
     cmp word [ple_entry_cs], 0
-    je  .bad_table
+    je .bad_table
     cmp word [ple_stack_ss], 0
-    je  .bad_table
+    je .bad_table
 
-    ; ---- Splash screen ----
     pop ds
     pop es
-    call ple_show_splash
-
-    mov [com_stack_save], sp
-    mov [com_ss_save], ss
-
-    call DisableMouse
-
-    mov ax, [ple_stack_ss]
-    mov bx, [ple_stack_sp]
-    mov dx, [ple_entry_cs]
-    mov cx, [ple_entry_ip]
-
-    cli
-    mov ss, ax
-    mov sp, bx
-
-    push cs
-    push word .ple_done
-
-    mov ax, [ple_entry_cs]
-    mov ds, ax
-    mov es, ax
-    sti
-
-    push dx                       ; entry CS
-    push cx                       ; entry IP
-    retf
-
-.ple_done:
-    cli
-    mov ax, KERNEL_DATA_SEG
-    mov ds, ax
-    mov es, ax
-    mov ss, [com_ss_save]
-    mov sp, [com_stack_save]
-    sti
-
-    call fs_reset_floppy
-    call EnableMouse
-    call font_reinstall
-    call load_and_apply_theme
+    clc
     ret
-
-; ---- Error paths ----
 
 .bad_sig:
     pop ds
     pop es
+    mov ax, [ple_base_seg]
+    call mem_free
     mov si, ple_bad_sig_msg
     call print_string_red
     call print_newline
@@ -178,6 +248,8 @@ ple_execute:
 .bad_version:
     pop ds
     pop es
+    mov ax, [ple_base_seg]
+    call mem_free
     mov si, ple_bad_version_msg
     call print_string_red
     call print_newline
@@ -187,6 +259,8 @@ ple_execute:
 .bad_table:
     pop ds
     pop es
+    mov ax, [ple_base_seg]
+    call mem_free
     mov si, ple_bad_table_msg
     call print_string_red
     call print_newline
@@ -196,6 +270,8 @@ ple_execute:
 .bad_align:
     pop ds
     pop es
+    mov ax, [ple_base_seg]
+    call mem_free
     mov si, ple_bad_align_msg
     call print_string_red
     call print_newline
@@ -203,8 +279,135 @@ ple_execute:
     ret
 
 ; =======================================================================
+; PLE_EXECUTE - foreground launch.
+; IN : AX = pointer to filename
+;      BL = launch flags (bit 0 = show splash + wait for key; 0 = silent)
+;      [ple_param_ptr] = command line for the program, set by the caller
+; OUT : CF = 1 on load failure, otherwise 0.
+; =======================================================================
+ple_execute:
+    mov [ple_exec_flags], bl
+    call ple_load
+    jc .load_failed
+    mov bl, [ple_exec_flags]
+    jmp ple_run_loaded
+
+.load_failed:
+    ret
+
+; =======================================================================
+; PLE_RUN_LOADED - runs an already-loaded PLE (skips ple_load).
+; IN : BL = launch flags (bit 0 = show splash + wait for key; 0 = silent)
+;      ple_base_seg / ple_filename / ple_entry_* already populated by
+;      a prior ple_load.
+; OUT : CF = 0 on success, CF = 1 if no task slot was free.
+; =======================================================================
+ple_run_loaded:
+    mov [ple_exec_flags], bl
+
+    test byte [ple_exec_flags], 0x01
+    jz .skip_splash
+    test byte [ple_hdr_flags], PLE_HF_NO_SPLASH
+    jnz .skip_splash
+    call ple_show_splash
+.skip_splash:
+
+    call DisableMouse
+
+    xor al, al
+    call sched_task_create_from_ple
+    jc .no_slot
+
+    push ax
+    mov si, [ple_filename]
+    call sched_task_set_name
+    pop ax
+
+    mov [sched_disp_child], al
+    push bx
+    xor bh, bh
+    mov bl, al
+    shl bx, 4
+    mov al, [sched_cur_task]
+    mov [sched_tasks + bx + TASK_PARENT], al
+    pop bx
+
+    call sched_dispatch
+
+    call fs_reset_floppy
+    call EnableMouse
+    call font_reinstall
+    call load_and_apply_theme
+    clc
+    ret
+
+.no_slot:
+    mov ax, [ple_base_seg]
+    call mem_free
+    mov si, ple_no_slot_msg
+    call print_string_red
+    call print_newline
+    stc
+    ret
+
+; =======================================================================
+; PLE_EXECUTE_BG - background launch.
+; IN : AX = pointer to filename
+; OUT : CF = 1 on failure, otherwise 0. AX = new task id on success.
+; =======================================================================
+ple_execute_bg:
+    call ple_load
+    jc .load_failed
+
+    mov al, TASK_F_BACKGROUND
+    call sched_task_create_from_ple
+    jc .no_slot
+
+    push ax
+    mov si, [ple_filename]
+    call sched_task_set_name
+    pop ax
+
+    xor ah, ah
+    clc
+    ret
+
+.no_slot:
+    mov ax, [ple_base_seg]
+    call mem_free
+    mov si, ple_no_slot_msg
+    call print_string_red
+    call print_newline
+    stc
+    ret
+
+.load_failed:
+    ret
+
+ple_task_done:
+    cli
+    mov ax, KERNEL_DATA_SEG
+    mov ds, ax
+    mov es, ax
+    sti
+
+    call fs_reset_floppy
+
+    pushf
+    push cs
+    push word .never
+    pusha
+    push ds
+    push es
+
+    jmp sched_exit
+
+.never:
+    ret
+
+; =======================================================================
 ; PLE_SHOW_SPLASH - Draws the splash and waits for any key.
-; Uses ES = PLE_TEMP_SEG to read description / author / logo from the
+; Uses DS = [ple_base_seg] to read description / author / logo from the
 ; loaded file. Preserves all registers visible to the loader.
 ; =======================================================================
 ple_show_splash:
@@ -222,7 +425,7 @@ ple_show_splash:
     call print_string
 
     push ds
-    mov ax, PLE_TEMP_SEG
+    mov ax, [ple_base_seg]
     mov ds, ax
     mov si, PLE_OFF_DESC
     call print_string
@@ -235,7 +438,7 @@ ple_show_splash:
     call print_string
 
     push ds
-    mov ax, PLE_TEMP_SEG
+    mov ax, [ple_base_seg]
     mov ds, ax
     mov si, PLE_OFF_AUTHOR
     call print_string
@@ -252,8 +455,11 @@ ple_show_splash:
 
     call print_newline
 
+    test byte [ple_hdr_flags], PLE_HF_NO_WAIT
+    jnz .skip_press_msg
     mov si, ple_press_key_msg
     call print_string
+.skip_press_msg:
 
     mov ah, 0x03
     xor bh, bh
@@ -270,8 +476,11 @@ ple_show_splash:
     call ple_draw_logo
 
     ; ---- Wait for key ----
+    test byte [ple_hdr_flags], PLE_HF_NO_WAIT
+    jnz .skip_wait
     xor ax, ax
     int 0x16
+.skip_wait:
 
     call print_newline
 
@@ -315,7 +524,7 @@ ple_draw_logo:
     jae .done
 
     push ds
-    mov ax, PLE_TEMP_SEG
+    mov ax, [ple_base_seg]
     mov ds, ax
     mov ax, KERNEL_DATA_SEG
     mov es, ax
@@ -373,6 +582,7 @@ ple_bad_sig_msg      db 'Not a PLE file (bad signature)', 10, 13, 0
 ple_bad_version_msg  db 'Unsupported PLE version', 10, 13, 0
 ple_bad_table_msg    db 'PLE: bad load table', 10, 13, 0
 ple_bad_align_msg    db 'PLE: segment not paragraph aligned', 10, 13, 0
+ple_no_slot_msg      db 'PLE: no task slot available', 10, 13, 0
 ple_press_key_msg    db 'Press any key to run...', 0
 
 ple_label_name       db 'Name:    ', 0
@@ -381,7 +591,10 @@ ple_label_file       db 'File:    ', 0
 
 ple_extension        db '.PLE', 0
 
+ple_hdr_peek         times PLE_PEEK_BYTES db 0
+ple_arena_size       dw 0
 ple_filename         dw 0
+ple_base_seg         dw 0
 ple_entry_seg_id     dw 0
 ple_stack_seg_id     dw 0
 ple_entry_cs         dw 0
@@ -396,3 +609,7 @@ ple_logo_y0          dw 0
 ple_row_off          dw 0
 ple_pix_color        db 0
 ple_logo_row_buf     times 64 db 0
+ple_exec_flags       db 0
+ple_hdr_flags        db 0
+ple_param_ptr        dw ple_no_params
+ple_no_params        db 0

@@ -1,135 +1,105 @@
 ===========================================================================
-                       TERMINAL COMMANDS REFERENCE
+                      TERMINAL COMMANDS REFERENCE
 ===========================================================================
 
-HELP & INFORMATION:
+GETTING SOME INFORMATION
+-------------------------------------------
   help
-    Display categorized command reference
-    Navigate with arrow keys
-    Press ESC to exit
+    Get list of the comands
 
   info
-    Show system information
-    OS version, architecture
-    Memory and hardware details
+    Shows quick system info
 
   ver
-    Display PRos terminal version
-    Quick version check
+    Prints the PRos terminal version.
 
-  cpu
-    Detailed CPU information
-    Family, model, stepping
-    Cache size, core count
-    Feature flags
-
-SCREEN & DISPLAY:
+SCREEN
+-------------------------------------------
   cls
-    Clear terminal screen
-    Reset cursor to top
+    Clear the screen
 
   date
-    Show current date
-    Format: DD/MM/YY
-    Uses RTC (Real-Time Clock)
+    Shows today's date in DD/MM/YY format.
 
   time
-    Show current time
-    Format: HH:MM:SS
-    Uses UTC + TIMEZONE.CFG offset
+    Shows the current time in HH:MM:SS format.
 
-FILE OPERATIONS:
+FILES
+-------------------------------------------
   dir
-    List files in current directory
-    Shows filenames and sizes
-    Displays file count
+    List all files in the current directory with their
+    sizes and a total file count.
 
-  cat <filename>
-    Display text file contents
-    For .TXT files
-    Example: cat README.TXT
+  cat <file>
+    Print the contents of a text file to the screen.
 
-  size <filename>
-    Show file size in bytes
-    Example: size KERNEL.BIN
+  size <file>
+    Show the file size in bytes.
 
-  del <filename>
-    Delete a file
-    KERNEL.BIN is protected
-    Permanent deletion (no recycle bin)
-    Example: del OLDFILE.TXT
+  del <file>
+    Delete a file.
 
   copy <source> <destination>
-    Copy file (root directory only)
-    Example: copy FILE1.TXT FILE2.TXT
-
+    Copy a file. Works only in current directory.
+  
   ren <oldname> <newname>
-    Rename file (root directory only)
-    Example: ren OLD.TXT NEW.TXT
+    Rename a file.
 
-  touch <filename>
-    Create empty file
-    Example: touch NEWFILE.TXT
+  touch <file>
+    Create a new empty file.
+    
+  write <file> <text>
+    Write text into a file (overwrites old content).
 
-  write <filename> <text>
-    Write text to file
-    Overwrites existing content
-    Example: write TEST.TXT Hello world
-
-DIRECTORY OPERATIONS:
-  cd <directory>
-    Change current directory
-    Example: cd BIN
+DIRECTORIES
+-------------------------------------------
+  cd <dirname>
+    Change current directory.
 
   cd ..
-    Go to parent directory
-    Move up one level
+    Go up one level to the parent directory.
 
   cd /
-    Go to root directory
-    Reset to top level
+    Go back to the root directory.
 
   mkdir <dirname>
-    Create new directory
-    Example: mkdir MYFILES
+    Create a new diretory.
 
-  deldir <dirname>
-    Delete empty directory only
-    Directory must be empty
-    Example: deldir OLDDIR
+  deldir <name>
+    Delete a directory. The directory must be empty.
 
-MEDIA & VIEWING:
-  view <filename> [options]
-    Display BMP image
-    Maximum resolution: 320x240
-    256 colors
+IMAGES
+-------------------------------------------
+  view <file> [options]
+    Display a BMP image on screen.
+    Supports up to 320x240 resolution, 256 colors.
 
     Options:
-      -upscale  Scale image 2x
-      -stretch  Stretch to fullscreen
+      -upscale   Scale the image 2x
+      -stretch   Stretch to fill the screen
 
-    Examples:
-      view IMAGE.BMP
-      view LOGO.BMP -upscale
-      view PHOTO.BMP -stretch
+MULTITASKING
+-------------------------------------------
+  bg <file>
+    Runs a .PLE program in the background.
+    The terminal stays available while the program
+    works. See PROGRAMS.TXT for PLE programs.
 
-SYSTEM CONTROL:
+SYSTEM
+-------------------------------------------
   reboot
-    Restart computer
-    Immediate restart
-    No confirmation prompt
+    Restart the computer immediately.
 
   shut
-    Shutdown computer via APM
-    Only works on APM-compatible systems
-    May not work in emulators
+    Shut down the computer using APM.
+    Only works on APM-compatible hardware.
 
   exit
-    Exit to bootloader
-    Return to boot menu
-    Allows booting other OS
+    Exit to the bootloader.
 
+-------------------------------------------
 
-TIP: Type program name to run .BIN, .EXE, .PLE or .COM files
+TIP: To run a program, just type its name:
+     CALC  or  CALC.BIN
 
 ===========================================================================

@@ -4,12 +4,16 @@ init_system:
     mov word [es:0x80], int20_handler
     mov word [es:0x82], cs
 
+    mov word [es:0x2F*4], int2F_handler
+    mov word [es:0x2F*4 + 2], cs
+
     sti
     cld
 
     call init_segments
     call init_disks
     call init_timer
+    call init_memory
     call init_api
     call init_configs
     call init_display
@@ -34,8 +38,22 @@ init_segments:
 init_disks:
     call fs_init_drives
 
-    mov al, 'A'
+    mov al, [boot_drive]
+    cmp al, 0x80
+    jb .boot_floppy
+    sub al, 0x80
+    add al, 'C'
+    jmp .boot_select
+.boot_floppy:
+    add al, 'A'
+.boot_select:
+    mov [sys_drive_char], al
     call fs_change_drive_letter
+    jnc .boot_ready
+    mov al, 'A'
+    mov [sys_drive_char], al
+    call fs_change_drive_letter
+.boot_ready:
     call log_clear_on_boot
 
     mov si, disk_init_msg
@@ -56,6 +74,19 @@ init_timer:
 
     ret
 
+init_memory:
+    call dosmem_probe_top
+    call mem_init
+
+    mov si, memory_init_msg
+    call log_okay
+
+    call sched_init
+
+    mov si, sched_init_msg
+    call log_okay
+    ret
+
 init_api:
     mov si, api_init_msg
     call log_okay
@@ -68,6 +99,17 @@ init_api:
     call api_fs_init
 
     mov si, api_fs_init_msg
+    call log_okay
+
+    call api_sys_init
+
+    mov si, api_sys_init_msg
+    call log_okay
+
+    call dosvars_init
+    call int33_init
+
+    mov si, int33_init_msg
     call log_okay
     ret
 
@@ -981,9 +1023,13 @@ load_password_cfg:
 segment_init_msg         db 'Segment initialization', 0
 disk_init_msg            db 'Disks initialisation', 0
 timer_init_msg           db 'Timer initialization', 0
+memory_init_msg          db 'Memory allocator', 0
+sched_init_msg           db 'Task scheduler', 0
 api_init_msg             db 'API initialization', 0
 api_output_init_msg      db 'Output API (INT 0x21)', 0
 api_fs_init_msg          db 'File System API (INT 0x22)', 0
+api_sys_init_msg         db 'System API (INT 0x23)', 0
+int33_init_msg           db 'Mouse API (INT 0x33)', 0
 config_init_msg          db 'Configuration loading', 0
 display_init_msg         db 'Display initialization', 0
 mouse_init_msg           db 'Mouse driver loaded', 0

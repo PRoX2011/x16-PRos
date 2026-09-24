@@ -46,21 +46,24 @@
 ;  Function 23h: Get file size using FCB
 ;  Function 24h: Set random record number in FCB
 ;  [DONE] Function 25h: Set interrupt vector
-;  Function 26h: Create PSP (Program Segment Prefix)
+;  [DONE] Function 26h/55h: Create PSP (Program Segment Prefix)
 ;  Function 27h: Random block read using FCB
 ;  Function 28h: Random block write using FCB
-;  Function 29h: Parse filename and build FCB
+;  [DONE] Function 29h: Parse filename and build FCB
 ;  [DONE] Function 2Ah: Get system date
-;  Function 2Bh: Set system date
+;  [DONE] Function 2Bh: Set system date
 ;  [DONE] Function 2Ch: Get system time
-;  Function 2Dh: Set system time
+;  [DONE] Function 2Dh: Set system time
 ;  Function 2Eh: Set/Reset verify switch
 ;  [DONE] Function 2Fh: Get current DTA address
 ;  [DONE] Function 30h: Get DOS version number
 ;  Function 31h: Terminate and stay resident (TSR)
 ;  Function 32h: Get DOS drive information (undocumented)
-;  Function 33h: Get/Set Ctrl+C / Ctrl+Break handling
-;  Function 34h: Get address of InDOS flag (undocumented)
+;  [DONE] Function 50h: Set current PSP
+;  [DONE] Function 51h: Get current PSP
+;  [DONE] Function 52h: Get List of Lists (undocumented)
+;  [DONE] Function 33h: Get/Set Ctrl+C / Ctrl+Break handling
+;  [DONE] Function 34h: Get address of InDOS flag (undocumented)
 ;  [DONE] Function 35h: Get interrupt vector
 ;  [DONE] Function 36h: Get free disk space
 ;  Function 37h: Get/Set switch character (undocumented)
@@ -68,45 +71,206 @@
 ;  [DONE] Function 39h: Create subdirectory (MKDIR)
 ;  [DONE] Function 3Ah: Remove subdirectory (RMDIR)
 ;  [DONE] Function 3Bh: Change current directory (CHDIR)
-;  Function 3Ch: Create file
-;  Function 3Dh: Open file
-;  Function 3Eh: Close file
-;  Function 3Fh: Read from file/device
-;  Function 40h: Write to file/device
+;  [DONE] Function 3Ch: Create file
+;  [DONE] Function 3Dh: Open file
+;  [DONE] Function 3Eh: Close file
+;  [DONE] Function 3Fh: Read from file/device
+;  [DONE] Function 40h: Write to file/device
 ;  [DONE] Function 41h: Delete file
-;  Function 42h: Move file pointer (seek)
-;  Function 43h: Get/Set file attributes
-;  Function 44h: I/O control for devices (IOCTL)
-;  Function 45h: Duplicate file handle
-;  Function 46h: Force duplicate file handle
-;  Function 47h: Get current directory path
-;  Function 48h: Allocate memory block
-;  Function 49h: Free allocated memory block
-;  Function 4Ah: Resize memory block
-;  Function 4Bh: Load/Execute program (EXEC)
+;  [DONE] Function 42h: Move file pointer (seek)
+;  [DONE] Function 43h: Get/Set file attributes
+;  [DONE] Function 44h: I/O control for devices (IOCTL)
+;  [DONE] Function 45h: Duplicate file handle
+;  [DONE] Function 46h: Force duplicate file handle
+;  [DONE] Function 47h: Get current directory path
+;  [DONE] Function 48h: Allocate memory block
+;  [DONE] Function 49h: Free allocated memory block
+;  [DONE] Function 4Ah: Resize memory block
+;  [DONE] Function 4Bh: Load/Execute program (EXEC)
 ;  [DONE] Function 4Ch: Terminate program with return code
 ;  [DONE] Function 4Dh: Get program return code
-;  Function 4Eh: Find first matching file (FindFirst)
-;  Function 4Fh: Find next matching file (FindNext)
+;  [DONE] Function 4Eh: Find first matching file (FindFirst)
+;  [DONE] Function 4Fh: Find next matching file (FindNext)
 ;  [DONE] Function 54h: Get verify flag
-;  Function 56h: Rename/move file
-;  Function 57h: Get/Set file date and time
-;  Function 59h: Get extended error information
-;  Function 5Ah: Create unique temporary file
-;  Function 5Bh: Create new file (fails if already exists)
+;  [DONE] Function 56h: Rename/move file
+;  [DONE] Function 57h: Get/Set file date and time
+;  [DONE] Function 59h: Get extended error information
+;  [DONE] Function 5Dh: Get swappable data area (DOS 3)
+;  [DONE] Function 5Ah: Create a temporary file
+;  [DONE] Function 5Bh: Create new file (fails if already exists)
 ;  Function 5Ch: Lock/Unlock file region (record locking)
 ;  Function 5Eh: Various network functions
 ;  Function 5Fh: Network redirection functions
-;  Function 62h: Get PSP (Program Segment Prefix) address
-;  Function 68h: Commit file (flush buffers)
+;  [DONE] Function 62h: Get PSP (Program Segment Prefix) address
+;  [DONE] Function 68h: Commit file (flush buffers)
 ;  Function 6Ch: Extended open/create file
 ; ---------------------------------------------
 ;
 ; ==================================================================
 
+int2F_handler:
+    xor al, al
+    iret
+
+; ==================================================================
+; DOS_TERMINATE_TASK - end one process and return to its parent.
+; ==================================================================
+dos_terminate_task:
+    cli
+
+    push ax
+    mov ax, [cs:dos_current_psp]
+    call dosmem_free_owner
+    pop ax
+
+    mov es, [cs:dos_current_psp]
+
+    mov word [cs:dos_term_ss], 0
+    mov word [cs:dos_term_sp], 0
+
+    mov ax, [es:0x0C]
+    mov bx, cs
+    cmp ax, bx
+    je .no_way_back
+    test ax, ax
+    jz .no_way_back
+    mov [cs:dos_term_addr + 2], ax
+    mov ax, [es:0x0A]
+    mov [cs:dos_term_addr], ax
+    jmp .have_term_addr
+
+.no_way_back:
+    cmp byte [cs:exec_nest_active], 0
+    jne dos_terminate_nested
+
+    xor ax, ax
+    mov ds, ax
+    mov ax, [0x22 * 4]
+    mov [cs:dos_term_addr], ax
+    mov ax, [0x22 * 4 + 2]
+    mov [cs:dos_term_addr + 2], ax
+
+.have_term_addr:
+    xor ax, ax
+    mov ds, ax
+
+    mov ax, [es:0x16]
+    mov [cs:dos_current_psp], ax
+    call dosvars_stamp_psp
+    mov ds, ax
+    mov es, ax
+
+    mov ax, [cs:dos_term_ss]
+    test ax, ax
+    jz .caller_stack
+
+    mov ss, ax
+    mov sp, [cs:dos_term_sp]
+
+    mov bp, sp
+    mov ax, [cs:dos_term_addr]
+    mov [bp + 18], ax
+    mov ax, [cs:dos_term_addr + 2]
+    mov [bp + 20], ax
+    mov word [bp + 22], 0x0202
+
+    pop ax
+    pop bx
+    pop cx
+    pop dx
+    pop si
+    pop di
+    pop bp
+    pop ds
+    pop es
+    iret
+
+.caller_stack:
+    mov ss, [cs:dos_entry_ss]
+    mov sp, [cs:dos_entry_sp]
+    add sp, 4
+    sti
+    jmp far [cs:dos_term_addr]
+
+dos_term_addr dw 0, 0
+dos_term_sp   dw 0
+dos_term_ss   dw 0
+dos_entry_sp  dw 0
+dos_entry_ss  dw 0
+
+; ==================================================================
+; DOS_TERMINATE_NESTED - end a child that INT 0x21 AH=4Bh started
+; ==================================================================
+dos_terminate_nested:
+    cli
+
+    push ax
+    mov ax, [cs:dos_current_psp]
+    call dosmem_free_owner
+    pop ax
+
+    mov es, [cs:dos_current_psp]
+    mov ax, [es:0x16]
+    test ax, ax
+    jnz .have_parent
+    mov ax, EXE_PSP_SEG
+.have_parent:
+    mov [cs:dos_current_psp], ax
+    call dosvars_stamp_psp
+
+    mov byte [cs:exec_nest_active], 0
+    mov ss, [cs:exec_ret_ss]
+    mov sp, [cs:exec_ret_sp]
+    sti
+    jmp exec_resume
+
+; ==================================================================
+; INT 20h - Terminate program.
+; The same ending as AH = 4Ch, so it goes there.
+; ==================================================================
 int20_handler:
     cli
     cld
+    jmp dos_terminate
+
+dos_terminate:
+    cmp byte [cs:exec_nest_active], 0
+    je .not_nested
+    push ax
+    mov ax, [cs:dos_current_psp]
+    cmp ax, [cs:exec_nest_psp]
+    pop ax
+    je dos_terminate_nested
+
+.not_nested:
+    push ds
+    push ax
+    mov ds, [cs:dos_current_psp]
+    mov ax, [0x16]
+    test ax, ax
+    jz .decided
+
+    mov ds, ax
+    mov ax, [0x16]
+    test ax, ax
+
+.decided:
+    pop ax
+    pop ds
+    jnz dos_terminate_task
+
+    cmp byte [cs:com_active], 0
+    jne .com_teardown
+
+    mov ax, 0x12
+    int 0x10
+    jmp launch_bin_program.program_done
+
+.com_teardown:
+    mov byte [cs:com_active], 0
+    mov word [cs:dos_current_psp], EXE_PSP_SEG
+
+    call dosfile_close_all
 
     push ds
     push es
@@ -150,7 +314,9 @@ int20_handler:
     int 16h
 
     call api_output_init
+    call set_video_mode
     call string_clear_screen
+    call mouse_dos_end
 
     jmp get_cmd
 
@@ -160,6 +326,17 @@ api_dos_init:
     pusha
     push es
     push ds
+
+    call dosmem_init
+    call dosfile_init
+    call dosvars_init
+
+    xor ax, ax
+    mov es, ax
+    mov di, 0x0500
+    mov cx, 128
+    cld
+    rep stosw
 
     push ds
     push es
@@ -195,6 +372,10 @@ api_dos_init:
 
 int21_dos_handler:
     sti
+
+    mov [cs:dos_entry_ss], ss
+    mov [cs:dos_entry_sp], sp
+
     cmp ah, 0x00
     je com_00h
     cmp ah, 0x01
@@ -241,6 +422,12 @@ int21_dos_handler:
     je com_1Ah
     cmp ah, 0x25
     je com_25h
+    cmp ah, 0x26
+    je com_26h
+    cmp ah, 0x55
+    je com_55h
+    cmp ah, 0x29
+    je com_29h
     cmp ah, 0x2A
     je com_2Ah
     cmp ah, 0x2C
@@ -259,15 +446,79 @@ int21_dos_handler:
     je com_3Ah
     cmp ah, 0x3B
     je com_3Bh
+    cmp ah, 0x3C
+    je com_3Ch
+    cmp ah, 0x3D
+    je com_3Dh
+    cmp ah, 0x3E
+    je com_3Eh
+    cmp ah, 0x3F
+    je com_3Fh
+    cmp ah, 0x40
+    je com_40h
     cmp ah, 0x41
     je com_41h
+    cmp ah, 0x42
+    je com_42h
+    cmp ah, 0x43
+    je com_43h
+    cmp ah, 0x44
+    je com_44h
+    cmp ah, 0x45
+    je com_45h
+    cmp ah, 0x46
+    je com_46h
+    cmp ah, 0x47
+    je com_47h
+    cmp ah, 0x48
+    je com_48h
+    cmp ah, 0x49
+    je com_49h
+    cmp ah, 0x4A
+    je com_4Ah
+    cmp ah, 0x4B
+    je com_4Bh
+    cmp ah, 0x52
+    je com_52h
+    cmp ah, 0x5A
+    je com_5Ah
+    cmp ah, 0x56
+    je com_56h
+    cmp ah, 0x5B
+    je com_5Bh
+    cmp ah, 0x5D
+    je com_5Dh
+    cmp ah, 0x34
+    je com_34h
+    cmp ah, 0x50
+    je com_50h
+    cmp ah, 0x51
+    je com_51h
+    cmp ah, 0x4E
+    je com_4Eh
+    cmp ah, 0x4F
+    je com_4Fh
     cmp ah, 0x4C
     je com_4Ch
     cmp ah, 0x4D
     je com_4Dh
     cmp ah, 0x54
     je com_54h
-    iret
+    cmp ah, 0x57
+    je com_57h
+    cmp ah, 0x59
+    je com_59h
+    cmp ah, 0x62
+    je com_62h
+    cmp ah, 0x68
+    je com_68h
+    cmp ah, 0x2B
+    je com_2Bh
+    cmp ah, 0x2D
+    je com_2Dh
+    cmp ah, 0x33
+    je com_33h
+    jmp com_unsupported
 
 
 saved_interrupt_table times 1024 db 0
@@ -376,6 +627,14 @@ bcd_to_bin_time:
     pop ax
     ret
 
+com_unsupported:
+    push bp
+    mov bp, sp
+    mov ax, 0x0001
+    or word [bp+6], 1
+    pop bp
+    iret
+
 %include "src/kernel/features/com/00h.asm"
 %include "src/kernel/features/com/01h.asm"
 %include "src/kernel/features/com/02h.asm"
@@ -415,3 +674,47 @@ bcd_to_bin_time:
 %include "src/kernel/features/com/4Ch.asm"
 %include "src/kernel/features/com/4Dh.asm"
 %include "src/kernel/features/com/54h.asm"
+
+%include "src/kernel/features/com/dosmem.asm"
+%include "src/kernel/features/com/48h.asm"
+%include "src/kernel/features/com/49h.asm"
+%include "src/kernel/features/com/4Ah.asm"
+%include "src/kernel/features/com/4Bh.asm"
+%include "src/kernel/features/com/find.inc"
+%include "src/kernel/features/com/4Eh.asm"
+%include "src/kernel/features/com/4Fh.asm"
+%include "src/kernel/features/com/47h.asm"
+%include "src/kernel/features/com/dosvars.asm"
+%include "src/kernel/features/com/52h.asm"
+%include "src/kernel/features/com/34h.asm"
+%include "src/kernel/features/com/50h.asm"
+%include "src/kernel/features/com/51h.asm"
+%include "src/kernel/features/com/5Dh.asm"
+
+%include "src/kernel/features/com/dosfile.asm"
+%include "src/kernel/features/com/3Ch.asm"
+%include "src/kernel/features/com/56h.asm"
+%include "src/kernel/features/com/5Bh.asm"
+%include "src/kernel/features/com/3Dh.asm"
+%include "src/kernel/features/com/3Eh.asm"
+%include "src/kernel/features/com/3Fh.asm"
+%include "src/kernel/features/com/40h.asm"
+%include "src/kernel/features/com/42h.asm"
+%include "src/kernel/features/com/57h.asm"
+%include "src/kernel/features/com/26h.asm"
+%include "src/kernel/features/com/55h.asm"
+%include "src/kernel/features/com/29h.asm"
+%include "src/kernel/features/com/5Ah.asm"
+
+%include "src/kernel/features/com/2Bh.asm"
+%include "src/kernel/features/com/2Dh.asm"
+%include "src/kernel/features/com/33h.asm"
+%include "src/kernel/features/com/43h.asm"
+%include "src/kernel/features/com/44h.asm"
+%include "src/kernel/features/com/45h.asm"
+%include "src/kernel/features/com/46h.asm"
+%include "src/kernel/features/com/59h.asm"
+%include "src/kernel/features/com/62h.asm"
+%include "src/kernel/features/com/68h.asm"
+
+%INCLUDE "src/kernel/features/com/int33h/int33h.asm"

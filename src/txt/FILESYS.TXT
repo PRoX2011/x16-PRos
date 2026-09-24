@@ -1,64 +1,67 @@
 ===========================================================================
-                          FILE SYSTEM INFORMATION
+                        FILE SYSTEM INFORMATION
 ===========================================================================
 
-FILE SYSTEM: FAT12
+x16-PRos uses the FAT12 file system, the same format used
+by MS-DOS and early Windows versions so you can CRUD this disks.
 
-FILE NAMING FORMAT: 8.3
-  - Up to 8 characters for name
-  - Up to 3 characters for extension
-  - Example: FILENAME.TXT
+FILE NAMES
+-------------------------------------------
+Files follow the 8.3 naming rule:
+  - Up to 8 characters for the name
+  - Up to 3 characters for the extension
+  - Example: MYFILE.TXT
 
-FORBIDDEN CHARACTERS:
-  \ / : * ? " < > | (space)
+Names are always stored in UPPERCASE.
+Spaces and these characters are not allowed:
+  \ / : * ? " < > |
 
-MAXIMUM FILE SIZE: 32768 bytes (32 KB)
+SUPPORTED FILE TYPES
+-------------------------------------------
+  .BIN   Programs made for x16-PRos.
+         Run by typing the name in the terminal.
 
-SUPPORTED FILE TYPES:
+  .PLE   PRos Large Executable. Native x16-PRos format
+         for bigger programs. Can run in the background
+         with the BG command.
 
-  .BIN - Executable programs
-         Run by typing filename in terminal
-         Must be in BIN/ folder or current directory
+  .COM   Simple MS-DOS programs.
 
-  .COM - MS-DOS executable programs
-         Native MS-DOS compatibility
-         Run same way as .BIN files
+  .EXE   MS-DOS MZ executables.
 
-  .EXE - MS-DOS EXE(MZ) executable
+  .TXT   Plain text files.
+         Read with CAT, edit with WRITER or ED.
 
-  .PLE - PRos Large Executable
-         Native x16-PRos exec file
-         for lagre programs
+  .BMP   Bitmap images, up to 320x240, 256 colors.
+         View with the VIEW command.
 
-  .TXT - Plain text files
-         Display with CAT command
-         Edit with WRITER.BIN
+  .IMF   Music files for AdLib/OPL2 sound cards.
+         Play with IMFPLAY.
 
-  .BMP - Bitmap images
-         Maximum resolution: 320x240
-         256 colors supported
-         Display with VIEW command
-         Flags: -upscale (2x zoom), -stretch (fullscreen)
+  .WAV   Sound files.
+         Play with WAVPLAY.
 
-  .IMF - Music files for AdLib sound card
-         Play with IMFPLAY.BIN
-         Requires AdLib/OPL2 compatible hardware
+  .CFG   Configuration files (in the CONF folder).
+         See CONFIGS.TXT for details.
 
-  .CFG - System configuration files
-         Located in CONF/ directory
-         See CONFIGS.TXT for details
+  .FNT   Font files (in the FONTS folder).
+         Change font with FONT.BIN.
 
-DIRECTORY STRUCTURE:
-  /           - Root directory
-  BIN/        - System programs and applications
-  COM/        - MS-DOS .COM executables
-  EXE/        - MS-DOS .EXE executables
-  PLE/        - PRos large executables
-  CONF/       - Configuration files
-  DOCS/       - Documentation files
-  BMP/        - Image files
-  MUSIC/      - IMF music files
-  FONTS/      - cp866 FONTS
-  THEMES/     - themes for PRos Terminal in .THM format
+  .THM   Color theme files (in the THEMES folder).
+         Switch themes with THEME.BIN.
+
+FOLDER STRUCTURE
+-------------------------------------------
+  /         Root directory (up to 224 files)
+  BIN/      Programs and applications
+  COM/      MS-DOS .COM programs
+  EXE/      MS-DOS .EXE programs
+  PLE/      PRos large executables
+  CONF/     Configuration files
+  DOCS/     Documentation (you are reading it now)
+  BMP/      Images
+  MUSIC/    Music and sound files
+  FONTS/    Terminal fonts
+  THEMES/   Terminal color themes
 
 ===========================================================================

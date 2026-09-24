@@ -1,164 +1,186 @@
 ===========================================================================
-                        BUILT-IN PROGRAMS REFERENCE
+                       BUILT-IN PROGRAMS REFERENCE
 ===========================================================================
 
-All programs are located in BIN/ directory.
-Programs can be executed from any directory by typing their name.
+Almost all programs live in the BIN and PLE folders and can be started from
+anywhere by typing their name.
 
-SYSTEM PROGRAMS:
+SYSTEM
+-------------------------------------------
   SETUP.BIN
-    First-boot setup wizard
-    Configure username, password, theme
-    Run manually to reconfigure system
+    First-boot wizard. Sets up your username, password
+    and theme. Run it again any time to reconfigure.
+
+  SETTINGS.BIN
+    Change system settings like the timezone.
 
   AUTOEXEC.BIN
-    Auto-execution script
-    Runs automatically at startup (after login)
-    Edit to customize startup behavior
+    Runs automatically after you log in.
+    Edit it to customize what happens at startup.
 
   THEME.BIN
-    Color theme configurator
-    Switch between DEFAULT, GROOVYBOX, UBUNTU
-    Create custom themes
+    Switch between color themes.
 
-PRODUCTIVITY:
+  FONT.BIN
+    Change the terminal font. Fonts are stored in
+    the FONTS folder.
+
+  LAUNCH.BIN
+    Program launcher with a graphical menu.
+
+  FDISK.BIN
+    Disk utility. View partition information.
+
+PRODUCTIVITY
+-------------------------------------------
   WRITER.BIN
-    Text file editor
-    Create and edit .TXT files
-    Keyboard controls displayed in program
+    Full-screen text editor for text files.
+
+  ED.BIN
+    Line-based text editor, inspired by UNIX ed.
+    See EDMAN.TXT for the manual.
 
   CALC.BIN
-    Basic calculator
-    Supports +, -, *, / operations
-    Decimal and integer arithmetic
+    Calculator with +, -, * and / operations.
 
   PROCENTC.BIN
-    Percentage calculator
-    Calculate percentages quickly
-    Useful for discounts and ratios
+    Quick percentage calculator.
 
-UTILITIES:
-  FETCH.BIN
-    System information display
-    Shows CPU, memory, OS version
-    "I use PRos btw" style output
-
-  MEMORY.BIN
-    Memory viewer
-    Inspect RAM contents
-    Hexadecimal display
-    Navigate with arrow keys
-
-  HEXEDIT.BIN
-    Hexadecimal file editor
-    Edit binary files byte-by-byte
-    Advanced users only
-
-  CHARS.BIN
-    ASCII character table
-    Shows all printable characters
-    Useful for finding special symbols
-
-  CLOCK.BIN
-    Real-time clock display
-    Shows current time and date
-    Uses TIMEZONE.CFG setting
-
-MEDIA:
-  IMFPLAY.BIN
-    IMF music player
-    Play .IMF music files
-    Requires AdLib sound card
-    Usage: IMFPLAY <filename>
-
-  PAINT.BIN
-    Basic drawing program
-    Create simple BMP images
-    Save and load artwork
-    Mouse required
-
-GAMES:
-  MINE.BIN
-    Minesweeper game
-    Classic puzzle game
-    Mouse or keyboard controls
-    Multiple difficulty levels
-
-  SPACE.BIN
-    Space shooter arcade game
-    Keyboard controls
-    Shoot enemies, avoid obstacles
-    Score tracking
-
-  PONG.BIN
-    Classic Pong game
-    Two-player or vs CPU
-    Keyboard controls (W/S and arrows)
-
-  SNAKE.BIN
-    Snake game
-    Arrow keys to move
-    Eat food, grow longer
-    Don't hit walls or yourself
-
-  TETRIS.BIN
-    Tetris game
-    Arrow keys to move/rotate
-    Clear lines for points
-    Speed increases over time
-
-DEVELOPMENT:
-  BRAINF.BIN
-    Brainfuck interpreter
-    Execute .BF programs
-    Educational tool for esoteric programming
+  CALENDAR.BIN
+    Shows a calendar for the current month.
 
   BCHART.BIN
-    Bar chart creator
-    Create simple data visualizations
-    Text-based output
+    Creates simple bar charts.
+
+UTILITIES
+-------------------------------------------
+  FETCH.BIN
+    Shows system info in a stylish way.
+
+  TREE.BIN
+    Shows the folder structure as a tree.
+
+  PS.BIN
+    Lists running background processes.
+
+  KILL.BIN
+    Stops a background process by its ID.
+    Use PS.BIN to find the process ID first.
+
+  HEAD.BIN
+    Shows the first lines of a text file.
+    Usage: HEAD <file>
+
+  TAIL.BIN
+    Shows the last lines of a text file.
+    Usage: TAIL <file>
 
   GREP.BIN
-    Text search utility
-    Find patterns in files
+    Searches for text inside files.
     Usage: GREP <pattern> <file>
 
-SPECIAL:
-  CREDITS.BIN
-    Contributors and special thanks
-    Shows project contributors
-    Acknowledgments
+  DLIST.BIN
+    Lists available disk drives.
+
+  PRINT.BIN
+    Sends a file to the printer (LPT port).
+
+  MEMORY.BIN
+    Lets you browse RAM contents in hex.
+    Navigate with arrow keys.
+
+  HEXEDIT.BIN
+    Edit any file byte-by-byte in hex.
+    For advanced users.
+
+  CHARS.BIN
+    Shows the full ASCII character table.
+
+  CLOCK.BIN
+    Displays a live clock on screen.
+    Uses your timezone from TIMEZONE.CFG.
+
+MEDIA
+-------------------------------------------
+  IMFPLAY.BIN
+    Plays .IMF music files (AdLib format).
+    Requires AdLib/OPL2 compatible sound card.
+    Usage: IMFPLAY MUSIC/SONG.IMF
+
+  WAVPLAY.BIN
+    Plays .WAV sound files.
+    Usage: WAVPLAY <file>
+
+  PAINT.BIN
+    A drawing program. Create and save BMP images.
+    Mouse required. Supports 256 colors.
+
+  PIANO.BIN
+    Play music using your keyboard keys.
+    No sound card needed (uses PC speaker).
+
+GAMES
+-------------------------------------------
+  MINE.BIN
+    Minesweeper. Mouse or keyboard controls.
+
+  TETRIS.BIN
+    Classic Tetris.
+
+  TETRIS2.BIN
+    Alternative Tetris version.
+
+  SNAKE.BIN
+    Guide the snake with arrow keys. Eat food,
+    grow longer, and do not hit the walls.
+
+  SPACE.BIN
+    Space arcade game.
+
+  PONG.BIN
+    Classic Pong.
 
   MANDEL.BIN
-    Mandelbrot set generator
-    Mathematical visualization
-    Navigate with arrow keys
+    Mandelbrot fractal viewer.
 
-  FRACTAL.COM
-    Fractal pattern generator
-    MS-DOS .COM program example
-    Demonstrates DOS compatibility
+  EYE.BIN
 
-  HELLO.COM
-    "Hello, world" demonstration
-    MS-DOS .COM program example
-    Source code available for learning
+  BRAINF.BIN
+    Brainfuck language interpreter.
 
-RUNNING PROGRAMS:
-  Method 1: Type name without extension
-    Example: CALC
+  CREDITS.BIN
+    Project contributors and thanks.
 
-  Method 2: Type full filename
-    Example: CALC.BIN
+MS-DOS COMPATIBLE PROGRAMS
+-------------------------------------------
+x16-PRos can run simple MS-DOS .COM and .EXE files.
+They live in the COM and EXE directories:
 
-  With parameters:
-    Example: IMFPLAY MUSIC/SONG.IMF
+  HELLO.COM     "Hello, world" demo
+  FRACTAL.COM   Fractal pattern generator
+  CLOCK.COM     Simple clock display
+  HELLO.EXE     "Hello, world" (MZ EXE format)
 
-PROGRAM LOCATIONS:
-  - BIN/ directory: Run from anywhere
-  - Current directory: Run only when in that directory
-  - Use full path for files in other directories
+PLE PROGRAMS (MULTITASKING SUPPORT)
+-------------------------------------------
+.PLE files are large executables that supports multitasking and 
+can be run in the background using the BG command. They live in the PLE
+directory:
 
-See COMMANDS.TXT for built-in terminal commands.
+  HELLO.PLE     "Hello, world" PLE demo
+  CLOCK.PLE     Background clock
+
+  To see running tasks: PS
+  To stop a task:       KILL <id>
+
+HOW TO RUN PROGRAMS
+-------------------------------------------
+  Type the name:         CALC
+  Or with extension:     CALC.BIN
+  With an argument:      IMFPLAY MUSIC/SONG.IMF
+  In the background:     bg PLE/CLOCK.PLE
+
+Programs in BIN/ and PLE/ work from any directory.
+Other programs work only in their own dir.
 
 ===========================================================================

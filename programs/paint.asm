@@ -37,9 +37,12 @@ start:
     call draw_frame
     call draw_status
 
-    call InitMouse
-    mov byte [SelEnabled], 0
-    call EnableMouse
+    xor al, al
+    mov ah, 0x25                ; drag-select off
+    int 0x23
+    mov al, 1
+    mov ah, 0x24                ; enable mouse
+    int 0x23
 
 programLoop:
     mov ah, 0x01
@@ -100,7 +103,8 @@ decrease_size:
     jmp check_mouse
 
 check_mouse:
-    mov al, [ButtonStatus]
+    call poll_mouse
+    mov al, [MBtn]
     and al, 0x01
     mov ah, [PaintPrevLMB]
     mov [PaintPrevLMB], al
@@ -115,13 +119,13 @@ check_mouse:
     cmp byte [DrawMode], 0
     je paint
 
-    mov ax, [MouseX]
+    mov ax, [MX]
     mov [DragX1], ax
-    mov ax, [MouseY]
+    mov ax, [MY]
     sub ax, 2
     mov [DragY1], ax
-    call HideCursor
-    mov byte [CursorVisible], 0
+    mov ah, 0x22                ; hide cursor
+    int 0x23
     jmp programLoop
 
 .released:
@@ -136,15 +140,15 @@ check_mouse:
     mov [draw_line.x1], ax
     mov ax, [DragY1]
     mov [draw_line.y1], ax
-    mov ax, [MouseX]
+    mov ax, [MX]
     mov [draw_line.x2], ax
-    mov ax, [MouseY]
+    mov ax, [MY]
     sub ax, 2
     mov [draw_line.y2], ax
     mov byte [XorMode], 0
     call draw_line
-    mov byte [CursorVisible], 1
-    call ShowCursor
+    mov ah, 0x23                ; show cursor
+    int 0x23
     jmp programLoop
 
 .same_state:
@@ -155,8 +159,8 @@ check_mouse:
     jmp paint
 
 .preview:
-    mov bx, [MouseX]
-    mov ax, [MouseY]
+    mov bx, [MX]
+    mov ax, [MY]
     sub ax, 2
 
     cmp byte [PreviewActive], 0
@@ -193,8 +197,8 @@ check_mouse:
     jmp programLoop
 
 paint:
-    mov cx, [MouseX]
-    mov dx, [MouseY]
+    mov cx, [MX]
+    mov dx, [MY]
     sub dx, 2
 
     mov al, [BrushSize]
@@ -302,8 +306,11 @@ draw_frame:
 ; ==================================================================
 save_image:
     call clear_preview
-    call DisableMouse
-    call HideCursor
+    xor al, al
+    mov ah, 0x24                ; disable mouse
+    int 0x23
+    mov ah, 0x22                ; hide cursor
+    int 0x23
 
     ; ---- Read 320x200 canvas pixels into BMP buffer ----
     push es
@@ -450,7 +457,11 @@ save_image:
     jg .row_paint
     pop es
 
-    call EnableMouse
+    mov al, 1
+    mov ah, 0x24                ; enable mouse
+    int 0x23
+    mov ah, 0x23
+    int 0x23
     jmp programLoop
 
 ; ==================================================================
@@ -614,12 +625,31 @@ clear_preview:
     call erase_preview
     mov byte [PreviewActive], 0
 .cp_after_erase:
-    cmp byte [CursorVisible], 0
+    call poll_mouse
+    cmp byte [MVis], 0
     jne .cp_done
-    mov byte [CursorVisible], 1
-    call ShowCursor
+    mov ah, 0x23                ; show cursor
+    int 0x23
 .cp_done:
     popa
+    ret
+
+; ==================================================================
+; poll_mouse -- refresh local mouse state via INT 0x23 / AH=0x20
+; ==================================================================
+poll_mouse:
+    push ax
+    push bx
+    push cx
+    mov ah, 0x20
+    int 0x23
+    mov [MX], ax
+    mov [MY], bx
+    mov [MBtn], cl
+    mov [MVis], ch
+    pop cx
+    pop bx
+    pop ax
     ret
 
 draw_status:
@@ -658,6 +688,11 @@ PreviewActive db 0
 PrevX2        dw 0
 PrevY2        dw 0
 XorMode       db 0
+
+MX            dw 0
+MY            dw 0
+MBtn          db 0
+MVis          db 1
 
 ; Table of correspondence of numbers to colors:
 ; 0 - black (0x00)
@@ -732,6 +767,3 @@ save_filename_buf times 17 db 0
 
 %include "programs/lib/font.inc"
 %include "programs/lib/tui.inc"
-
-section .text
-%include "src/drivers/ps2_mouse.asm"

@@ -14,7 +14,7 @@ load_timezone_cfg:
     mov word [timezone_offset], 0
 
     call save_current_dir
-    mov al, 'A'
+    mov al, [sys_drive_char]
     call fs_change_drive_letter
     mov byte [current_directory], 0
     mov word [current_dir_cluster], 0

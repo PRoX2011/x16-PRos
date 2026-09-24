@@ -161,6 +161,12 @@ draw_ui:
     mov ax, [score]
     call print_number
 
+    mov dh, 23
+    mov dl, 5
+    call set_cursor
+    mov si, msg_controls
+    call print_string
+
     ; Next Piece - Just draw the preview
     call draw_next_piece_ui
     ret
@@ -229,12 +235,19 @@ handle_input:
     je .move_down_fast
     cmp al, 'S'
     je .move_down_fast
+    cmp al, ' '
+    je .hard_drop
     cmp al, 0x1B
     je .exit
     ret
 
 .exit:
     int 0x20
+
+.hard_drop:
+    call move_down
+    jnc .hard_drop
+    ret
 
 .move_down_fast:
     call move_down
@@ -559,7 +572,9 @@ game_over:
     call set_cursor
     mov si, msg_game_over
     call print_string
-    jmp $
+    xor ah, ah                  ; wait for a key instead of locking up
+    int 0x16
+    int 0x20
 
 ; --- DATA ---
 
@@ -596,6 +611,7 @@ msg_score:     db "SCORE: ", 0
 msg_next:      db "NEXT:", 0
 clr_next:      db "          ", 0 ;
 msg_game_over: db "GAME OVER", 0
+msg_controls:  db "A/D - move   Q/E - rotate   S - soft drop   SPACE - drop   ESC - exit", 0
 frame_left:    db "<|", 0
 frame_right:   db "|>", 0
 footer_start:  db "  ", 0

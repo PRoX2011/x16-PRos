@@ -56,11 +56,15 @@ PROGRAM_PARAMS_OFF   equ 0x7F00
 CFG_SCRATCH_SEG      equ FONT_SEG
 CFG_SCRATCH_OFF      equ 0x1000
 
-DIRLIST_OFF          equ 0xA800
-COMMAND_HISTORY_OFF  equ 0xD000
+KERNEL_WORK_SEG      equ 0x0060
+DIRLIST_OFF          equ 0x0000
+COMMAND_HISTORY_OFF  equ 0x2800
 DISK_BUFFER_OFF      equ 0xE000
 DISK_BUFFER_SIZE     equ 0x1C00
 KERNEL_WORK_END_OFF  equ DISK_BUFFER_OFF + DISK_BUFFER_SIZE  ; 0xFC00
+
+FS_STAGE_SEG         equ KERNEL_WORK_SEG
+FS_STAGE_OFF         equ 0x3800
 
 disk_buffer          equ DISK_BUFFER_OFF
 dirlist              equ DIRLIST_OFF
@@ -72,6 +76,7 @@ section .text
 
 start:
     cli
+    mov [cs:boot_drive], dl         ; the bootloader leaves it in DL
 
     ; ------ Stack installation ------
     xor ax, ax
@@ -384,6 +389,8 @@ get_cmd:
 
     ; append input to command history (16 entries x 256 bytes)
     pusha
+    mov ax, KERNEL_WORK_SEG
+    mov es, ax
     cmp byte [command_history_top], 16
     jbe .history_top_ok
     mov byte [command_history_top], 16
@@ -404,8 +411,8 @@ get_cmd:
     add bx, 256
     lea di, [command_history + bx]
 .shift_history_shift_char:
-    mov al, [si]
-    mov [di], al
+    mov al, [es:si]
+    mov [es:di], al
     inc si
     inc di
     cmp al, 0
@@ -420,7 +427,7 @@ get_cmd:
     mov si, input
 .save_input_loop:
     mov al, [si]
-    mov [di], al
+    mov [es:di], al
     cmp al, 0
     je .save_input_to_history_end
     inc si
@@ -431,6 +438,8 @@ get_cmd:
     jae .save_input_to_history_done
     inc byte [command_history_top]
 .save_input_to_history_done:
+    push ds
+    pop es
     popa
 
 .save_input_to_history_skip:
@@ -452,6 +461,8 @@ get_cmd:
 
     mov ax, command
     call string_string_uppercase
+
+    mov byte [ple_fallthrough], 0
 
     ; ============ Drive Change Check (A:, B:, C:) ============
     mov si, command
@@ -565,6 +576,10 @@ get_cmd:
     call string_string_compare
     jc near cd_command
 
+    mov di, bg_string
+    call string_string_compare
+    jc near bg_command
+
     mov di, terry_string
     call string_string_compare
     jc near rip_terry
@@ -669,11 +684,10 @@ get_cmd:
     mov byte [si+3], 'E'
     mov byte [si+4], 0
 
-    ; Check if .PLE file exists
-    mov ax, command
-    call fs_file_exists
-    jnc .load_ple_program
+    mov byte [ple_fallthrough], 1
+    jmp .load_ple_program
 
+.try_bin_extension:
     ; .PLE not found, try .BIN
     mov ax, command
     call string_string_length
@@ -846,50 +860,77 @@ get_cmd:
     jmp get_cmd
 
 .load_ple_program:
-    ; Try to load PLE from current directory
+    ; Try to load PLE from current directory (only if file exists here)
+    mov si, [param_list]
+    mov [ple_param_ptr], si
+
     mov ax, command
+    call fs_file_exists
+    jc .try_ple_dir
+
+    mov ax, command
+    mov bl, 0x01                  ; show splash
     call ple_execute
     jnc get_cmd
+    jmp total_fail
 
-    ; If not found, try /BIN.DIR on current drive
+.try_ple_dir:
+    ; If not found, try /PLE.DIR on current drive
     call save_current_dir
     mov byte [current_directory], 0
     mov word [current_dir_cluster], 0
 
-    mov ax, bin_dir_name
+    mov ax, ple_dir_name
     call fs_change_directory
     jc .restore_and_try_a_ple
 
     mov ax, command
-    call ple_execute
-    jnc .restore_and_done_ple
+    call fs_file_exists
+    jc .restore_and_try_a_ple
+
+    ; Load while still in PLE.DIR, then restore working dir before running
+    mov ax, command
+    call ple_load
+    jc .restore_and_try_a_ple
+    call restore_current_dir
+    mov bl, 0x01                  ; show splash
+    call ple_run_loaded
+    jmp get_cmd
 
 .restore_and_try_a_ple:
     call restore_current_dir
     cmp byte [current_drive_char], 'A'
-    je total_fail
+    je .ple_not_found
 
-    ; Try A:/BIN.DIR
+    ; Try A:/PLE.DIR
     call save_current_dir
     mov al, 'A'
     call fs_change_drive_letter
     jc .restore_and_fail_a_ple
 
-    mov ax, bin_dir_name
+    mov ax, ple_dir_name
     call fs_change_directory
     jc .restore_and_fail_a_ple
 
     mov ax, command
-    call ple_execute
-    jnc .restore_and_done_ple
+    call fs_file_exists
+    jc .restore_and_fail_a_ple
+
+    ; Load while in A:/PLE.DIR, then restore working dir before running
+    mov ax, command
+    call ple_load
+    jc .restore_and_fail_a_ple
+    call restore_current_dir
+    mov bl, 0x01                  ; show splash
+    call ple_run_loaded
+    jmp get_cmd
 
 .restore_and_fail_a_ple:
     call restore_current_dir
-    jmp total_fail
-
-.restore_and_done_ple:
-    call restore_current_dir
-    jmp get_cmd
+.ple_not_found:
+    cmp byte [ple_fallthrough], 0
+    je total_fail
+    jmp .try_bin_extension
 
 .success_disk_change_msg db 'Disk changed', 0
 
@@ -939,8 +980,10 @@ install_program_thunk:
 ; OUT: DS = ES = KERNEL_DATA_SEG, SS:SP restored, mouse/floppy/font
 ;      and theme reinstalled. Caller resumes with kernel state intact.
 ;
-; Stack layout when exec:
-;   [SP+0] = PROGRAM_THUNK_OFF   ; what program's near ret will pop
+; The program runs with SS = DS = ES = CS = PROGRAM_LOAD_SEG (its own stack
+; at the top of the segment), so SS == DS as C tiny/small model requires.
+; The exit trampoline lives on the program's stack:
+;   [SP+0] = PROGRAM_THUNK_OFF   ; what the program's near ret pops
 ;   [SP+2] = .program_done       ; IP for thunk's retf
 ;   [SP+4] = kernel CS           ; CS for thunk's retf
 ; ==================================================================
@@ -969,25 +1012,26 @@ launch_bin_program:
     pop si
     pop ax
 
-    ; ---- Save kernel stack in case BIN messes with SS:SP ----
     mov [bin_stack_save], sp
     mov [bin_ss_save], ss
 
     call DisableMouse
 
-    ; ---- Build trampoline frame on the (still kernel) stack ----
-    push cs                       ; -> [SP+4] for retf
-    push word .program_done       ; -> [SP+2] for retf
-    push word PROGRAM_THUNK_OFF   ; -> [SP+0] for program's near ret
-
-    ; ---- Set up program entry registers ----
     test si, si
     jz .si_zero
     mov si, PROGRAM_PARAMS_OFF
 .si_zero:
 
     mov ax, PROGRAM_LOAD_SEG
-    mov ds, ax
+    cli
+    mov ss, ax
+    mov sp, COM_STACK_TOP         ; 0xFFFE, top of the program segment
+    push cs                       ; [SP+4] kernel CS for the thunk's retf
+    push word .program_done       ; [SP+2] IP for the thunk's retf
+    push word PROGRAM_THUNK_OFF   ; [SP+0] target of the program's near ret
+    sti
+
+    mov ds, ax                    ; SS == DS == ES == CS == PROGRAM_LOAD_SEG
     mov es, ax
 
     jmp PROGRAM_LOAD_SEG:PROGRAM_LOAD_OFF
@@ -1000,6 +1044,9 @@ launch_bin_program:
     mov ss, [bin_ss_save]
     mov sp, [bin_stack_save]
     sti
+
+    mov byte [sched_cur_task], 0
+    mov byte [sched_tasks + TASK_STATE], TASK_S_RUNNING
 
     call fs_reset_floppy
     call EnableMouse
@@ -1014,6 +1061,20 @@ execute_com:
     ; Save current stack
     mov [com_stack_save], sp
     mov [com_ss_save], ss
+    mov byte [com_active], 1
+    mov ax, [program_seg_runtime]
+    mov [dos_current_psp], ax
+    mov [dosmem_prog_base], ax
+    mov word [dosmem_prog_paras], 0x1000
+    add ax, 0x1000
+    mov [dosmem_env_seg], ax
+
+    mov ax, [dosmem_top_seg]
+    mov [exe_mem_top], ax
+
+    mov ax, [program_seg_runtime]
+    mov si, [param_list]
+    call exe_build_psp
 
     call api_dos_init
 
@@ -1022,16 +1083,17 @@ execute_com:
     mov ds, ax
     mov es, ax
 
-    mov byte [ds:0x0000], COM_EXIT_OPCODE
-    mov byte [ds:0x0001], DOS_INT20_VECTOR
-
     ; Setup COM program stack
     cli
     mov ss, ax
     mov sp, COM_STACK_TOP
     sti
 
-    call DisableMouse
+    call mouse_dos_begin
+
+    mov ah, 0x00
+    mov al, 0x03
+    int 0x10
 
     push word 0x0000
 
@@ -1175,8 +1237,7 @@ list_directory:
     cmp byte [current_directory], 0
     je .show_root
 
-    mov si, .subdir_prefix
-    call print_string
+    call print_drive_prefix
     mov si, current_directory
     call print_string
     jmp .show_path_done
@@ -1192,11 +1253,13 @@ list_directory:
     call fs_get_file_list
     mov word [file_count], dx
 
+    mov ax, KERNEL_WORK_SEG
+    mov es, ax
     mov si, dirlist
     mov word [.files_in_row], 0
 
 .print_entry:
-    cmp byte [si], 0
+    cmp byte [es:si], 0
     je .done_entries
 
     push si
@@ -1204,7 +1267,7 @@ list_directory:
     mov ah, 0x0E
     mov bl, COLOR_WHITE
 .print_name_char:
-    lodsb
+    es lodsb
     int 0x10
     loop .print_name_char
     pop si
@@ -1215,10 +1278,11 @@ list_directory:
     int 0x10
     int 0x10
 
-    test byte [si+16], 0x10
+    test byte [es:si+16], 0x10
     jnz .print_dir_marker
 
-    mov ax, [si+12]
+    mov ax, [es:si+12]
+    mov dx, [es:si+14]
     call .print_size_decimal
     jmp .after_size
 
@@ -1255,6 +1319,9 @@ list_directory:
     jmp .print_entry
 
 .done_entries:
+    push ds
+    pop es
+
     cmp word [.files_in_row], 0
     je .no_final_newline
     call print_newline
@@ -1272,11 +1339,11 @@ list_directory:
     call print_string
 
     call fs_free_space
-    shr ax, 1
+    call fs_clus_to_kb
     mov [.freespace], ax
-    mov bx, 1440
-    sub bx, ax
-    mov ax, bx
+    mov ax, [fs_total_clus]
+    call fs_clus_to_kb
+    sub ax, [.freespace]
     call string_int_to_string
     mov si, ax
     call print_string_green
@@ -1305,12 +1372,19 @@ list_directory:
     push dx
     xor cx, cx
 .sd_push_digits:
-    test ax, ax
+    mov bx, ax
+    or bx, dx
     je .sd_check_zero
-    xor dx, dx
     mov bx, 10
+    push ax
+    mov ax, dx
+    xor dx, dx
+    div bx
+    mov [.sd_qhi], ax
+    pop ax
     div bx
     push dx
+    mov dx, [.sd_qhi]
     inc cx
     inc word [.size_digits]
     jmp .sd_push_digits
@@ -1341,16 +1415,17 @@ list_directory:
 
 .files_in_row    dw 0
 .size_digits     dw 0
+.sd_qhi        dw 0
 .dir_marker_str  db '<DIR>', 0
 .free_msg        db ' KB free', 0
 .kb_msg          db ' KB', 0
 .sep             db '   ', 0
-.subdir_prefix   db 'A:/', 0
 .freespace       dw 0
 
 cat_file:
     call print_newline
     pusha
+    push es
 
     mov word si, [param_list]
     call string_string_parse
@@ -1460,6 +1535,7 @@ cat_file:
     call print_newline
 
 .exit_cat:
+    pop es
     popa
     call print_newline
     jmp get_cmd
@@ -2013,23 +2089,20 @@ cd_command:
     jmp .skip_empty_comp
 
 .not_dotdot_comp:
-    ; Auto-append .DIR if no extension
+    mov ax, .comp_buffer
+    call fs_change_directory
+    jnc .skip_empty_comp
+
     mov si, .comp_buffer
-    xor bx, bx
 .check_comp_dot:
     lodsb
     cmp al, 0
-    je .comp_check_dot_done
+    je .comp_no_ext
     cmp al, '.'
-    je .comp_has_dot
+    je .cd_rollback
     jmp .check_comp_dot
-.comp_has_dot:
-    mov bx, 1
-.comp_check_dot_done:
-    test bx, bx
-    jne .comp_has_ext
 
-    ; Append .DIR
+.comp_no_ext:
     mov si, .comp_buffer
     mov ax, si
     call string_string_length
@@ -2041,7 +2114,6 @@ cd_command:
     mov byte [si+3], 'R'
     mov byte [si+4], 0
 
-.comp_has_ext:
     mov ax, .comp_buffer
     call fs_change_directory
     jc .cd_rollback
@@ -2150,6 +2222,56 @@ rip_terry:
 
 .rip_terry db "Rest in peace Terry A. Devis (1969 - 2018)", 0
 
+bg_command:
+    call print_newline
+
+    mov word si, [param_list]
+    call string_string_parse
+    test ax, ax
+    jne .have_arg
+
+    mov si, nofilename_msg
+    call print_string_red
+    call print_newline
+    jmp get_cmd
+
+.have_arg:
+    mov [.fname_ptr], ax
+    call fs_file_exists
+    jc .not_found
+
+    mov ax, [.fname_ptr]
+    mov word [ple_param_ptr], ple_no_params
+    call ple_execute_bg
+    jc .launch_failed
+
+    push ax
+    mov si, .bg_started_msg
+    call print_string
+    pop ax
+    add al, '0'
+    mov ah, 0x0E
+    xor bh, bh
+    int 0x10
+    call print_newline
+    jmp get_cmd
+
+.not_found:
+    mov si, notfound_msg
+    call print_string_red
+    call print_newline
+    jmp get_cmd
+
+.launch_failed:
+    mov si, .launch_fail_msg
+    call print_string_red
+    call print_newline
+    jmp get_cmd
+
+.fname_ptr        dw 0
+.bg_started_msg   db 'Background task started: id = ', 0
+.launch_fail_msg  db 'Failed to launch background task', 0
+
 %INCLUDE "src/kernel/init.asm"                      ; x16-PRos initialisation
 %INCLUDE "src/kernel/log.asm"                       ; Log functions
 %INCLUDE "src/kernel/features/fs.asm"               ; FAT12 filesystem functions
@@ -2159,6 +2281,8 @@ rip_terry:
 %INCLUDE "src/kernel/features/bmp_rendering.asm"    ; BMP rendering functions
 %INCLUDE "src/kernel/features/themes.asm"           ; Themes
 %INCLUDE "src/kernel/features/encrypt.asm"          ; Encryption
+%INCLUDE "src/kernel/features/memory.asm"           ; Kernel heap allocator
+%INCLUDE "src/kernel/features/sched.asm"            ; Cooperative scheduler
 %INCLUDE "src/kernel/features/com/com.asm"          ; COM
 %INCLUDE "src/kernel/features/exe/exe.asm"          ; MZ EXE
 %INCLUDE "src/kernel/features/ple/ple.asm"          ; PLE
@@ -2171,12 +2295,13 @@ rip_terry:
 ; ====== API ======
 %INCLUDE "src/kernel/features/api/api_output.asm"
 %INCLUDE "src/kernel/features/api/api_fs.asm"
+%INCLUDE "src/kernel/features/api/api_sys.asm"
 ; =================
 
 ; ===================== Data Section =====================
 section .data
 ; ------ Header ------
-header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v0.9', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
+header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v1.0', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
 
 ; ------ Help ------
 kshell_comands db 'HELP               - get list of commands', 10, 13
@@ -2199,6 +2324,7 @@ kshell_comands db 'HELP               - get list of commands', 10, 13
                db 'CD     <dir>       - change directory', 10, 13
                db 'MKDIR  <dir>       - create directory', 10, 13
                db 'DELDIR <dir>       - delete directory', 10, 13
+               db 'BG     <f>         - run *.PLE program in the background'
                db 'EXIT               - exit to bootloader', 10, 13, 0
 
 ; ------ About OS ------
@@ -2211,7 +2337,7 @@ info db 10, 13
      db '  Support project:  DALink (https://dalink.to/PRoXdev)', 10, 13
      db '  Source code:      GitHub (https://github.com/PRoX2011/x16-PRos)', 10, 13
      db '  License:          MIT', 10, 13
-     db '  OS version:       0.9', 10, 13
+     db '  OS version:       1.0', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.3', 10, 13, 0
@@ -2239,6 +2365,7 @@ mkdir_string   db 'MKDIR', 0
 deldir_string  db 'DELDIR', 0
 cd_string      db 'CD', 0
 terry_string   db 'TERRY', 0
+bg_string      db 'BG', 0
 
 autocomplete_cmd_table:
     dw exit_string, help_string, info_string, cls_string
@@ -2247,6 +2374,7 @@ autocomplete_cmd_table:
     dw size_string, shut_string, reboot_string
     dw touch_string, write_string, view_string, mkdir_string
     dw deldir_string
+    dw bg_string
     dw 0
 
 ; ------ Errors ------
@@ -2409,6 +2537,7 @@ y_offset             dw 0
 
 bin_extension        db '.BIN', 0
 com_extension        db '.COM', 0
+ple_fallthrough      db 0
 
 total_file_size      dd 0
 file_count           dw 0
@@ -2417,6 +2546,7 @@ timezone_offset      dw 0
 
 com_stack_save       dw 0
 com_ss_save          dw 0
+com_active           db 0
 bin_stack_save       dw 0
 bin_ss_save          dw 0
 program_seg_runtime  dw program_seg
@@ -2444,6 +2574,7 @@ cfg_logo_stretch     db 0  ; 1 = Stretch, 0 = Centered
 
 bin_dir_name         db 'BIN.DIR', 0
 conf_dir_name        db 'CONF.DIR', 0
+ple_dir_name         db 'PLE.DIR', 0
 
 current_drive_char   db 'A'
 
@@ -2455,6 +2586,15 @@ login_password_prompt  db 19 dup(' '), 0xC9, 39 dup(0xCD), 0xBB, 10, 13
 mt                   db '', 10, 13, 0
 Sides                dw 2
 SecsPerTrack         dw 18
+
+fs_fat_lba           dw 1
+fs_fat_secs          dw 9
+fs_root_lba          dw 19
+fs_root_secs         dw 14 
+fs_root_ents         dw 224
+fs_spc               dw 1
+fs_clus_base         dw 31
+fs_total_clus        dw 2847 
 bootdev              db 0
 current_disk         db 0 
 fmt_date             dw 1
@@ -2463,6 +2603,8 @@ command_history_top  db 0
 saved_disk           db 0
 saved_drive_char     db 0
 autocomplete_enabled db 0
+boot_drive           db 0
+sys_drive_char       db 'A'
 current_dir_cluster  dw 0
 saved_dir_cluster    dw 0
 
@@ -2487,4 +2629,4 @@ temp_saved_cluster resw 1
 first_boot_buf     resb 8
 
 kernel_end:
-; kernel_end MUST stay below DIRLIST_OFF (0xA800)
+; kernel_end MUST stay below 0xA800

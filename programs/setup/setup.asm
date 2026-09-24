@@ -30,6 +30,10 @@
 %define SETUP_STAGE_PROGRAMS  6
 %define SETUP_STAGE_END       7
 
+; Max chars accepted in any setup field. The *.CFG field buffers are 32
+; bytes (31 chars + null), so this also bounds the input visually.
+%define SETUP_FIELD_MAX       31
+
 ; ========== SETUP ROUTINE ==========
 setup:
 %ifndef NO_SETUP
@@ -96,7 +100,10 @@ setup:
     mov di, 43008
     mov byte [di], 0
     mov ax, di
+    mov cx, SETUP_FIELD_MAX
     call string_input_string
+
+    mov byte [43008 + 31], 0
 
     ; Check length
     mov si, 43008
@@ -160,7 +167,10 @@ setup:
     mov di, 43008
     mov byte [di], 0
     mov ax, di
+    mov cx, SETUP_FIELD_MAX
     call string_input_string
+
+    mov byte [43008 + 31], 0
 
     mov si, 43008
     call string_string_length
@@ -219,7 +229,10 @@ setup:
     mov di, 43008
     mov byte [di], 0
     mov ax, di
+    mov cx, SETUP_FIELD_MAX
     call string_input_string
+
+    mov byte [43008 + 31], 0
 
     mov si, 43008
     call string_string_length
@@ -273,6 +286,7 @@ setup:
     mov di, 43008
     mov byte [di], 0
     mov ax, di
+    mov cx, SETUP_FIELD_MAX
     call string_input_string
 
     mov si, 43008
@@ -354,6 +368,7 @@ setup:
     mov di, 43008
     mov byte [di], 0
     mov ax, di
+    mov cx, SETUP_FIELD_MAX
     call string_input_string
 
     mov si, 43008
@@ -432,6 +447,7 @@ setup:
     mov di, 43008
     mov byte [di], 0
     mov ax, di
+    mov cx, SETUP_FIELD_MAX
     call string_input_string
 
     mov si, 43008

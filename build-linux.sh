@@ -15,8 +15,8 @@ FLAG_NO_LOGO_DISPLAY=0
 FLAG_NO_SETUP=0
 FLAG_DTM=0  # DTM - Dev Tesing Mode
 
-MAX_KERNEL_LOADER_BYTES=43008   # 0xA800 - kernel image must end before dirlist
-KERNEL_SIZE_WARN_BYTES=40960    # 0xA000 - warn 2 KiB before the ceiling
+MAX_KERNEL_LOADER_BYTES=57344   # 0xE000 - kernel image must end before disk_buffer
+KERNEL_SIZE_WARN_BYTES=55296    # 0xD800 - warn 2 KiB before the ceiling
 
 for arg in $@; do
     if [ $arg == "-quiet" ]; then FLAG_QUIET_MODE=1; continue; fi
@@ -168,6 +168,33 @@ mkfs.vfat disk_img/FLOPPY2.img -n "x16-PROS"
 check_error "FLOPPY2.img formatting failed"
 # ==================================================================
 
+# ==================================================================
+# This section builds the HDD.IMG (5MiB).
+#
+# The geometry matters!!! FAT12 addresses at most 4084 clusters, so a
+# 5 MiB volume needs 4 sectors to a cluster.
+# Anything dropped into assets/hdd_img ends up on the disk.
+# ==================================================================
+print_splitline "Creating HDD image..."
+print_info "Creating 5 MiB HDD image..."
+dd if=/dev/zero of=disk_img/HDD.img bs=1M count=5 status=none
+check_error "HDD.img creation failed"
+
+mkfs.fat -F 12 -s 4 -r 192 -n "x16-PROS" disk_img/HDD.img >/dev/null
+check_error "HDD.img formatting failed"
+print_ok "HDD image created successfully"
+
+if [ -d assets/hdd_img ] && [ -n "$(ls -A assets/hdd_img 2>/dev/null)" ]; then
+    print_info "Copying files to HDD image..."
+    for f in assets/hdd_img/*; do
+        [ -e "$f" ] || continue
+        mcopy -s -o -i disk_img/HDD.img "$f" ::/
+        check_error "Copying $(basename "$f") to HDD.img failed"
+        print_ok "$(basename "$f") copied to HDD"
+    done
+fi
+# ==================================================================
+
 # Write bootloader
 print_info "Writing bootloader to disk..."
 dd status=none if=bin/BOOT.BIN of=disk_img/x16pros.img conv=notrunc
@@ -208,6 +235,12 @@ mmd -i disk_img/x16pros.img ::/PLE.DIR
 check_error "Failed to create PLE directory"
 print_ok "PLE directory created successfully"
 
+# Create PLE/GUI directory (windowed programs the GUI launches)
+print_info "Creating PLE/GUI directory..."
+mmd -i disk_img/x16pros.img ::/PLE.DIR/GUI.DIR
+check_error "Failed to create PLE/GUI directory"
+print_ok "PLE/GUI directory created successfully"
+
 # Create BMP directory
 print_splitline "Creating BMP directory..."
 print_info "Creating BMP directory..."
@@ -221,6 +254,12 @@ print_info "Creating CONF directory..."
 mmd -i disk_img/x16pros.img ::/CONF.DIR
 check_error "Failed to create CONF directory"
 print_ok "CONF directory created successfully"
+
+# Create CONF/GUI directory (settings SETTINGS.PLE writes)
+print_info "Creating CONF/GUI directory..."
+mmd -i disk_img/x16pros.img ::/CONF.DIR/GUI.DIR
+check_error "Failed to create CONF/GUI directory"
+print_ok "CONF/GUI directory created successfully"
 
 # Create DOCS directory
 print_splitline "Creating DOCS directory..."
@@ -250,6 +289,13 @@ mmd -i disk_img/x16pros.img ::/THEMES.DIR
 check_error "Failed to create THEMES directory"
 print_ok "THEMES directory created successfully"
 
+# Create ASM directory
+print_splitline "Creating ASM directory..."
+print_info "Creating ASM directory..."
+mmd -i disk_img/x16pros.img ::/ASM.DIR
+check_error "Failed to create ASM directory"
+print_ok "ASM directory created successfully"
+
 # Copy fonts
 print_info "Copying DEFAULT.FNT to disk..."
 mcopy -i disk_img/x16pros.img assets/fonts/DEFAULT.FNT ::/FONTS.DIR/
@@ -270,6 +316,11 @@ print_info "Copying ITALIC.FNT to disk..."
 mcopy -i disk_img/x16pros.img assets/fonts/ITALIC.FNT ::/FONTS.DIR/
 check_error "ITALIC.FNT copy failed"
 print_ok "ITALIC.FNT copied successfully"
+
+print_info "Copying DOTS.FNT to disk..."
+mcopy -i disk_img/x16pros.img assets/fonts/DOTS.FNT ::/FONTS.DIR/
+check_error "DOTS.FNT copy failed"
+print_ok "DOTS.FNT copied successfully"
 
 # Copy themes
 print_splitline "Copying themes..."
@@ -306,6 +357,12 @@ print_ok "THEME.CFG copied successfully"
 mcopy -i disk_img/x16pros.img src/kernel/configs/FONT.CFG ::/CONF.DIR/
 check_error "FONT.CFG copy failed"
 print_ok "FONT.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/gui/IC_ROUND.CFG ::/CONF.DIR/GUI.DIR/
+check_error "IC_ROUND.CFG copy failed"
+print_ok "IC_ROUND.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/gui/NAME_GAP.CFG ::/CONF.DIR/GUI.DIR/
+check_error "NAME_GAP.CFG copy failed"
+print_ok "NAME_GAP.CFG copied successfully"
 mcopy -i disk_img/x16pros.img src/kernel/configs/SYSTEM.CFG ::/
 check_error "SYSTEM.CFG copy failed"
 print_ok "SYSTEM.CFG copied successfully"
@@ -344,6 +401,8 @@ done
 programs=(
     "programs/help.asm HELP.BIN"
     "programs/grep.asm GREP.BIN"
+    "programs/ps.asm PS.BIN"
+    "programs/kill.asm KILL.BIN"
     "programs/head.asm HEAD.BIN"
     "programs/tail.asm TAIL.BIN"
     "programs/cpu.asm CPU.BIN"
@@ -381,6 +440,7 @@ programs=(
     "programs/print.asm PRINT.BIN"
     "programs/calendar.asm CALENDAR.BIN"
     "programs/settings.asm SETTINGS.BIN"
+    "programs/prasm.asm PRASM.BIN"
 )
 
 for prog in "${programs[@]}"; do
@@ -445,8 +505,11 @@ for prog in "${programs_exe[@]}"; do
     print_ok "$bin_name copied successfully"
 done
 
+# CLI PLE programs
 programs_ple=(
     "programs/PLE/src/hello.asm HELLO.PLE"
+    "programs/PLE/src/clock.asm CLOCK.PLE"
+    "programs/PLE/src/gui/gui.asm GUI.PLE"
 )
 
 for prog in "${programs_ple[@]}"; do
@@ -455,7 +518,7 @@ for prog in "${programs_ple[@]}"; do
 
     if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
         print_info "Compiling $src => bin/$bin_name..."
-        nasm -f bin -I programs/PLE/ $src -o bin/$bin_name
+        nasm -f bin -I programs/PLE/ -I programs/lib/ -I programs/PLE/src/gui/ $src -o bin/$bin_name
         check_error "Compilation of $src failed"
         print_ok "$bin_name compiled successfully"
     fi
@@ -466,7 +529,46 @@ for prog in "${programs_ple[@]}"; do
     print_ok "$bin_name copied successfully"
 done
 
-mcopy -i disk_img/x16pros.img bin/prasm.bin ::/BIN.DIR/
+# Windowed PLE programs (GUI.PLE compatible)
+programs_ple_gui=(
+    "programs/PLE/src/windowed/eyes.asm EYES.PLE"
+    "programs/PLE/src/windowed/clock.asm CLOCK.PLE"
+    "programs/PLE/src/windowed/hello.asm HELLO.PLE"
+    "programs/PLE/src/windowed/calc.asm CALC.PLE"
+    "programs/PLE/src/windowed/settings.asm SETTINGS.PLE"
+)
+
+for prog in "${programs_ple_gui[@]}"; do
+    src=$(echo $prog | cut -d' ' -f1)
+    bin_name=$(echo $prog | cut -d' ' -f2)
+
+    if [ $FLAG_NO_PROGRAMS_RECOMP == 0 ]; then
+        print_info "Compiling $src => bin/$bin_name..."
+        nasm -f bin -I programs/PLE/ -I programs/lib/ $src -o bin/$bin_name
+        check_error "Compilation of $src failed"
+        print_ok "$bin_name compiled successfully"
+    fi
+
+    print_info "Copying $bin_name to PLE.DIR/GUI.DIR..."
+    mcopy -i disk_img/x16pros.img bin/$bin_name ::/PLE.DIR/GUI.DIR/
+    check_error "Copy of $bin_name failed"
+    print_ok "$bin_name copied successfully"
+done
+
+# Copy ASM source code wich can be assembled using prasm
+print_splitline "Copying ASM files..."
+asm_files=(
+    "assets/ASM/HELLO.ASM"
+    "assets/ASM/TIME.ASM"
+    "assets/ASM/DATE.ASM"
+)
+
+for file in "${asm_files[@]}"; do
+    print_info "Copying $file..."
+    mcopy -i disk_img/x16pros.img $file ::/ASM.DIR/
+    check_error "Copy of $file failed"
+    print_ok "$file copied successfully"
+done
 
 # Copy text files
 if [ $FLAG_NO_TXT == 0 ]; then
@@ -487,22 +589,40 @@ if [ $FLAG_NO_TXT == 0 ]; then
     check_error "Copy of PROJECT.TXT failed"
     print_ok "PROJECT.TXT copied successfully"
 
-    text_files_doc=(
-        "src/txt/README.TXT"
-        "src/txt/CONFIGS.TXT"
-        "src/txt/FILESYS.TXT"
-        "src/txt/LIMITS.TXT"
-        "src/txt/PROGRAMS.TXT"
-        "src/txt/QUICKST.TXT"
-        "src/txt/COMMANDS.TXT"
-        "src/txt/EDMAN.TXT"
+    doc_names=(
+        "README.TXT"
+        "CONFIGS.TXT"
+        "FILESYS.TXT"
+        "LIMITS.TXT"
+        "PROGRAMS.TXT"
+        "QUICKST.TXT"
+        "COMMANDS.TXT"
+        "EDMAN.TXT"
+        "PRASM.TXT"
     )
 
-    for file in "${text_files_doc[@]}"; do
-        print_info "Copying $file..."
-        mcopy -i disk_img/x16pros.img $file ::/DOCS.DIR/
-        check_error "Copy of $file failed"
-        print_ok "$file copied successfully"
+    print_info "Creating DOCS.DIR/EN.DIR directory..."
+    mmd -i disk_img/x16pros.img ::/DOCS.DIR/EN.DIR
+    check_error "Failed to create DOCS.DIR/EN.DIR directory"
+    print_ok "DOCS.DIR/EN.DIR directory created successfully"
+
+    print_info "Creating DOCS.DIR/RU.DIR directory..."
+    mmd -i disk_img/x16pros.img ::/DOCS.DIR/RU.DIR
+    check_error "Failed to create DOCS.DIR/RU.DIR directory"
+    print_ok "DOCS.DIR/RU.DIR directory created successfully"
+
+    for name in "${doc_names[@]}"; do
+        print_info "Copying src/txt/$name => DOCS.DIR/EN.DIR/..."
+        mcopy -i disk_img/x16pros.img "src/txt/$name" ::/DOCS.DIR/EN.DIR/
+        check_error "Copy of src/txt/$name failed"
+        print_ok "$name (EN) copied successfully"
+    done
+
+    for name in "${doc_names[@]}"; do
+        print_info "Copying bin/docs_ru/$name => DOCS.DIR/RU.DIR/..."
+        mcopy -i disk_img/x16pros.img "src/txt/RU/$name" ::/DOCS.DIR/RU.DIR/
+        check_error "Copy of RU $name failed"
+        print_ok "$name (RU) copied successfully"
     done
 fi
 

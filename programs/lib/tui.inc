@@ -53,8 +53,58 @@ TUI_SHORTCUT_ROW   equ 29
 ; OUT: Nothing
 ; ========================================================================
 tui_init:
+    mov ah, 0x0C
+    int 0x21
     call font_init
     ret
+
+; ========================================================================
+; tui_reset_palette -- Restore the default VGA 16-color DAC palette
+; ========================================================================
+tui_reset_palette:
+    pusha
+    mov byte [.tp_idx], 0
+.tp_loop:
+    movzx bx, byte [.tp_idx]
+    mov bl, [.tp_atc_to_dac + bx]
+    mov bh, 0
+
+    movzx di, byte [.tp_idx]
+    mov ax, di
+    add di, di
+    add di, ax
+
+    mov dh, [.tp_rgb + di]          ; red
+    mov ch, [.tp_rgb + di + 1]      ; green
+    mov cl, [.tp_rgb + di + 2]      ; blue
+    mov ax, 0x1010
+    int 0x10
+
+    inc byte [.tp_idx]
+    cmp byte [.tp_idx], 16
+    jb .tp_loop
+    popa
+    ret
+
+.tp_idx db 0
+.tp_atc_to_dac db 0, 1, 2, 3, 4, 5, 20, 7, 56, 57, 58, 59, 60, 61, 62, 63
+.tp_rgb:
+    db 0x00, 0x00, 0x00     ; 0  black
+    db 0x00, 0x00, 0x2A     ; 1  blue
+    db 0x00, 0x2A, 0x00     ; 2  green
+    db 0x00, 0x2A, 0x2A     ; 3  cyan
+    db 0x2A, 0x00, 0x00     ; 4  red
+    db 0x2A, 0x00, 0x2A     ; 5  magenta
+    db 0x2A, 0x15, 0x00     ; 6  brown
+    db 0x2A, 0x2A, 0x2A     ; 7  light gray
+    db 0x15, 0x15, 0x15     ; 8  dark gray
+    db 0x15, 0x15, 0x3F     ; 9  light blue
+    db 0x15, 0x3F, 0x15     ; 10 light green
+    db 0x15, 0x3F, 0x3F     ; 11 light cyan
+    db 0x3F, 0x15, 0x15     ; 12 light red
+    db 0x3F, 0x15, 0x3F     ; 13 light magenta
+    db 0x3F, 0x3F, 0x15     ; 14 yellow
+    db 0x3F, 0x3F, 0x3F     ; 15 white
 
 ; ========================================================================
 ; tui_clear_screen -- Clear screen with theme background color

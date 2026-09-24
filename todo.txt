@@ -1,9 +1,21 @@
-[ IN PROGRESS ] Implement all MS-DOS system calls for the compatibility layer (37/87)
-[     TODO    ] Implement cooperative multitasking
-[     TODO    ] Add malloc, mfree
+[ IN PROGRESS ] Implement all MS-DOS INT 0x21 system calls for the compatibility layer (71/93)
+
+[     DONE    ] Implement cooperative multitasking
+[     DONE    ] Add malloc, mfree
+[     DONE    ] GUI
+[     DONE    ] RUN DOOM!
+[     DONE    ] Run Microsoft Windows 1x
+
+[     TODO    ] Midi driver
+[     TODO    ] VESA
+[     TODO    ] EMS
 [     TODO    ] Add the ability to compile x16-PRos to ISO image
 [     TODO    ] Add internet driver
 [     TODO    ] Separate PRos Terminal from kernel
 [     TODO    ] I/O redirection and pipes (cmd > file, cmd1 | cmd2)
 [     TODO    ] Batch script support (.BAT / .SH style)
-[     TODO    ] System uptime counter and INT 0x21 syscall to query it
+[     TODO    ] System uptime counter and INT 0x23 syscall to query it
+[     TODO    ] Run Microsoft Windows 3x
+[     TODO    ] Run Wolf3D
+[     TODO    ] DPMI
+[     TODO    ] XMS
