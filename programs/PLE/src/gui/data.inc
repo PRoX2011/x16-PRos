@@ -55,6 +55,9 @@ w_rh            times MAX_WIN dw 0
 wtile_x         dw 30, 260, 30, 260, 145
 wtile_y         dw 30, 30, 240, 240, 135
 
+clip_n          db 0
+clip_rects      times MAX_CLIP * 4 dw 0
+
 menu_str        db 'x16-PRos GUI v0.1', 0
 pledir_name     db 'PLE.DIR', 0
 guidir_name     db 'GUI.DIR', 0
@@ -65,7 +68,7 @@ icon_has_logo   times MAX_ICONS    db 0
 
 ; background
 bg_style        db  0
-bg_STYLE_COUNT  equ 4
+bg_pattern      db 0x88, 0x00, 0x22, 0x00, 0x88, 0x00, 0x22, 0x00
 
 bg_patterns:
                 db 0x88, 0x00, 0x22, 0x00, 0x88, 0x00, 0x22, 0x00

@@ -7,7 +7,7 @@
 
 %include "ple.inc"
 
-PLE_HEADER start, "x16-PRos GUI", "PRoX-dev"
+PLE_HEADER start, "x16-PRos GUI", "PRoX-dev", 0, PLE_FULL_SEGMENT
 PLE_LOGO          "logo/gui.raw"
 
 %define MENUBAR_H   18
@@ -17,6 +17,10 @@ PLE_LOGO          "logo/gui.raw"
 %define MIN_WW      140
 %define MIN_WH      80
 %define MAX_WIN     5
+%define QUIT_WAIT_TICKS 40
+
+%define MAX_OVERLAY 2
+%define MAX_CLIP    (MAX_WIN - 1 + MAX_OVERLAY)
 %define IW          32
 %define IH          26
 %define ICON_X0     24
@@ -25,13 +29,17 @@ PLE_LOGO          "logo/gui.raw"
 %define ICON_DY     80
 %define ICON_COLS   6
 %define MAX_ICONS   16
+%define MAX_TASKS   8
 %define LOGO_LOAD_OFF   0x4000
 %define LOGO_LOAD_MAX   0x4000
 %define LOGO_CACHE_OFF  0x8000
 %define LOGO_PX         32
+%define POPUP_BUF_OFF   0xC000
+%define POPUP_MAX_BPR   16
+%define POPUP_MAX_ROWS  (MAX_FONTS * 16)
 
-%define ICON_ROUND      2  ; corner chamfer
-%define NAME_GAP        6  ; gap between icon and label
+%define ICON_ROUND_MAX  16 ; corner chamfer ceiling
+%define NAME_GAP_MAX    24 ; icon to label gap ceiling
 
 %define STAR_X        4
 %define STAR_Y        3
@@ -63,7 +71,23 @@ PLE_LOGO          "logo/gui.raw"
 %define WPMENU_Y   (MENU_Y + WP_ITEM*MENU_IH)
 %define WPMENU_H   (WPMENU_N * WPMENU_IH)
 
-%define BG_STYLE_COUNT 4
+%define CAL_CW        22
+%define CAL_CH        16
+%define CAL_W         (7 * CAL_CW + 8)
+%define CAL_X         (640 - CAL_W - 2)
+%define CAL_Y         MENUBAR_H
+%define CAL_HDR_H     18
+%define CAL_WD_Y      (CAL_Y + CAL_HDR_H)
+%define CAL_DAY_Y     (CAL_WD_Y + CAL_CH)
+%define CAL_H         (CAL_HDR_H + CAL_CH * 7 + 4)
+%define CAL_GX        (CAL_X + 4)
+%define CAL_BTN_W     14
+%define CAL_BTN_H     14
+%define CAL_BTN_Y     (CAL_Y + 2)
+%define CAL_PREV_X    (CAL_X + 4)
+%define CAL_NEXT_X    (CAL_X + CAL_W - 4 - CAL_BTN_W)
+
+%define BG_STYLE_COUNT 8
 
 start:
     push cs
@@ -99,8 +123,11 @@ start:
     mov al, 0
     int 0x23
 
+    call wm_create
+    call load_gui_configs
     call enumerate_ple
     call cache_logos
+    call adopt_tasks
     call full_repaint
 
 .loop:
@@ -121,6 +148,8 @@ start:
     test al, al
     jz .released
 
+    call cal_handle_press
+    jc .after_edge
     call menu_handle_press
     jc .after_edge
     call win_at
@@ -265,10 +294,15 @@ start:
     jne .skip_reap
     cmp byte [font_menu_open], 0
     jne .skip_reap
+    cmp byte [wp_menu_open], 0
+    jne .skip_reap
+    cmp byte [cal_open], 0
+    jne .skip_reap
     call reap_dead_windows
 .skip_reap:
     call tick_clock
     call menu_tick
+    call sync_overlay_clip
     call update_cursor
     mov ah, 0x13
     int 0x23
@@ -395,21 +429,8 @@ start:
     jmp .after_edge
 
 gui_quit:
-    xor bx, bx
-.qk:
-    cmp bx, MAX_WIN
-    jae .qk_done
-    cmp byte [w_open + bx], 0
-    je .qk_next
-    push bx
-    mov bl, [w_task + bx]
-    mov ah, 0x32
-    int 0x23
-    pop bx
-.qk_next:
-    inc bx
-    jmp .qk
-.qk_done:
+    call close_all_windows
+    call wm_release
     mov ah, 0x26
     mov al, 0
     int 0x23
@@ -420,12 +441,18 @@ gui_quit:
     int 0x21
     retf
 
+%include "wm.inc"
+%include "wmblock.inc"
 %include "windows.inc"
 %include "launch.inc"
 %include "bar.inc"
 %include "icons.inc"
 %include "menu.inc"
 %include "fonts.inc"
+%include "widget.inc"
+%include "popup.inc"
+%include "calendar.inc"
+%include "config.inc"
 %include "data.inc"
 
 %include "grafx.inc"

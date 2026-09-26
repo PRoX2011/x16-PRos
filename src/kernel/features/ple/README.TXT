@@ -32,7 +32,8 @@ fs_load_huge_file, so it can span more than 64 KiB.
   | 0x06   |   2  | entry rel-seg id                   |
   | 0x08   |   2  | entry IP                           |
   | 0x0A   |   2  | stack rel-seg id                   |
-  | 0x0C   |   2  | stack SP                           |
+  | 0x0C   |   2  | stack SP (loader sizes the arena   |
+  |        |      | from this before allocating)       |
   | 0x0E   |   2  | load-table entry count             |
   | 0x10   |  32  | description                        |
   | 0x30   |  16  | author                             |
@@ -66,11 +67,52 @@ fs_load_huge_file, so it can span more than 64 KiB.
   +-------------------+-------------------------------+
   | segment:offset    | content                       |
   +-------------------+-------------------------------+
-  | 0x3000:0x0000     | PLE header                    |
-  | 0x3000:0x0040     | logo (used by splash)         |
-  | 0x3000:0x1040     | load table                    |
-  | 0x3000:0x1050+    | segment data                  |
+  | BASE:0x0000       | PLE header                    |
+  | BASE:0x0040       | logo (used by splash)         |
+  | BASE:0x1040       | load table                    |
+  | BASE:0x1050+      | segment data, one after       |
+  |                   | another, paragraph-aligned    |
+  | after the image   | the stack segment             |
   +-------------------+-------------------------------+
+
+============================================================
+ Registers on entry
+============================================================
+
+  CS = DS = the program's segment 0
+  SS:SP   = the program's stack
+  ES      = kernel data segment
+  SI      = pointer to the command line args, in ES
+
+============================================================
+ Segments
+============================================================
+
+  Segment 0 holds the code and opens by itself. Extra segments are
+  opened with PLE_SEGMENT and each one can be up to 64 KiB.
+
+  Segments are written one after another and each ends where the
+  next begins, so do not reopen an earlier one.
+
+      PLE_SEGMENT tables
+      big_table   times 40000 db 0
+
+  To reach a segment at run time, add its distance in paragraphs to
+  CS. PLE_SEG works that distance out while assembling, there is
+  nothing to look up:
+
+      mov ax, cs
+      add ax, PLE_SEG(tables)
+      mov es, ax
+
+  or the same thing in one line, which clobbers AX:
+
+      PLE_LOAD_SEG es, tables
+
+  PLE_DATA is the old spelling of PLE_SEGMENT data.
+
+  Every byte of every segment sits in the file, so a segment full of
+  zeroes costs that many bytes on disk.
 
 ============================================================
  Building a PLE program

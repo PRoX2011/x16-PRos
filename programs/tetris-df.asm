@@ -38,11 +38,13 @@ KEY_ESC equ 011bh
 KEY_LEFT equ 04b00h
 KEY_RIGHT equ 04d00h
 KEY_UP equ 04800h
+KEY_DOWN equ 05000h
 
 
 
 start:          mov     ax, 0003h       ; AH=0 - set video mode, AL=3 80x25 text mode
                 int     10h
+                call    DrawHelp
 
 @@spawnFigure:  mov     ax, (0*256)+(FIELD_WIDTH/2)
                 mov     word  [cur_x], ax
@@ -92,6 +94,10 @@ start:          mov     ax, 0003h       ; AH=0 - set video mode, AL=3 80x25 text
                 je      @@moveLeft
                 cmp     ax, KEY_RIGHT
                 je      @@moveRight
+                cmp     ax, KEY_DOWN
+                je      @@moveDown
+                cmp     al, CHAR_SPACE
+                je      @@hardDrop
                 jmp     @@keyLoop
 
 @@noKey:        mov     al, byte  [cur_y]
@@ -107,7 +113,9 @@ start:          mov     ax, 0003h       ; AH=0 - set video mode, AL=3 80x25 text
 
                 jmp     @@spawnFigure
 
-@@exit:         ret
+@@exit:         mov     ax, 0012h       ; back to the shell's video mode
+                int     10h
+                ret
 
 
 @@rotate:       call    RotateFigure
@@ -132,6 +140,22 @@ start:          mov     ax, 0003h       ; AH=0 - set video mode, AL=3 80x25 text
                 jnc     @@keyLoop
                 dec     byte  [cur_x]
                 jmp     @@keyLoop
+
+@@moveDown:     inc     byte  [cur_y]
+                mov     si,  cur_figure
+                call    CheckCollides
+                jnc     @@keyLoop
+                dec     byte  [cur_y]
+                jmp     @@keyLoop
+
+@@hardDrop:     inc     byte  [cur_y]
+                mov     si,  cur_figure
+                call    CheckCollides
+                jnc     @@hardDrop
+                dec     byte  [cur_y]
+                call    FixateFigure
+                call    RemoveLines
+                jmp     @@spawnFigure
 
 DrawField:      mov     bx, FIELD_HEIGHT
                 mov     si,  field; DS:SI -> field
@@ -340,12 +364,55 @@ RotateFigure:   mov     bx, word  [fig_width]
                 mov     di,  cur_figure
                 mov     cx, FIGURE_WIDTH*FIGURE_HEIGHT
                 rep     movsb
-                mov     ax, word  (fig_width)
+                mov     ax, word  [fig_width]   ; the value, not its address
                 xchg    al, ah
 
                 mov [fig_width], ax
 
 @@cantRotate:   ret
+
+PrintAt:        push    ax
+                push    bx
+                push    cx
+                push    di
+                push    es
+                mov     bl, ah
+                mov     cx, 0b800h
+                mov     es, cx
+                mov     al, dh
+                mov     ah, SCREEN_SKIP_ROW
+                mul     ah
+                mov     di, ax
+                mov     al, dl
+                xor     ah, ah
+                shl     ax, 1
+                add     di, ax
+                mov     ah, bl
+@@paNext:       lodsb
+                or      al, al
+                jz      @@paEnd
+                stosw
+                jmp     @@paNext
+@@paEnd:        pop     es
+                pop     di
+                pop     cx
+                pop     bx
+                pop     ax
+                ret
+
+DrawHelp:       mov     si,  help_line1
+                mov     dx, (22*256)+FIELD_X
+                mov     ah, WHITE
+                call    PrintAt
+                mov     si,  help_line2
+                mov     dx, (23*256)+FIELD_X
+                mov     ah, WHITE
+                call    PrintAt
+                ret
+
+help_line1      db      'Left/Right - move   Up - rotate', 0
+help_line2      db      'Down - soft drop   Space - hard drop   ESC - exit', 0
+
 field times (FIELD_WIDTH*FIELD_HEIGHT) db 0
 
 

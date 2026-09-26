@@ -4,6 +4,8 @@ com_0Eh:
 
     mov ax, 0x2000
     mov ds, ax
+    push es
+    mov es, ax
 
     mov al, dl
     add al, 'A'
@@ -20,6 +22,7 @@ com_0Eh:
     stc
 
 .done:
+    pop es
     pop ds
     pop bx
     iret

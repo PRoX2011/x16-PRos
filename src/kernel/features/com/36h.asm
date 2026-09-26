@@ -6,6 +6,8 @@ com_36h:
 
     mov ax, 0x2000
     mov ds, ax
+    push es
+    mov es, ax
     call save_current_dir
 
     cmp dl, 0
@@ -20,9 +22,9 @@ com_36h:
 .measure:
     call fs_free_space
     mov bx, ax
-    mov ax, 1
+    mov ax, [fs_spc]
     mov cx, 512
-    mov dx, 2847
+    mov dx, [fs_total_clus]
     and word [bp+6], 0xFFFE
     jmp .restore
 
@@ -35,6 +37,7 @@ com_36h:
 
 .restore:
     call restore_current_dir
+    pop es
     pop ds
     pop si
     pop bp

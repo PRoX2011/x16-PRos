@@ -26,6 +26,16 @@
 ;   0x12: Change drive (SI = Drive letter pointer)
 ;   0x13: Write huge file (SI = filename, CX = source offset, DX = source segment, BX = size low, DI = size high)
 ;   0x14: Get current drive letter (returns AL = drive letter)
+;   0x15: Streaming file access, AL selects the subfunction:
+;         AL=0x00 open  (SI = filename)
+;                 returns BX = handle, DX = size low, CX = size high
+;         AL=0x01 read  (BX = handle, CX = bytes wanted,
+;                 DX = destination segment, DI = destination offset)
+;                 returns AX = bytes actually read, 0 at end of file
+;         AL=0x02 write (BX = handle, CX = bytes, DX = source segment,
+;                 DI = source offset) returns AX = bytes actually written
+;         AL=0x03 seek  (BX = handle, DX = position low, CX = position high)
+;         AL=0x04 close (BX = handle)
 ; ==================================================================
 
 [BITS 16]
@@ -51,6 +61,7 @@ int22_handler:
     push es
 
     mov [cs:caller_ds_save_22], ds
+    mov [cs:caller_ax_22], ax
 
     mov bp, cs
     mov ds, bp
@@ -72,7 +83,12 @@ int22_handler:
     je .copy_si_str
     cmp al, 0x13
     je .copy_si_str
+    cmp al, 0x15
+    je .stream_name
     jmp .no_si_str
+.stream_name:
+    cmp byte [cs:caller_ax_22], 0x00
+    jne .no_si_str
 .copy_si_str:
     call copy_caller_string_si
 .no_si_str:
@@ -122,6 +138,8 @@ int22_handler:
     je .write_huge_file
     cmp al, 0x14
     je .get_current_drive
+    cmp al, 0x15
+    je .stream
     stc
     jmp .done
 
@@ -292,6 +310,66 @@ int22_handler:
     mov [bp+18], al
     jmp .done
 
+.stream:
+    mov al, [cs:caller_ax_22]
+    cmp al, 0x00
+    je .stream_open
+    cmp al, 0x01
+    je .stream_read
+    cmp al, 0x02
+    je .stream_write
+    cmp al, 0x03
+    je .stream_seek
+    cmp al, 0x04
+    je .stream_close
+    stc
+    jmp .done
+
+.stream_open:
+    mov ax, si
+    call fs_stream_open
+    jc .done
+    mov bp, sp
+    mov [bp+12], ax
+    mov [bp+14], bx
+    mov [bp+16], dx
+    clc
+    jmp .done
+
+.stream_read:
+    mov ax, bx
+    mov bx, cx
+    mov cx, di
+    call fs_stream_read
+    jc .done
+    mov bp, sp
+    mov [bp+18], ax
+    clc
+    jmp .done
+
+.stream_write:
+    mov ax, bx
+    mov bx, cx
+    mov cx, di
+    call fs_stream_write
+    jc .done
+    mov bp, sp
+    mov [bp+18], ax
+    clc
+    jmp .done
+
+.stream_seek:
+    mov ax, bx
+    mov bx, dx
+    mov dx, cx
+    call fs_stream_seek
+    jmp .done
+
+.stream_close:
+    mov ax, bx
+    call fs_stream_close
+    jmp .done
+
 .done:
     jc .set_cf
     push bp
@@ -390,6 +468,7 @@ copy_caller_string_di:
 .di_scratch times 64 db 0
 
 caller_ds_save_22 dw 0
+caller_ax_22 dw 0
 
 int22_handler.saved_bx dw 0
 int22_handler.saved_cx dw 0

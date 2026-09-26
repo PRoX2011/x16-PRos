@@ -63,6 +63,9 @@ DISK_BUFFER_OFF      equ 0xE000
 DISK_BUFFER_SIZE     equ 0x1C00
 KERNEL_WORK_END_OFF  equ DISK_BUFFER_OFF + DISK_BUFFER_SIZE  ; 0xFC00
 
+FS_STAGE_SEG         equ KERNEL_WORK_SEG
+FS_STAGE_OFF         equ 0x3800
+
 disk_buffer          equ DISK_BUFFER_OFF
 dirlist              equ DIRLIST_OFF
 command_history      equ COMMAND_HISTORY_OFF
@@ -73,6 +76,7 @@ section .text
 
 start:
     cli
+    mov [cs:boot_drive], dl         ; the bootloader leaves it in DL
 
     ; ------ Stack installation ------
     xor ax, ax
@@ -857,9 +861,13 @@ get_cmd:
 
 .load_ple_program:
     ; Try to load PLE from current directory (only if file exists here)
+    mov si, [param_list]
+    mov [ple_param_ptr], si
+
     mov ax, command
     call fs_file_exists
     jc .try_ple_dir
+
     mov ax, command
     mov bl, 0x01                  ; show splash
     call ple_execute
@@ -1054,6 +1062,19 @@ execute_com:
     mov [com_stack_save], sp
     mov [com_ss_save], ss
     mov byte [com_active], 1
+    mov ax, [program_seg_runtime]
+    mov [dos_current_psp], ax
+    mov [dosmem_prog_base], ax
+    mov word [dosmem_prog_paras], 0x1000
+    add ax, 0x1000
+    mov [dosmem_env_seg], ax
+
+    mov ax, [dosmem_top_seg]
+    mov [exe_mem_top], ax
+
+    mov ax, [program_seg_runtime]
+    mov si, [param_list]
+    call exe_build_psp
 
     call api_dos_init
 
@@ -1062,16 +1083,13 @@ execute_com:
     mov ds, ax
     mov es, ax
 
-    mov byte [ds:0x0000], COM_EXIT_OPCODE
-    mov byte [ds:0x0001], DOS_INT20_VECTOR
-
     ; Setup COM program stack
     cli
     mov ss, ax
     mov sp, COM_STACK_TOP
     sti
 
-    call DisableMouse
+    call mouse_dos_begin
 
     mov ah, 0x00
     mov al, 0x03
@@ -1219,8 +1237,7 @@ list_directory:
     cmp byte [current_directory], 0
     je .show_root
 
-    mov si, .subdir_prefix
-    call print_string
+    call print_drive_prefix
     mov si, current_directory
     call print_string
     jmp .show_path_done
@@ -1265,6 +1282,7 @@ list_directory:
     jnz .print_dir_marker
 
     mov ax, [es:si+12]
+    mov dx, [es:si+14]
     call .print_size_decimal
     jmp .after_size
 
@@ -1321,11 +1339,11 @@ list_directory:
     call print_string
 
     call fs_free_space
-    shr ax, 1
+    call fs_clus_to_kb
     mov [.freespace], ax
-    mov bx, 1440
-    sub bx, ax
-    mov ax, bx
+    mov ax, [fs_total_clus]
+    call fs_clus_to_kb
+    sub ax, [.freespace]
     call string_int_to_string
     mov si, ax
     call print_string_green
@@ -1354,12 +1372,19 @@ list_directory:
     push dx
     xor cx, cx
 .sd_push_digits:
-    test ax, ax
+    mov bx, ax
+    or bx, dx
     je .sd_check_zero
-    xor dx, dx
     mov bx, 10
+    push ax
+    mov ax, dx
+    xor dx, dx
+    div bx
+    mov [.sd_qhi], ax
+    pop ax
     div bx
     push dx
+    mov dx, [.sd_qhi]
     inc cx
     inc word [.size_digits]
     jmp .sd_push_digits
@@ -1390,11 +1415,11 @@ list_directory:
 
 .files_in_row    dw 0
 .size_digits     dw 0
+.sd_qhi        dw 0
 .dir_marker_str  db '<DIR>', 0
 .free_msg        db ' KB free', 0
 .kb_msg          db ' KB', 0
 .sep             db '   ', 0
-.subdir_prefix   db 'A:/', 0
 .freespace       dw 0
 
 cat_file:
@@ -2064,23 +2089,20 @@ cd_command:
     jmp .skip_empty_comp
 
 .not_dotdot_comp:
-    ; Auto-append .DIR if no extension
+    mov ax, .comp_buffer
+    call fs_change_directory
+    jnc .skip_empty_comp
+
     mov si, .comp_buffer
-    xor bx, bx
 .check_comp_dot:
     lodsb
     cmp al, 0
-    je .comp_check_dot_done
+    je .comp_no_ext
     cmp al, '.'
-    je .comp_has_dot
+    je .cd_rollback
     jmp .check_comp_dot
-.comp_has_dot:
-    mov bx, 1
-.comp_check_dot_done:
-    test bx, bx
-    jne .comp_has_ext
 
-    ; Append .DIR
+.comp_no_ext:
     mov si, .comp_buffer
     mov ax, si
     call string_string_length
@@ -2092,7 +2114,6 @@ cd_command:
     mov byte [si+3], 'R'
     mov byte [si+4], 0
 
-.comp_has_ext:
     mov ax, .comp_buffer
     call fs_change_directory
     jc .cd_rollback
@@ -2220,6 +2241,7 @@ bg_command:
     jc .not_found
 
     mov ax, [.fname_ptr]
+    mov word [ple_param_ptr], ple_no_params
     call ple_execute_bg
     jc .launch_failed
 
@@ -2315,7 +2337,7 @@ info db 10, 13
      db '  Support project:  DALink (https://dalink.to/PRoXdev)', 10, 13
      db '  Source code:      GitHub (https://github.com/PRoX2011/x16-PRos)', 10, 13
      db '  License:          MIT', 10, 13
-     db '  OS version:       1.0-dev', 10, 13
+     db '  OS version:       1.0', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.3', 10, 13, 0
@@ -2564,6 +2586,15 @@ login_password_prompt  db 19 dup(' '), 0xC9, 39 dup(0xCD), 0xBB, 10, 13
 mt                   db '', 10, 13, 0
 Sides                dw 2
 SecsPerTrack         dw 18
+
+fs_fat_lba           dw 1
+fs_fat_secs          dw 9
+fs_root_lba          dw 19
+fs_root_secs         dw 14 
+fs_root_ents         dw 224
+fs_spc               dw 1
+fs_clus_base         dw 31
+fs_total_clus        dw 2847 
 bootdev              db 0
 current_disk         db 0 
 fmt_date             dw 1
@@ -2572,6 +2603,8 @@ command_history_top  db 0
 saved_disk           db 0
 saved_drive_char     db 0
 autocomplete_enabled db 0
+boot_drive           db 0
+sys_drive_char       db 'A'
 current_dir_cluster  dw 0
 saved_dir_cluster    dw 0
 

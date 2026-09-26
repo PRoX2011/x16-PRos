@@ -3,7 +3,7 @@
 ; Copyright (C) 2026 PRoX2011
 ; ==================================================================
 
-PLE_MAX_PARAS       equ 0x2000
+PLE_PEEK_BYTES      equ 16
 
 ; PLE header field offsets
 PLE_OFF_MAGIC       equ 0x00          ; 'P','L','E' (3 bytes)
@@ -30,6 +30,93 @@ PLE_INSN_SIZE       equ 6
 PLE_INSN_SIZE_BYTES equ 8
 
 ; =======================================================================
+; PLE_ARENA_PARAS - work out how much memory a PLE file needs without
+; loading it, so the arena can be sized before it is taken
+; IN : [ple_filename] = pointer to the file name
+; OUT : BX = paragraphs to allocate
+;       CF = 1 if the file could not be opened, or needs more
+;            memory than the heap could ever hand out
+; =======================================================================
+ple_arena_paras:
+    push ax
+    push cx
+    push dx
+    push si
+    push di
+
+    mov word [.sp], 0xFFFE
+
+    mov ax, [ple_filename]
+    call fs_stream_open
+    jc .fail
+    mov si, ax
+    mov [.size_lo], bx
+    mov [.size_hi], dx
+
+    mov ax, si
+    mov bx, PLE_PEEK_BYTES
+    mov cx, ple_hdr_peek
+    mov dx, ds
+    call fs_stream_read
+    mov di, ax
+
+    mov ax, si
+    call fs_stream_close
+
+    cmp di, PLE_PEEK_BYTES
+    jb .have_sp
+    cmp word [ple_hdr_peek + PLE_OFF_MAGIC], 0x4C50
+    jne .have_sp
+    cmp byte [ple_hdr_peek + PLE_OFF_MAGIC + 2], 'E'
+    jne .have_sp
+    cmp word [ple_hdr_peek + PLE_OFF_VERSION], 1
+    jne .have_sp
+    mov ax, [ple_hdr_peek + PLE_OFF_STACK_SP]
+    test ax, ax
+    jz .have_sp
+    mov [.sp], ax
+
+.have_sp:
+    mov bx, [.size_lo]
+    mov dx, [.size_hi]
+    add bx, 15
+    adc dx, 0
+    shr bx, 4
+    mov ax, dx
+    shl ax, 12
+    or bx, ax
+    shr dx, 4
+    jnz .fail
+
+    mov ax, [.sp]
+    shr ax, 4
+    inc ax
+    add bx, ax
+    jc .fail
+    cmp bx, HEAP_TOTAL_PARAS
+    ja .fail
+.done:
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop ax
+    clc
+    ret
+
+.fail:
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop ax
+    stc
+    ret
+.size_lo dw 0
+.size_hi dw 0
+.sp      dw 0
+
+; =======================================================================
 ; PLE_LOAD - allocates memory, loads file, validates the header, and
 ; resolves entry/stack segment ids into absolute segments.
 ; IN : AX = pointer to filename
@@ -41,16 +128,9 @@ PLE_INSN_SIZE_BYTES equ 8
 ple_load:
     mov [ple_filename], ax
 
-    mov ax, [ple_filename]
-    call fs_get_file_size
+    call ple_arena_paras
     jc .alloc_failed
-    add ebx, 15
-    shr ebx, 4
-    add ebx, 0x1000
-    cmp ebx, PLE_MAX_PARAS
-    jbe .have_paras
-    mov ebx, PLE_MAX_PARAS
-.have_paras:
+    mov [ple_arena_size], bx
     call mem_alloc
     jc .alloc_failed
     mov [ple_base_seg], ax
@@ -202,6 +282,7 @@ ple_load:
 ; PLE_EXECUTE - foreground launch.
 ; IN : AX = pointer to filename
 ;      BL = launch flags (bit 0 = show splash + wait for key; 0 = silent)
+;      [ple_param_ptr] = command line for the program, set by the caller
 ; OUT : CF = 1 on load failure, otherwise 0.
 ; =======================================================================
 ple_execute:
@@ -510,6 +591,8 @@ ple_label_file       db 'File:    ', 0
 
 ple_extension        db '.PLE', 0
 
+ple_hdr_peek         times PLE_PEEK_BYTES db 0
+ple_arena_size       dw 0
 ple_filename         dw 0
 ple_base_seg         dw 0
 ple_entry_seg_id     dw 0
@@ -528,3 +611,5 @@ ple_pix_color        db 0
 ple_logo_row_buf     times 64 db 0
 ple_exec_flags       db 0
 ple_hdr_flags        db 0
+ple_param_ptr        dw ple_no_params
+ple_no_params        db 0

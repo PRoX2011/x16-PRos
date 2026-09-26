@@ -158,7 +158,7 @@ mode (640x480, 16 colors).
 - **Output**: None
 - **Preserves**: All registers
 - **Error Handling**: No errors reported
-- **Notes**: Internally calls `set_video_mode` followed by `load_and_apply_theme`. If the theme file is missing or unreadable, the screen falls back to default VGA colors.
+- **Notes**: Blanks the screen through the VGA registers, homes the cursor, and reloads the palette with `load_and_apply_theme`. It does **not** set the video mode, so a program that changed the mode has to restore it itself. If the theme file is missing or unreadable the palette is left at the VGA default.
 
 ## Color Palette
 
@@ -207,7 +207,7 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
   file count.
 - **Input**:
     - `AH` = 0x01
-    - `AX` = Pointer to buffer for storing the file list (comma-separated, null-terminated)
+    - `SI` = Pointer to buffer for storing the file list (comma-separated, null-terminated)
 - **Output**:
     - `BX` = Low word of total file size (in bytes)
     - `CX` = High word of total file size (32-bit size)
@@ -362,6 +362,24 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Notes**: Converts the filename to uppercase and FAT12’s 11-character format. Reads the root directory and FAT to
   locate and load file sectors.
 
+### Function 0x11: List Drives
+
+- **Description**: Prints a table of the available drives - letter, type, size, and used space — directly to the screen.
+- **Input**:
+    - `AH` = 0x11
+- **Output**: None (the table is written to the screen)
+- **Preserves**: All registers
+
+### Function 0x12: Change Drive
+
+- **Description**: Switches the current drive.
+- **Input**:
+    - `AH` = 0x12
+    - `SI` = Pointer to a drive letter (the first character is used, e.g. `"C"`)
+- **Output**: Carry flag set if no such drive exists
+- **Preserves**: All registers
+- **Notes**: The current directory is reset to the root of the new drive.
+
 ### Function 0x13: Write Huge File
 
 - **Description**: Writes a large file from an arbitrary segment:offset in memory to the current directory. Supports
@@ -387,6 +405,64 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Input**: `AH` = 0x14
 - **Output**: `AL` = current drive letter
 
+### Function 0x15: Streaming File Access
+
+#### AL = 0x00: Open
+
+- **Input**:
+    - `AH` = 0x15
+    - `AL` = 0x00
+    - `SI` = Pointer to null-terminated filename (8.3 format)
+- **Output**:
+    - `BX` = Handle (1..8)
+    - `DX` = File size low word
+    - `CX` = File size high word
+    - Carry flag set on error
+- **Error Handling**: Sets CF if the file does not exist in the current directory or all eight handles are already open
+
+#### AL = 0x01: Read
+
+- **Input**:
+    - `AH` = 0x15, `AL` = 0x01
+    - `BX` = Handle
+    - `CX` = Bytes wanted
+    - `DX` = Destination segment
+    - `DI` = Destination offset
+- **Output**:
+    - `AX` = Bytes actually read, 0 at the end of the file
+    - Carry flag set if the handle is not open
+
+#### AL = 0x02: Write
+
+- **Input**:
+    - `AH` = 0x15
+    - `AL` = 0x02
+    - `BX` = Handle
+    - `CX` = Bytes to write
+    - `DX` = Source segment
+    - `DI` = Source offset
+- **Output**:
+    - `AX` = Bytes actually written
+    - Carry flag set if the handle is not open
+
+#### AL = 0x03: Seek
+
+- **Input**:
+    - `AH` = 0x15
+    - `AL` = 0x03
+    - `BX` = Handle
+    - `DX` = Position low word
+    - `CX` = Position high word
+- **Output**: Carry flag set if the handle is not open
+
+#### AL = 0x04: Close
+
+- **Input**:
+    - `AH` = 0x15
+    - `AL` = 0x04
+    - `BX` = Handle
+- **Output**: Carry flag set if the handle is not open or the directory entry could not be written
+
 ---
 
 ## INT 0x23 - System API
@@ -396,7 +472,7 @@ the hooks for launching PLE programs and steering the cooperative scheduler, and
 handful of mouse calls.
 
 The functions fall into three groups: memory (`0x00`–`0x03`), tasks and PLE
-(`0x10`–`0x19`), and mouse (`0x20`–`0x25`).
+(`0x10`–`0x19` plus `0x34`), and mouse (`0x20`–`0x26`).
 
 ### Function 0x00: Get Version
 
@@ -552,6 +628,7 @@ manager or a `ps`-style listing.
     - `AL` = State: 0 = free, 1 = ready, 2 = running, 3 = sleeping
     - `AH` = Flags: bit 0 = background, bit 7 = kernel slot
     - `CX` = Base segment of the task's arena (kernel `CS` for slot 0, 0 for a free slot)
+    - `DL` = Parent task id, or `0xFF` when the task has no parent
     - `CF` = 1 if `BL` is out of range
 
 ### Function 0x18: Kill Task by Id
@@ -647,6 +724,28 @@ themselves can switch this off so the selection overlay stays out of their way.
     - `AH` = 0x25
     - `AL` = 1 to enable, 0 to disable
 - **Output**: None
+
+### Function 0x26: Set Cursor Shape
+
+Swaps the sprite the driver draws for the mouse pointer.
+
+- **Input**:
+    - `AH` = 0x26
+    - `AL` = 0 for the arrow, non-zero for the resize shape
+- **Output**: None
+
+### Function 0x34: Reparent a Task
+
+Points a task's parent link at a different slot.
+
+Only the parent field is touched; state, flags and arena are left alone.
+
+- **Input**:
+    - `AH` = 0x34
+    - `BL` = Task id to reparent (0..3)
+    - `BH` = New parent task id (`0xFF` for none)
+- **Output**:
+    - `CF` = 1 if `BL` is out of range or names a free slot
 
 ---
 

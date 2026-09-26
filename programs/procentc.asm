@@ -42,6 +42,7 @@ start:
     mov si, input_buffer
     mov bx, 5
     call scan_string
+    jc .cancelled
     mov ah, 0x05
     int 0x21
     mov di, input_buffer
@@ -54,17 +55,20 @@ start:
     mov si, input_buffer
     mov bx, 5
     call scan_string
+    jc .cancelled
     mov ah, 0x05
     int 0x21
     mov di, input_buffer
     mov bx, num2
     call convert_to_number
 
+    mov bx, [num2]
     mov ax, [num1]
     xor dx, dx
-    mov bx, 100
-    mul bx
-    mov bx, [num2]
+    mov cx, 100
+    mul cx
+    cmp dx, bx
+    jae .bad_input
     div bx
 
     mov di, result_str
@@ -82,6 +86,7 @@ start:
     mov ah, 0x05
     int 0x21
     
+.wait:
     mov ah, 0x01
     mov si, when_done
     int 0x21
@@ -90,8 +95,24 @@ start:
     mov ah, 0
     int 0x16
 
+.leave:
     popa
     ret
+
+.cancelled:
+    mov ah, 0x05
+    int 0x21
+    jmp .leave
+
+.bad_input:
+    mov ah, 0x05
+    int 0x21
+    mov ah, 0x04
+    mov si, err_msg
+    int 0x21
+    mov ah, 0x05
+    int 0x21
+    jmp .wait
 
 ; Convert String to Number
 ; di - buffer
@@ -115,18 +136,22 @@ convert_to_number:
 ; Scan String From Input
 ; si - buffer
 ; bx - max count
+; OUT: CF = 1 if the user pressed ESC
 scan_string:
     mov di, si
     xor cx, cx
+    mov dx, bx
 .read_loop:
     mov ah, 0x00
     int 0x16
+    cmp al, 0x1B
+    je .cancelled
     cmp al, 0x0D
     je .done_read
     cmp al, 0x08
     je .handle_backspace
-    cmp cx, bx
-    jge .done_read
+    cmp cx, dx
+    jge .read_loop
     stosb
     mov ah, 0x0E
     mov bl, 0x1F
@@ -141,6 +166,7 @@ scan_string:
     dec cx
     mov ah, 0x0E
     mov al, 0x08
+    mov bl, 0x1F
     int 0x10
     mov al, ' '
     int 0x10
@@ -150,6 +176,12 @@ scan_string:
 
 .done_read:
     mov byte [di], 0
+    clc
+    ret
+
+.cancelled:
+    mov byte [di], 0
+    stc
     ret
 
 ; Number To String
@@ -192,6 +224,7 @@ input_msg   db 'Number 1: ', 0
 input2_msg  db 'Number 2: ', 0
 result_msg  db 'Result: ', 0
 percent_msg db '%', 0
-help_msg    db 'This programm will calculate how many percent is num 1 out of num 2. If ', 13, 10
-            db 'malfunctioning then make sure num 2 is greater than num 1', 13, 10, 0
+help_msg    db 'This program will calculate how many percent is num 1 out of num 2.', 13, 10
+            db 'Press ESC at any prompt to quit.', 13, 10, 0
 when_done   db 'When done press any key', 13, 10, 0
+err_msg     db 'Cannot work that out: number 2 is zero, or the result is too big.', 0

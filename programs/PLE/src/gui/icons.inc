@@ -301,7 +301,7 @@ draw_icon_logo:
     mov bx, cx
 .dyok:
     add ax, bx
-    cmp ax, ICON_ROUND
+    cmp ax, [icon_round]
     pop ax
     jl .skippx
     mov cx, [ico_x]
@@ -347,7 +347,8 @@ draw_icon_name:
 .dn_xok:
     mov [.x], ax
     mov ax, [ico_y]
-    add ax, LOGO_PX + NAME_GAP
+    add ax, LOGO_PX
+    add ax, [name_gap]
     mov [.y], ax
 
     mov si, [.sptr]

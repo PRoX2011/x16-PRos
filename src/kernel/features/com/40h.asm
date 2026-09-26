@@ -23,7 +23,7 @@ com_40h:
     jc .fail
 
     call dosfile_materialise
-    jc .full
+    jc .to_stream
 
     test cx, cx
     jz .truncate
@@ -35,17 +35,45 @@ com_40h:
     call dosfile_grow
     jnc .have_room
 
-    call dosfile_capacity
-    sub ax, [si + DF_POS]
-    sbb dx, [si + DF_POS + 2]
-    jb .full
-    test dx, dx
-    jnz .have_room
+    call dosfile_spill
+    jc .full
+    jmp .stream
+
+.to_stream:
+    test byte [si + DF_FLAGS], DFF_STREAM
+    jnz .streaming
+    cmp word [si + DF_FIRST], 0
+    jne .adopt
+    call dosfile_spill
+    jc .full
+    jmp .streaming
+.adopt:
+    or byte [si + DF_FLAGS], DFF_STREAM
+
+.streaming:
+    cmp word [cs:dosf_count], 0
+    je .stream_truncate
+
+.stream:
+    mov bx, [cs:dosf_count]
+    mov cx, [cs:dosf_caller_dx]
+    mov dx, [cs:dosf_caller_ds]
+    add si, DF_STREAM
+    call fs_stream_write_desc
+    sub si, DF_STREAM
     test ax, ax
-    jz .full
-    cmp ax, cx
-    jae .have_room
-    mov cx, ax
+    jz .ok
+    or byte [si + DF_FLAGS], DFF_DIRTY
+    jmp .ok
+
+.stream_truncate:
+    mov ax, [si + DF_POS]
+    mov dx, [si + DF_POS + 2]
+    mov [si + DF_SIZE], ax
+    mov [si + DF_SIZE + 2], dx
+    or byte [si + DF_FLAGS], DFF_DIRTY
+    xor ax, ax
+    jmp .ok
 
 .have_room:
     call dosfile_fill_gap
@@ -128,6 +156,7 @@ com_40h:
     mov ax, [cs:dosf_count]
 
 .ok:
+    call dosvars_sync_sft
     and word [bp+6], 0xFFFE
     pop es
     pop ds

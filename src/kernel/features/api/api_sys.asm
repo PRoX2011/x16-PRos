@@ -17,7 +17,8 @@
 ;   0x16: Blocking key read with cooperative yield while idle
 ;         (returns AX = INT 16h/AH=0 result)
 ;   0x17: Query task slot (BL = id; OUT AL = state, AH = flags, CX = base_seg
-;         (kernel's CS for slot 0); CF on bad id)
+;         (kernel's CS for slot 0), DL = parent id (0xFF = none);
+;         CF on bad id)
 ;         States: 0=free, 1=ready, 2=running, 3=sleeping
 ;         Flags : bit0=background, bit7=kernel
 ;   0x18: Kill task by id (BL = id; CF on failure -
@@ -32,6 +33,7 @@
 ;   0x24: Mouse enable (AL = 1 enable, 0 disable)
 ;   0x25: Mouse drag-select (AL = 1 enable, 0 disable)
 ;   0x26: Set cursor shape (AL = 0 arrow, 1 resize)
+;   0x34: Reparent a task (BL = task id, BH = new parent id; CF on a bad or free task id)
 ; ==================================================================
 
 [BITS 16]
@@ -104,12 +106,8 @@ int23_handler:
     je .mouse_drag_select
     cmp ah, 0x26
     je .mouse_set_cursor
-    cmp ah, 0x30
-    je .win_set
-    cmp ah, 0x31
-    je .win_get
-    cmp ah, 0x32
-    je .win_close
+    cmp ah, 0x34
+    je .task_reparent
     stc
     jmp .done
 
@@ -154,6 +152,7 @@ int23_handler:
 .exec_ple:
     call copy_caller_string_si_23
     mov ax, si
+    mov word [ple_param_ptr], ple_no_params
     mov bl, 0x01
     call ple_execute
     jmp .done
@@ -161,6 +160,7 @@ int23_handler:
 .exec_ple_bg:
     call copy_caller_string_si_23
     mov ax, si
+    mov word [ple_param_ptr], ple_no_params
     call ple_execute_bg
     jc .exec_ple_bg_fail
     mov bp, sp
@@ -212,12 +212,14 @@ int23_handler:
     mov bp, sp
     mov [bp+18], ax
     mov [bp+16], cx
+    mov [bp+14], dx
     clc
     jmp .done
 .task_query_bad:
     mov bp, sp
     mov word [bp+18], 0
     mov word [bp+16], 0
+    mov word [bp+14], 0x00FF
     stc
     jmp .done
 
@@ -334,48 +336,8 @@ int23_handler:
     clc
     jmp .done
 
-.win_set:
-    cmp bl, TASK_SLOT_COUNT
-    jae .win_bad
-    xor bh, bh
-    mov byte [task_win_flags + bx], 0x05
-    shl bx, 1
-    mov [task_win_x + bx], cx
-    mov [task_win_y + bx], dx
-    mov [task_win_w + bx], si
-    mov [task_win_h + bx], di
-    clc
-    jmp .done
-.win_bad:
-    stc
-    jmp .done
-
-.win_close:
-    cmp bl, TASK_SLOT_COUNT
-    jae .win_bad
-    xor bh, bh
-    or byte [task_win_flags + bx], 0x02
-    clc
-    jmp .done
-
-.win_get:
-    xor bh, bh
-    mov bl, [sched_cur_task]
-    mov al, [task_win_flags + bx]
-    and byte [task_win_flags + bx], 0xFB
-    mov bp, sp
-    xor ah, ah
-    mov [bp+18], ax
-    shl bx, 1
-    mov ax, [task_win_x + bx]
-    mov [bp+16], ax
-    mov ax, [task_win_y + bx]
-    mov [bp+14], ax
-    mov ax, [task_win_w + bx]
-    mov [bp+6], ax
-    mov ax, [task_win_h + bx]
-    mov [bp+4], ax
-    clc
+.task_reparent:
+    call sched_task_set_parent
     jmp .done
 
 .done:
@@ -433,9 +395,3 @@ copy_caller_string_si_23:
 .scratch times 64 db 0
 
 caller_ds_save_23 dw 0
-
-task_win_flags  times TASK_SLOT_COUNT db 0
-task_win_x      times TASK_SLOT_COUNT dw 0
-task_win_y      times TASK_SLOT_COUNT dw 0
-task_win_w      times TASK_SLOT_COUNT dw 0
-task_win_h      times TASK_SLOT_COUNT dw 0

@@ -103,21 +103,16 @@ sched_task_create_from_ple:
     mov [bx + TASK_FLAGS], al
     mov ax, [ple_base_seg]
     mov [bx + TASK_BASE_SEG], ax
-    mov word [bx + TASK_PARAS], PLE_MAX_PARAS
+    mov ax, [ple_arena_size]
+    mov [bx + TASK_PARAS], ax
     mov byte [bx + TASK_PARENT], 0xFF             ; no parent by default
-
-    push bx
-    xor bh, bh
-    mov bl, [.id_tmp]
-    mov byte [task_win_flags + bx], 0
-    pop bx
 
     ; ----- build initial stack frame in task's stack segment -----
     ; Layout (from epilogue's perspective, low -> high addresses):
-    ;   SP+0   ES     (popped first)
+    ;   SP+0   ES     (popped first) (kernel data segment)
     ;   SP+2   DS
     ;   SP+4   DI     (popa: DI first)
-    ;   SP+6   SI
+    ;   SP+6   SI      (pointer to args)
     ;   SP+8   BP
     ;   SP+10  SP-phantom
     ;   SP+12  BX
@@ -140,11 +135,16 @@ sched_task_create_from_ple:
     sub di, 30                            ; new SP for the saved frame
 
     mov ax, [ple_entry_cs]                ; DS/ES initial value for the task
+    push ax
+    mov ax, KERNEL_DATA_SEG
     mov [es:di + 0],  ax                  ; ES
+    pop ax
     mov [es:di + 2],  ax                  ; DS
     xor ax, ax
     mov [es:di + 4],  ax                  ; DI
+    mov ax, [ple_param_ptr]               ; ptr to params
     mov [es:di + 6],  ax                  ; SI
+    xor ax, ax
     mov [es:di + 8],  ax                  ; BP
     mov [es:di + 10], ax                  ; phantom SP
     mov [es:di + 12], ax                  ; BX
@@ -556,6 +556,7 @@ sched_task_query:
     mov al, [sched_tasks + bx + TASK_STATE]
     mov ah, [sched_tasks + bx + TASK_FLAGS]
     mov cx, [sched_tasks + bx + TASK_BASE_SEG]
+    mov dl, [sched_tasks + bx + TASK_PARENT]
     pop bx
     clc
     ret
@@ -613,6 +614,35 @@ sched_yield_call:
     push es
     jmp sched_yield
 .resume:
+    ret
+
+; ==================================================================
+; sched_task_set_parent - hand a task over to a different parent.
+; A foreground parent sleeps until its child exits, so a replacement
+; task has to take over that link or the parent never wakes up.
+; IN : BL = task id, BH = parent id
+; OUT: CF = 1 on a bad or free task id
+; ==================================================================
+sched_task_set_parent:
+    cmp bl, TASK_SLOT_COUNT
+    jae .bad
+    push bx
+    push ax
+    mov al, bh
+    xor bh, bh
+    shl bx, 4
+    cmp byte [sched_tasks + bx + TASK_STATE], TASK_S_FREE
+    je .bad_pop
+    mov [sched_tasks + bx + TASK_PARENT], al
+    pop ax
+    pop bx
+    clc
+    ret
+.bad_pop:
+    pop ax
+    pop bx
+.bad:
+    stc
     ret
 
 section .data

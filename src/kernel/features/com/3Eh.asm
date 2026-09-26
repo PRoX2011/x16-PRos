@@ -14,6 +14,7 @@ com_3Eh:
     jc .fail
     call dosfile_close_slot
     jc .write_error
+    call dosvars_sync_sft
 
 .device:
     xor ax, ax

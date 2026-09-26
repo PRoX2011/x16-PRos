@@ -72,8 +72,7 @@ close_window:
     xor ah, ah
     mov bx, ax
     mov bl, [w_task + bx]
-    mov ah, 0x32
-    int 0x23
+    call wm_ask_close
     xor bh, bh
     mov bl, [close_slot]
     cmp bl, MAX_WIN
@@ -82,6 +81,92 @@ close_window:
 .skip:
     call full_repaint
     popa
+    ret
+
+; ========================================================================
+; CLOSE_ALL_WINDOWS - shut every hosted program down before quitting
+; IN : nothing
+; OUT : nothing
+; ========================================================================
+close_all_windows:
+    pusha
+    xor bx, bx
+.ask:
+    cmp bx, MAX_WIN
+    jae .wait
+    cmp byte [w_open + bx], 0
+    je .ask_next
+    push bx
+    mov bl, [w_task + bx]
+    call wm_ask_close
+    pop bx
+.ask_next:
+    inc bx
+    jmp .ask
+
+.wait:
+    mov cx, QUIT_WAIT_TICKS
+.spin:
+    call windows_alive
+    jnc .done
+    push cx
+    mov ah, 0x14
+    mov cx, 1
+    int 0x23
+    pop cx
+    loop .spin
+
+    xor bx, bx
+.kill:
+    cmp bx, MAX_WIN
+    jae .done
+    cmp byte [w_open + bx], 0
+    je .kill_next
+    push bx
+    mov bl, [w_task + bx]
+    xor bh, bh
+    mov ah, 0x18
+    int 0x23
+    pop bx
+.kill_next:
+    inc bx
+    jmp .kill
+.done:
+    popa
+    ret
+
+; ========================================================================
+; WINDOWS_ALIVE - is any hosted program still running?
+; IN : nothing
+; OUT : CF = 1 while at least one of them still holds a task slot
+; ========================================================================
+windows_alive:
+    pusha
+    xor bx, bx
+.slot:
+    cmp bx, MAX_WIN
+    jae .none
+    cmp byte [w_open + bx], 0
+    je .next
+    push bx
+    mov bl, [w_task + bx]
+    xor bh, bh
+    mov ah, 0x17
+    int 0x23
+    pop bx
+    jc .next
+    test al, al
+    jnz .alive
+.next:
+    inc bx
+    jmp .slot
+.alive:
+    popa
+    stc
+    ret
+.none:
+    popa
+    clc
     ret
 
 reap_dead_windows:
@@ -109,6 +194,7 @@ reap_dead_windows:
     inc word [.i]
     jmp .rl
 .fin:
+    call wm_sweep
     cmp byte [.changed], 0
     je .ret
     call full_repaint
@@ -156,3 +242,118 @@ toggle_maximize:
     call full_repaint
     popa
     ret
+
+adopt_tasks:
+    pusha
+    mov ah, 0x15
+    int 0x23
+    mov [.self], al
+    mov byte [.id], 1
+.scan:
+    cmp byte [.id], MAX_TASKS
+    jae .done
+    mov al, [.id]
+    cmp al, [.self]
+    je .next
+
+    mov bl, [.id]
+    mov ah, 0x17
+    int 0x23
+    jc .next
+    test al, al
+    jz .next
+    test ah, 0x80
+    jnz .next
+
+    call adopt_one
+.next:
+    inc byte [.id]
+    jmp .scan
+.done:
+    popa
+    ret
+.self db 0
+.id   db 0
+
+adopt_one:
+    pusha
+    xor bx, bx
+.fw:
+    cmp bx, MAX_WIN
+    jae .full
+    cmp byte [w_open + bx], 0
+    je .got
+    inc bx
+    jmp .fw
+.full:
+    popa
+    ret
+.got:
+    mov [.slot], bl
+    mov si, bx
+    add si, si
+    mov ax, [wtile_x + si]
+    mov [w_x + si], ax
+    mov ax, [wtile_y + si]
+    mov [w_y + si], ax
+    mov word [w_w + si], WW
+    mov word [w_h + si], WH
+    mov byte [w_max + bx], 0
+
+    xor bh, bh
+    mov bl, [.slot]
+    mov al, [adopt_tasks.id]
+    mov [w_task + bx], al
+    mov byte [w_open + bx], 1
+
+    mov bl, [adopt_tasks.id]
+    mov di, adopt_name
+    mov ah, 0x19
+    int 0x23
+    jc .titled
+    call adopt_match_icon
+.titled:
+    mov al, [.slot]
+    call publish_window
+    popa
+    ret
+.slot db 0
+
+adopt_match_icon:
+    pusha
+    xor bh, bh
+    mov bl, [adopt_one.slot]
+    mov byte [w_icon + bx], 0
+
+    mov word [.i], 0
+.probe:
+    mov ax, [.i]
+    cmp ax, [icon_count]
+    jae .done
+    shl ax, 4
+    mov si, icon_names
+    add si, ax
+    mov di, adopt_name
+.cmp:
+    mov al, [si]
+    cmp al, [di]
+    jne .nomatch
+    test al, al
+    jz .hit
+    inc si
+    inc di
+    jmp .cmp
+.nomatch:
+    inc word [.i]
+    jmp .probe
+.hit:
+    xor bh, bh
+    mov bl, [adopt_one.slot]
+    mov ax, [.i]
+    mov [w_icon + bx], al
+.done:
+    popa
+    ret
+.i dw 0
+
+adopt_name times 16 db 0
