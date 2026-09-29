@@ -45,15 +45,16 @@ COM_EXIT_OPCODE      equ 0xCD
 COM_STACK_TOP        equ 0xFFFE
 COM_ENTRY_OFFSET     equ 0x0100
 
-KERNEL_DATA_SEG      equ 0x2000
-FONT_SEG             equ 0x1000
+KERNEL_DATA_SEG      equ 0x0500
+KERNEL_STACK_SEG     equ 0x0000
+KERNEL_STACK_TOP     equ 0x5000
 
-PROGRAM_LOAD_SEG     equ 0x1000
+PROGRAM_LOAD_SEG     equ 0x2000
 PROGRAM_LOAD_OFF     equ 0x8000
 PROGRAM_THUNK_OFF    equ 0x7FF0
 PROGRAM_PARAMS_OFF   equ 0x7F00
 
-CFG_SCRATCH_SEG      equ FONT_SEG
+CFG_SCRATCH_SEG      equ PROGRAM_LOAD_SEG
 CFG_SCRATCH_OFF      equ 0x1000
 
 KERNEL_WORK_SEG      equ 0x0060
@@ -66,23 +67,47 @@ KERNEL_WORK_END_OFF  equ DISK_BUFFER_OFF + DISK_BUFFER_SIZE  ; 0xFC00
 FS_STAGE_SEG         equ KERNEL_WORK_SEG
 FS_STAGE_OFF         equ 0x3800
 
+FONT_SEG             equ KERNEL_DATA_SEG + (KERNEL_WORK_END_OFF >> 4)
+
 disk_buffer          equ DISK_BUFFER_OFF
 dirlist              equ DIRLIST_OFF
 command_history      equ COMMAND_HISTORY_OFF
-program_seg          equ 0x2FC0
+program_seg          equ FONT_SEG + 0x0100
 
 
 section .text
 
 start:
     cli
-    mov [cs:boot_drive], dl         ; the bootloader leaves it in DL
 
     ; ------ Stack installation ------
-    xor ax, ax
+    mov ax, KERNEL_STACK_SEG
     mov ss, ax
-    mov sp, 0x0FFFF
+    mov sp, KERNEL_STACK_TOP
     ; --------------------------------
+
+    mov ax, cs
+    cmp ax, KERNEL_DATA_SEG
+    je .relocated
+    mov ds, ax
+    mov ax, KERNEL_DATA_SEG
+    mov es, ax
+    xor si, si
+    xor di, di
+    mov cx, section..bss.start
+    cld
+    rep movsb
+    mov cx, kernel_end
+    sub cx, di
+    xor al, al
+    rep stosb
+    jmp KERNEL_DATA_SEG:.relocated
+
+.relocated:
+    mov ax, cs
+    mov ds, ax
+    mov es, ax
+    mov [boot_drive], dl
 
     call set_video_mode        ; Set video mode
     call init_system           ; Init system (segments, timer, api, configs, display, security, start autoexec)
@@ -1015,6 +1040,7 @@ launch_bin_program:
     mov [bin_stack_save], sp
     mov [bin_ss_save], ss
 
+    call install_program_thunk
     call DisableMouse
 
     test si, si

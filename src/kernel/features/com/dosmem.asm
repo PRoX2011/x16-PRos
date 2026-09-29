@@ -2,7 +2,7 @@
 ; x16-PRos - DOS memory arena for the compatibility layer
 ; ==================================================================
 
-DOSMEM_BASE      equ 0x3000
+DOSMEM_BASE      equ program_seg
 DOSMEM_TOP       equ 0xA000
 DOSMEM_ENV_SEG   equ DOSMEM_BASE
 DOSMEM_ENV_PARAS equ 0x0040

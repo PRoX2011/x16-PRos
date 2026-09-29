@@ -22,7 +22,7 @@ init_system:
     ret
 
 init_segments:
-    mov ax, 2000h
+    mov ax, KERNEL_DATA_SEG
     mov ds, ax
     mov es, ax
 

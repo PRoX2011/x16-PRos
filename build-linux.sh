@@ -169,18 +169,18 @@ check_error "FLOPPY2.img formatting failed"
 # ==================================================================
 
 # ==================================================================
-# This section builds the HDD.IMG (5MiB).
+# This section builds the HDD.IMG (10MiB).
 #
 # The geometry matters!!! FAT12 addresses at most 4084 clusters, so a
-# 5 MiB volume needs 4 sectors to a cluster.
+# 10 MiB volume needs 8 sectors to a cluster.
 # Anything dropped into assets/hdd_img ends up on the disk.
 # ==================================================================
 print_splitline "Creating HDD image..."
-print_info "Creating 5 MiB HDD image..."
-dd if=/dev/zero of=disk_img/HDD.img bs=1M count=5 status=none
+print_info "Creating 10 MiB HDD image..."
+dd if=/dev/zero of=disk_img/HDD.img bs=1M count=10 status=none
 check_error "HDD.img creation failed"
 
-mkfs.fat -F 12 -s 4 -r 192 -n "x16-PROS" disk_img/HDD.img >/dev/null
+mkfs.fat -F 12 -s 8 -r 192 -a -n "x16-PROS" disk_img/HDD.img >/dev/null
 check_error "HDD.img formatting failed"
 print_ok "HDD image created successfully"
 

@@ -4,7 +4,7 @@
 ;
 ; Loads 8x16 bitmap fonts (4096 bytes, 256 chars) from FONTS.DIR/.
 ; Hooks INT 43h so BIOS TTY and programs pick up the custom font.
-; Font data lives at FONT_SEG:0000 (physical 0x10000)
+; Font data lives at FONT_SEG:0000 (physical 0x14C00)
 ;
 ; https://wikipedia.org/wiki/CP866
 ; ==================================================================

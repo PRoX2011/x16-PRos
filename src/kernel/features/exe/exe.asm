@@ -3,8 +3,8 @@
 ; Copyright (C) 2025 PRoX2011
 ; ==================================================================
 
-EXE_PSP_SEG         equ 0x3040
-EXE_LOAD_SEG        equ 0x3050
+EXE_PSP_SEG         equ DOSMEM_BASE + DOSMEM_ENV_PARAS
+EXE_LOAD_SEG        equ EXE_PSP_SEG + 0x10
 
 ; MZ header offsets
 MZ_SIGNATURE        equ 0x00

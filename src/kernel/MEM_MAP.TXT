@@ -18,49 +18,17 @@ physical address = segment * 16 + offset
                                      for file transfers. Kept out of
                                      disk_buffer, which holds the FAT while
                                      a file's cluster chain is walked.
-  0000:4000 - 0000:7BFF      15 KiB  Low conventional RAM
-  0000:7C00 - 0000:7DFF      512 B   Boot sector load area
-  0000:7E00 - 0000:FFEF     ~32 KiB  Temporary low RAM
-  0000:FFF0 - 0000:FFFF      16 B    Kernel boot stack top
+  0000:4000 - 0000:4FFF      4 KiB   Kernel stack
+                                     (KERNEL_STACK_SEG:KERNEL_STACK_TOP =
+                                     0000:5000)
 
 
 ================================================================
-  Segment 07C0h  (bootloader)
+  Segment 0500h  (kernel)         KERNEL_DATA_SEG = 0x0500
 ================================================================
 
-  Bootloader code segment (boot.asm)
-
-
-================================================================
-  Segment 1000h  (font + BIN programs)
-================================================================
-
-  Physical: 0x10000 - 0x1FFFF (64 KiB)
-  This segment holds both the cp866 font (low offsets) and BIN
-  programs (high offsets). The two regions never overlap:
-
-  Offset range           Size    Name / Description
-  ---------------------------------------------------------------
-  0000 - 0FFF             4 KiB     cp866 font (8x16 * 256 chars)
-                                    INT 43h vector points here when a
-                                    custom font is loaded.
-  1000 - 7EFF            ~28 KiB    CFG_SCRATCH_OFF: scratch buffer for
-                                    .CFG files
-  7F00 - 7FEF             240 B     PROGRAM_PARAMS_OFF: command-line
-                                    parameters copied by kernel before
-                                    launching a BIN program.
-  7FF0 - 7FF0               1 B     PROGRAM_THUNK_OFF: 1-byte 0xCB
-                                    (retf).
-  8000 - FFFF            32 KiB     PROGRAM_LOAD_OFF: BIN program code,
-                                    data, and stack. Programs run with
-                                    CS = DS = ES = SS = 0x1000.
-
-
-================================================================
-  Segment 2000h  (kernel)         KERNEL_DATA_SEG = 0x2000
-================================================================
-
-  DS = ES = 2000h during normal kernel operation.
+  Physical: 0x05000 - 0x14BFF
+  DS = ES = 0500h during normal kernel operation.
   Buffers have fixed offsets independent of kernel image size.
 
   Offset range           Size    Name / Description
@@ -73,26 +41,66 @@ physical address = segment * 16 + offset
 
 
 ================================================================
-  Segment 2FC0h  (COM programs)   program_seg = 0x2FC0
+  Segment 14C0h  (font)           FONT_SEG = 0x14C0
 ================================================================
 
   Calculated: KERNEL_DATA_SEG + (KERNEL_WORK_END_OFF >> 4)
-            = 0x2000 + 0x0FC0 = 0x2FC0
+            = 0x0500 + 0x0FC0 = 0x14C0
 
-  Offset    Description
-  ---------------------------------------------------------------
-  0000      COM exit stub (INT 20h opcode)
-  0080      Default DTA (Disk Transfer Area)
-  0100      COM entry point (CS:IP after load)
-  FFFE      COM stack top
+  Physical: 0x14C00 - 0x15BFF (4 KiB)
+  cp866 font (8x16 * 256 chars).
 
 
 ================================================================
-  Segment 3000h - A000h  (kernel heap / DOS arena)
+  Segment 15C0h  (DOS arena)      program_seg = DOSMEM_BASE = 0x15C0
+================================================================
+
+  Calculated: FONT_SEG + 0x0100 = 0x15C0
+
+  The MS-DOS compatibility layer owns everything from here up to the
+  top of conventional memory while a COM/EXE program runs.
+
+  Segment          Description
+  ---------------------------------------------------------------
+  15C0             COM program: PSP, entry at 0100h, stack at FFFEh,
+                   64 KiB block; its environment follows at 25C0h
+  15C0             EXE program: environment block (DOSMEM_ENV_PARAS)
+  1600             EXE_PSP_SEG
+  1610             EXE_LOAD_SEG
+
+  EXE programs get 0x9FC0 - 0x1600 = 551 KiB
+
+
+================================================================
+  Segment 2000h  (BIN programs)   PROGRAM_LOAD_SEG = 0x2000
+================================================================
+
+  Physical: 0x20000 - 0x2FFFF (64 KiB, 64 KiB aligned so buffers of
+  BIN programs that call INT 13h directly never cross a DMA boundary)
+
+  Offset range           Size    Name / Description
+  ---------------------------------------------------------------
+  1000 - 7EFF            ~28 KiB    CFG_SCRATCH_OFF: scratch buffer for
+                                    .CFG files
+  7F00 - 7FEF             240 B     PROGRAM_PARAMS_OFF: command-line
+                                    parameters copied by kernel before
+                                    launching a BIN program.
+  7FF0 - 7FF0               1 B     PROGRAM_THUNK_OFF: 1-byte 0xCB
+                                    (retf), rewritten before every BIN
+                                    launch because a DOS program may
+                                    have overwritten it.
+  8000 - FFFF            32 KiB     PROGRAM_LOAD_OFF: BIN program code,
+                                    data, and stack. Programs run with
+                                    CS = DS = ES = SS = 0x2000.
+
+
+================================================================
+  Segment 3000h - A000h  (kernel heap)
 ================================================================
 
   Physical: 0x30000 - 0x9FFFF (~448 KiB)
   HEAP_BASE_SEG = 0x3000, HEAP_END_SEG = 0xA000.
+  PLE programs are loaded here.
 
 ================================================================
   Hardware / reserved

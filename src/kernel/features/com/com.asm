@@ -280,7 +280,7 @@ dos_terminate:
 
     xor ax, ax
     mov es, ax
-    mov ax, 0x2000
+    mov ax, KERNEL_DATA_SEG
     mov ds, ax
 
     mov si, saved_interrupt_table
@@ -294,7 +294,7 @@ dos_terminate:
     pop es
     pop ds
 
-    mov ax, 0x2000
+    mov ax, KERNEL_DATA_SEG
     mov ds, ax
     mov es, ax
 
@@ -346,7 +346,7 @@ api_dos_init:
 
     xor ax, ax
     mov ds, ax
-    mov ax, 0x2000
+    mov ax, KERNEL_DATA_SEG
     mov es, ax
 
     xor si, si
@@ -545,7 +545,7 @@ com_copy_path_from_caller:
 
     mov bx, ds
     mov es, bx
-    mov ax, 0x2000
+    mov ax, KERNEL_DATA_SEG
     mov ds, ax
 
     mov si, dx

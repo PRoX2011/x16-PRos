@@ -98,7 +98,7 @@ chmod +x build-linux.sh
 ```
 
 The build writes `disk_img/x16pros.img` (bootable 1.44 MB image), `disk_img/HDD.img`
-(5 MB hard disk image) and the separate binaries in `bin/`.
+(10 MB hard disk image) and the separate binaries in `bin/`.
 
 > [!NOTE]
 > FOR ADVANSED USERS

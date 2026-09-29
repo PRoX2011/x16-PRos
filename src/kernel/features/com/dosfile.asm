@@ -10,8 +10,6 @@ DOSF_SLOTS       equ 15
 DOSF_FIRST       equ 5
 DOSF_MAXPARAS    equ DOSMEM_TOP - DOSMEM_BASE
 DOSF_NEWPARAS    equ 0x0400
-DOSF_SPARE_SEG   equ 0x1800
-DOSF_SPARE_PARAS equ 0x0800
 
 DF_NAME          equ 0
 DF_SEG           equ 13
@@ -49,8 +47,6 @@ dosfile_init:
     xor al, al
     cld
     rep stosb
-
-    mov byte [dosf_spare_taken], 0
 
     pop es
     pop ds
@@ -434,11 +430,6 @@ dosfile_spill:
     mov ax, [si + DF_SEG]
     test ax, ax
     jz .no_buffer
-    cmp ax, DOSF_SPARE_SEG
-    jne .arena
-    mov byte [dosf_spare_taken], 0
-    jmp .no_buffer
-.arena:
     call dosmem_free
 .no_buffer:
     mov word [si + DF_SEG], 0
@@ -492,17 +483,7 @@ dosfile_materialise:
     jc .fail
     mov bx, ax
     call dosmem_alloc
-    jnc .got
-
-    cmp byte [dosf_spare_taken], 0
-    jne .fail
-    cmp word [si + DF_SIZE + 2], 0
-    jne .fail
-    cmp word [si + DF_SIZE], DOSF_SPARE_PARAS * 16
-    ja .fail
-    mov byte [dosf_spare_taken], 1
-    mov ax, DOSF_SPARE_SEG
-    mov bx, DOSF_SPARE_PARAS
+    jc .fail
 
 .got:
     mov [si + DF_SEG], ax
@@ -909,11 +890,6 @@ dosfile_close_slot:
     mov ax, [si + DF_SEG]
     test ax, ax
     jz .no_buffer
-    cmp ax, DOSF_SPARE_SEG
-    jne .arena_block
-    mov byte [dosf_spare_taken], 0
-    jmp .no_buffer
-.arena_block:
     call dosmem_free
 
 .no_buffer:
@@ -985,6 +961,5 @@ dosf_seek_lo    dw 0
 dosf_seek_hi    dw 0
 dosf_flush_failed db 0
 dosf_access     db 0
-dosf_spare_taken db 0
 
 section .text
