@@ -353,7 +353,7 @@ setup:
     mov si, setup_help_msg6
     int 0x21
 
-    mov dh, 12
+    mov dh, 17
     mov dl, 0
     call string_move_cursor
 
@@ -361,7 +361,7 @@ setup:
     mov si, setup_prompt_prompt
     int 0x21
 
-    mov dh, 14
+    mov dh, 19
     mov dl, 5
     call string_move_cursor
 
@@ -373,12 +373,24 @@ setup:
 
     mov si, 43008
     call string_to_int
+
     cmp ax, 0
     je .prompt_default
     cmp ax, 2
     je .prompt_fancy
     cmp ax, 3
     je .prompt_unix
+    cmp ax, 4
+    je .prompt_cpp
+    cmp ax, 5
+    je .prompt_vmini
+    cmp ax, 6
+    je .prompt_mini
+    cmp ax, 7
+    je .prompt_dos
+    cmp ax, 8
+    je .prompt_debian
+
     jmp .prompt_default
 
 .prompt_default:
@@ -391,6 +403,26 @@ setup:
 
 .prompt_unix:
     mov si, prompt_option3
+    jmp .save_prompt
+
+.prompt_cpp:
+    mov si, prompt_option4
+    jmp .save_prompt
+
+.prompt_vmini:
+    mov si, prompt_option5
+    jmp .save_prompt
+
+.prompt_mini:
+    mov si, prompt_option6
+    jmp .save_prompt
+
+.prompt_dos:
+    mov si, prompt_option7
+    jmp .save_prompt
+
+.prompt_debian:
+    mov si, prompt_option8
     jmp .save_prompt
 
 .save_prompt:
@@ -419,6 +451,18 @@ setup:
 
     mov ah, 0x0A
     int 0x22
+
+    mov dh, 3
+    mov dl, 0
+    call string_move_cursor
+
+    mov ah, 0x01
+    mov si, setup_help_msg_clear
+    int 0x21
+
+    mov dh, 3
+    mov dl, 0
+    call string_move_cursor
 
     ; ========== PROGRAM SELECTION ==========
     mov al, SETUP_STAGE_PROGRAMS
@@ -742,9 +786,14 @@ timezone             db '0', 0
 encrypted_pass       times 32 db 0
 
 ; Prompt options
-prompt_option1       db '[$username@PRos] > ', 0
-prompt_option2       db '%DA%C4%C4 $username%0A%C0%C4 %FE %10 ', 0
-prompt_option3       db '$username@pros:~$ ', 0
+prompt_option1    db '[$username@PRos] > ', 0
+prompt_option2    db '%DA%C4%C4 $username%0A%C0%C4 %FE %10 ', 0
+prompt_option3    db '$username@pros:~$ ', 0
+prompt_option4    db 'pros::$username; ', 0
+prompt_option5    db '%-', 0
+prompt_option6    db '$username> ', 0
+prompt_option7    db 'PRos\\> ', 0
+prompt_option8    db '$username@host:/$ ', 0
 
 ; Theme data - Default
 theme_default_data:

@@ -1,5 +1,8 @@
 setup_welcome_msg     db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos setup', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 10, 13, 0
 
+setup_help_msg_clear  times 20 db 50 dup(0x20), 10, 13
+                      db 0
+
 setup_username_prompt db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, '  Enter your username (max 31 chars):  ', 0xBA, 10, 13
                       db 0xBA, '    _______________________________    ', 0xBA, 10, 13
@@ -21,7 +24,7 @@ setup_theme_prompt    db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 0
 
 setup_prompt_prompt   db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
-                      db 0xBA, '  Select command prompt style (1-3):   ', 0xBA, 10, 13
+                      db 0xBA, '  Select command prompt style (1-8):   ', 0xBA, 10, 13
                       db 0xBA, '    _______________________________    ', 0xBA, 10, 13
                       db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 0
 
@@ -86,6 +89,11 @@ setup_help_msg6       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, '  [2] ', 0xDA, 0xC4, 0xC4, ' user                         ', 0xBA, 10, 13
                       db 0xBA, '      ', 0xC0, 0xC4, ' ', 0xFE, ' ', 0x10,'                           ', 0xBA, 10, 13
                       db 0xBA, '  [3] user@pros:~$                     ', 0xBA, 10, 13
+                      db 0xBA, '  [4] pros::user;                      ', 0xBA, 10, 13
+                      db 0xBA, '  [5] %-                               ', 0xBA, 10, 13
+                      db 0xBA, '  [6] user>                            ', 0xBA, 10, 13
+                      db 0xBA, '  [7] PRos\\>                          ', 0xBA, 10, 13
+                      db 0xBA, '  [8] user@host:/                      ', 0xBA, 10, 13
                       db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 10, 13, 0
 
 setup_help_msg7       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
@@ -98,6 +106,7 @@ setup_help_msg7       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, '  [3] VGA Default (classic 16 colors)  ', 0xBA, 10, 13
                       db 0xBA, '  [4] Ocean Deep (blue aqua theme)     ', 0xBA, 10, 13
                       db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 10, 13, 0
+
 
 setup_help_msg8       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, ' Before you start                      ', 0xBA, 10, 13
