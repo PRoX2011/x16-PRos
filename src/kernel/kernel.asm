@@ -476,13 +476,9 @@ get_cmd:
 
     mov al, [si]
     call fs_change_drive_letter
-    call print_newline
-    mov si, .success_disk_change_msg
-    call print_string_green
-    call print_newline
-    call print_newline
     jnc get_cmd
 
+.bad_drive_letter:
     mov si, bad_drive_msg
     call print_string_red
     call print_newline
