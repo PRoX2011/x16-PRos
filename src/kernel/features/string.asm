@@ -1383,6 +1383,7 @@ string_to_int:
 ;       DI = pointer to destination buffer
 ; OUT : Destination buffer filled with parsed prompt
 ;       Supports: $username (replaced with user variable)
+;                 $path (replaced with current directory)
 ;                 %XX (hex escape codes, e.g., %0A for newline)
 ; =======================================================================
 parse_prompt:
@@ -1398,12 +1399,41 @@ parse_prompt:
     cmp al, 0              
     je .done
     cmp al, '$'        
-    je .check_username
+    je .check_path
     cmp al, '%'             
     je .check_hex
 .store:
     call .store_char
     jc .done
+    jmp .loop
+
+.check_path:
+    ; Check for $path (next 4 bytes: 'p','a','t','h')
+    mov ax, [si]
+    cmp ax, 0x6170           ; 'p' (0x70), 'a' (0x61) -> 0x6170
+    jne .check_username
+    mov ax, [si+2]
+    cmp ax, 0x6874           ; 't' (0x74), 'h' (0x68) -> 0x6874
+    jne .check_username
+    add si, 4
+    push si
+    mov si, current_directory
+
+    mov al, [current_drive_char]
+    call .store_char
+    mov al, ':'
+    call .store_char
+    mov al, '/'
+    call .store_char
+.copy_path:
+    lodsb
+    cmp al, 0
+    je .path_done
+    call .store_char
+    jc .done
+    jmp .copy_path
+.path_done:
+    pop si
     jmp .loop
 
 .check_username:

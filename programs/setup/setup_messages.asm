@@ -82,10 +82,10 @@ setup_help_msg6       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13
                       db 0xBA, '                                       ', 0xBA, 10, 13
                       db 0xBA, 39 dup(0xC4), 0xBA, 10, 13
                       db 0xBA, ' Select a command prompt style:        ', 0xBA, 10, 13
-                      db 0xBA, '  [1] [user@PRos] >                    ', 0xBA, 10, 13
-                      db 0xBA, '  [2] ', 0xDA, 0xC4, 0xC4, ' user                         ', 0xBA, 10, 13
+                      db 0xBA, '  [1] [user@PRos]A:/>                  ', 0xBA, 10, 13
+                      db 0xBA, '  [2] ', 0xDA, 0xC4, 0xC4, ' user A:/                     ', 0xBA, 10, 13
                       db 0xBA, '      ', 0xC0, 0xC4, ' ', 0xFE, ' ', 0x10,'                           ', 0xBA, 10, 13
-                      db 0xBA, '  [3] user@pros:~$                     ', 0xBA, 10, 13
+                      db 0xBA, '  [3] user@pros A:/$                   ', 0xBA, 10, 13
                       db 0xC8, 39 dup(0xCD), 0xBC, 10, 13, 10, 13, 0
 
 setup_help_msg7       db 0xC9, 39 dup(0xCD), 0xBB, 10, 13

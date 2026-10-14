@@ -361,17 +361,9 @@ print_info:
 
 shell:
 get_cmd:
-    ;call refresh_prompt
-    ;mov si, final_prompt
-    ;call print_string
-
-    call print_drive_prefix
-    mov si, current_directory
+    call refresh_prompt
+    mov si, final_prompt
     call print_string
-    mov al, '>'
-    call print_char
-    mov al, ' '
-    call print_char
 
     mov di, input
     mov al, 0

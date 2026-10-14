@@ -24,12 +24,13 @@ x16-PRos uses configuration files stored in `CONF.DIR` (except `SYSTEM.CFG`, whi
 Default fallback prompt:
 
 ```text
-[$username@PRos] >
+[$username@PRos]$path> 
 ```
 
 ### Supported placeholders
 
 - `$username` - value from `USER.CFG`
+- `$path` - current drive and directory, e.g. `A:/DOCS.DIR/EN.DIR`
 - `%XX` - raw byte from a two-digit hex code, e.g. `%0A` (line feed) or `%20` (space).
   An invalid hex sequence is emitted as a literal `%`.
 
