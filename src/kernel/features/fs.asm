@@ -2209,17 +2209,33 @@ fs_read_fat:
     stc
     ret
 
+; ========================================================================
+; FS_WRITE_FAT - Writes the FAT image back to the volume
+; The FAT area keeps several copies of the same table. They have to stay
+; identical, otherwise a file system check reports "FATs differ" and a
+; tool may work with a stale copy. Every copy gets the same image.
+; IN : disk_buffer holding the FAT image
+; OUT: CF = 0 on success, CF = 1 if a write failed
+; ========================================================================
 fs_write_fat:
     push es
     pusha
     push ds
     pop es
-    mov ax, [fs_fat_lba]
     mov bx, disk_buffer
     movzx cx, byte [fs_fat_secs]
+    mov al, [fs_fat_count]
+    test al, al
+    jz .write_failure
+    mov [.copies], al
+    mov ax, [fs_fat_lba]
+.write_copy:
     mov dh, 3
     call fs_sector_run
     jc .write_failure
+    add ax, cx
+    dec byte [.copies]
+    jnz .write_copy
     popa
     pop es
     clc
@@ -2230,6 +2246,8 @@ fs_write_fat:
     pop es
     stc
     ret
+
+.copies db 0
 
 fs_read_root_dir:
     push es
@@ -4161,6 +4179,7 @@ fs_set_floppy_layout:
     mov word [Sides], 2
     mov word [fs_fat_lba], 1
     mov word [fs_fat_secs], 9
+    mov byte [fs_fat_count], 2
     mov word [fs_root_lba], 19
     mov word [fs_root_secs], 14
     mov word [fs_root_ents], 224
@@ -4208,6 +4227,7 @@ fs_layout_from_bpb:
     mov cl, [bx + 16]
     test cl, cl
     jz .bad
+    mov [.nfats], cl
     mul cx
     add ax, [.fat]
     mov [.root], ax
@@ -4251,6 +4271,8 @@ fs_layout_from_bpb:
     mov [fs_fat_lba], ax
     mov ax, [.fatsecs]
     mov [fs_fat_secs], ax
+    mov al, [.nfats]
+    mov [fs_fat_count], al
     mov ax, [.root]
     mov [fs_root_lba], ax
     mov ax, [.rootsecs]
@@ -4280,6 +4302,7 @@ fs_layout_from_bpb:
 .spc      dw 0
 .fat      dw 0
 .fatsecs  dw 0
+.nfats    db 0
 .root     dw 0
 .rootsecs dw 0
 .ents     dw 0

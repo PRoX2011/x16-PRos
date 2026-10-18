@@ -2589,6 +2589,7 @@ SecsPerTrack         dw 18
 
 fs_fat_lba           dw 1
 fs_fat_secs          dw 9
+fs_fat_count         db 2
 fs_root_lba          dw 19
 fs_root_secs         dw 14 
 fs_root_ents         dw 224
