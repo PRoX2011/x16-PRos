@@ -536,6 +536,7 @@ programs_ple_gui=(
     "programs/PLE/src/windowed/hello.asm HELLO.PLE"
     "programs/PLE/src/windowed/calc.asm CALC.PLE"
     "programs/PLE/src/windowed/settings.asm SETTINGS.PLE"
+    "programs/PLE/src/windowed/rmenu.asm RMENU.PLE"
 )
 
 for prog in "${programs_ple_gui[@]}"; do
