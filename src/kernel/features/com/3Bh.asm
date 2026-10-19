@@ -15,6 +15,12 @@ com_3Bh:
     mov ds, ax
     mov es, ax
 
+    mov si, com_path_buffer
+    call dos_path_drive
+    jc .no_drive
+    mov [cs:cd_saved_drive], al
+
+    push si
     mov ax, [current_dir_cluster]
     mov [cd_saved_cluster], ax
     mov si, current_directory
@@ -22,23 +28,8 @@ com_3Bh:
     mov cx, 64
     cld
     rep movsb
+    pop si
 
-    mov si, com_path_buffer
-
-    cmp byte [si + 1], ':'
-    jne .no_drive
-    mov al, [si]
-    cmp al, 'a'
-    jb .letter_ready
-    cmp al, 'z'
-    ja .letter_ready
-    sub al, 'a' - 'A'
-.letter_ready:
-    cmp al, [current_drive_char]
-    jne .fail
-    add si, 2
-
-.no_drive:
     cmp byte [si], '\'
     je .from_root
     cmp byte [si], '/'
@@ -87,6 +78,8 @@ com_3Bh:
     jmp .walk
 
 .done:
+    mov al, [cs:cd_saved_drive]
+    call dos_drive_back
     xor ax, ax
     and word [bp+6], 0xFFFE
     pop es
@@ -109,7 +102,10 @@ com_3Bh:
     mov cx, 64
     cld
     rep movsb
+    mov al, [cs:cd_saved_drive]
+    call dos_drive_back
 
+.no_drive:
     mov ax, 0x0003
     or word [bp+6], 1
     pop es
@@ -125,3 +121,4 @@ com_3Bh:
 cd_component    times 16 db 0
 cd_saved_path   times 64 db 0
 cd_saved_cluster dw 0
+cd_saved_drive  db 0

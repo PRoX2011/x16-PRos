@@ -4,7 +4,7 @@ com_3Dh:
 
     mov [cs:dosf_access], al
     xor al, al
-    call dosfile_open
+    call dosfile_open_handle
     jc .fail
 
     and word [bp+6], 0xFFFE

@@ -1,5 +1,5 @@
 com_0Ch:
-    mov bl, al
+    mov [cs:.func], al
 
 .flush_loop:
     mov ah, 0x01
@@ -10,14 +10,17 @@ com_0Ch:
     jmp .flush_loop
 
 .dispatch:
-    cmp bl, 0x01
+    mov al, [cs:.func]
+    cmp al, 0x01
     je com_01h
-    cmp bl, 0x06
+    cmp al, 0x06
     je com_06h
-    cmp bl, 0x07
+    cmp al, 0x07
     je com_07h
-    cmp bl, 0x08
+    cmp al, 0x08
     je com_08h
-    cmp bl, 0x0A
+    cmp al, 0x0A
     je com_0Ah
     iret
+
+.func db 0

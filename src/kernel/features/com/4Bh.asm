@@ -1,16 +1,17 @@
-EXEC_HEAP_GAP equ 0x2000
-
 com_4Bh:
+    push es
+    push ds
     push bp
+    push di
+    push si
+    push dx
+    push cx
+    push bx
+    push ax
     mov bp, sp
 
     test al, al
     jnz .unsupported
-
-    push ds
-    push es
-    push si
-    push di
 
     mov [cs:com_exec_blk_seg], es
     mov [cs:com_exec_blk_off], bx
@@ -26,83 +27,117 @@ com_4Bh:
     jc .fail
     mov [.name], si
 
-    mov ax, [program_seg_runtime]
-    call dosmem_find
-    jc .fixed_base
-    mov ax, [si + DM_START]
-    add ax, [si + DM_PARAS]
-    jmp short .have_base
-.fixed_base:
-    mov ax, [program_seg_runtime]
-    add ax, 0x1000
-.have_base:
-    mov [dosmem_env_seg], ax
-    add ax, DOSMEM_ENV_PARAS
+    mov ax, si
+    call fs_get_file_size
+    jc .fail
+    add ebx, 15
+    shr ebx, 4
+    add ebx, 0x10
+    cmp ebx, 0xFFFF
+    ja .no_mem
+    mov [.need], bx
+
+    mov bx, DOSMEM_ENV_PARAS
+    call dosmem_alloc
+    jc .no_mem
+    mov [.env], ax
+    mov bx, 0xFFFF
+    call dosmem_alloc
+    cmp bx, [.need]
+    jb .no_mem_env
+    call dosmem_alloc
+    jc .no_mem_env
+
     mov [exe_psp_seg], ax
-    mov [cs:exec_nest_psp], ax
-
-    add ax, 0x10 + EXEC_HEAP_GAP
+    add bx, ax
+    mov [exe_mem_end], bx
+    add ax, 0x10
     mov [exe_load_seg], ax
+    mov ax, [.env]
+    mov [dosmem_env_seg], ax
 
+    mov bx, [exe_psp_seg]
+    call dosmem_set_owner
+    mov ax, bx
+    call dosmem_set_owner
 
-    mov ax, [program_seg_runtime]
+    mov ax, [dos_current_psp]
     mov [exe_parent_psp], ax
-
-    mov [cs:exec_ret_ss], ss
-    mov [cs:exec_ret_sp], sp
-    mov [cs:exec_ret_bp], bp
-    mov byte [cs:exec_nest_active], 1
+    push es
+    mov es, ax
+    mov [es:0x2E], bp
+    mov [es:0x30], ss
+    pop es
 
     mov byte [exe_nested], 1
     mov ax, [.name]
     call exe_execute
 
-    mov byte [cs:exec_nest_active], 0
+    push es
+    mov es, [exe_parent_psp]
+    mov word [es:0x30], 0
+    pop es
     mov byte [exe_nested], 0
+    mov ax, [exe_psp_seg]
+    call dosmem_free
     mov word [exe_psp_seg], EXE_PSP_SEG
     mov word [exe_load_seg], EXE_LOAD_SEG
+    mov word [dosmem_env_seg], DOSMEM_ENV_SEG
+    mov ax, [.env]
+    call dosmem_free
 
 .fail:
-    pop di
-    pop si
-    pop es
-    pop ds
     mov ax, 0x0002
-    or word [bp+6], 1
-    pop bp
-    iret
-
+    jmp .error
+.no_mem_env:
+    mov ax, [.env]
+    call dosmem_free
+.no_mem:
+    mov ax, 0x0008
+    jmp .error
 .unsupported:
     mov ax, 0x0001
-    or word [bp+6], 1
-    pop bp
-    iret
+.error:
+    call exec_restore_dir
+    mov [cs:dos_last_error], ax
+    mov [bp], ax
+    or word [bp + 22], 1
+    jmp dos_frame_iret
 
 .name    dw 0
+.need    dw 0
+.env     dw 0
 
-exec_resume:
-    mov ax, KERNEL_DATA_SEG
-    mov ds, ax
-    mov es, ax
-    mov bp, [cs:exec_ret_bp]
-
-    mov byte [exe_nested], 0
-    mov word [exe_psp_seg], EXE_PSP_SEG
-    mov word [exe_load_seg], EXE_LOAD_SEG
-
-    pop di
+; ==================================================================
+; DOS_FRAME_IRET - leave INT 21h through a DOS register frame
+; IN : SS:SP = AX, BX, CX, DX, SI, DI, BP, DS, ES, IP, CS, FLAGS
+; ==================================================================
+dos_frame_iret:
+    pop ax
+    pop bx
+    pop cx
+    pop dx
     pop si
-    pop es
-    pop ds
-    and word [bp+6], 0xFFFE
+    pop di
     pop bp
+    pop ds
+    pop es
     iret
 
-exec_nest_psp    dw 0
-exec_ret_ss      dw 0
-exec_ret_sp      dw 0
-exec_ret_bp      dw 0
-exec_nest_active db 0
+; ==================================================================
+; EXEC_RESTORE_DIR - return to the caller's directory once a child
+;                    named by a path has been loaded
+; IN : DS = KERNEL_DATA_SEG
+; ==================================================================
+exec_restore_dir:
+    cmp byte [cs:exec_dir_split], 0
+    je .done
+    mov byte [cs:exec_dir_split], 0
+    call path_restore
+.done:
+    ret
+
+exec_dir_split   db 0
 
 com_exec_blk_seg dw 0
 com_exec_blk_off dw 0
@@ -135,17 +170,19 @@ com_exec_tail:
     ret
 
 ; ==================================================================
-; COM_EXEC_PATH - reduce "C:NAME.EXT" to a bare name on the right drive
+; COM_EXEC_PATH - switch to the drive and directory the caller's path
+;                 names and reduce it to a bare file name
 ; IN : com_path_buffer = the caller's path
 ;      DS = KERNEL_DATA_SEG
-; OUT: SI = the bare name
-;      CF = 1 if the drive is unknown or the path names a directory
+; OUT: SI = the bare name, the named directory is current until
+;      exec_restore_dir
+;      CF = 1 if the drive or a directory along the way is unknown
 ; ==================================================================
 com_exec_path:
     mov si, com_path_buffer
 
     cmp byte [si + 1], ':'
-    jne .no_drive
+    jne .split
     mov al, [si]
     cmp al, 'a'
     jb .have_letter
@@ -154,84 +191,18 @@ com_exec_path:
     sub al, 32
 .have_letter:
     cmp al, [current_drive_char]
-    je .same_drive
+    je .split
     call fs_change_drive_letter
     jc .bad
-.same_drive:
-    add si, 2
 
-.no_drive:
-    cmp byte [si], '\'
-    je .skip_root
-    cmp byte [si], '/'
-    jne .check
-.skip_root:
-    inc si
-
-.check:
-    push si
-.scan:
-    lodsb
-    test al, al
-    jz .plain
-    cmp al, '\'
-    je .has_dir
-    cmp al, '/'
-    jne .scan
-.has_dir:
-    pop si
-    jmp .bad
-.plain:
-    pop si
+.split:
+    call path_split
+    jc .bad
+    mov byte [cs:exec_dir_split], 1
     clc
     ret
 .bad:
     stc
     ret
 
-com_exec_args times 128 db 0
-
-com_strip_path:
-    mov si, com_path_buffer
-
-    cmp byte [si + 1], ':'
-    jne .no_drive
-    mov al, [si]
-    cmp al, 'a'
-    jb .have_letter
-    cmp al, 'z'
-    ja .have_letter
-    sub al, 32
-.have_letter:
-    cmp al, [current_drive_char]
-    jne .bad
-    add si, 2
-
-.no_drive:
-    cmp byte [si], '\'
-    je .skip_root
-    cmp byte [si], '/'
-    jne .check
-.skip_root:
-    inc si
-
-.check:
-    push si
-.scan:
-    lodsb
-    test al, al
-    jz .plain
-    cmp al, '\'
-    je .has_dir
-    cmp al, '/'
-    jne .scan
-.has_dir:
-    pop si
-    jmp .bad
-.plain:
-    pop si
-    clc
-    ret
-.bad:
-    stc
-    ret
+com_exec_args db 0

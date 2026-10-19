@@ -1377,7 +1377,7 @@ fs_file_exists:
     push ax
     call string_string_length
     test ax, ax
-    je .fail_ret
+    je .fail_ret_pop
     pop ax
 
     cmp word [current_dir_cluster], 0
@@ -1460,7 +1460,6 @@ fs_file_exists:
 
 .fail_ret_pop:
     pop ax
-.fail_ret:
     stc
     ret
 
@@ -1866,7 +1865,6 @@ fs_rename_file_body:
     ret
 
 .fail_read_sub:
-    pop ax
 .fail_read:
     pop ax
     stc
@@ -2215,11 +2213,15 @@ fs_write_fat:
     push ds
     pop es
     mov ax, [fs_fat_lba]
+.copy:
     mov bx, disk_buffer
     movzx cx, byte [fs_fat_secs]
     mov dh, 3
     call fs_sector_run
     jc .write_failure
+    add ax, cx
+    cmp ax, [fs_root_lba]
+    jb .copy
     popa
     pop es
     clc
@@ -2560,10 +2562,67 @@ fs_create_directory:
     call fs_file_exists
     jnc .failure
 
+    cmp word [current_dir_cluster], 0
+    jne .find_in_subdir
+
+    call fs_read_root_dir
+    jc .failure
+    mov di, disk_buffer
+    mov cx, [fs_root_ents]
+.find_free_entry:
+    mov al, [di]
+    cmp al, 0
+    je .have_entry
+    cmp al, 0E5h
+    je .have_entry
+    add di, 32
+    loop .find_free_entry
+    jmp .failure
+
+.find_in_subdir:
+    mov ax, [current_dir_cluster]
+    call fs_cluster_lba
+    mov [.entry_lba], ax
+.read_parent:
+    mov ax, [.entry_lba]
+    call fs_convert_l2hts
+    mov bx, disk_buffer
+    mov ah, 2
+    mov al, 1
+    stc
+    int 13h
+    jc .failure
+
+    mov di, disk_buffer
+    mov cx, 16
+.find_free_entry_sub:
+    mov al, [di]
+    cmp al, 0
+    je .have_entry
+    cmp al, 0E5h
+    je .have_entry
+    add di, 32
+    loop .find_free_entry_sub
+
+    mov ax, [.entry_lba]
+    call fs_next_dir_sector
+    jc .failure
+    mov [.entry_lba], ax
+    jmp .read_parent
+
+.have_entry:
+    sub di, disk_buffer
+    mov [.entry_off], di
+
     call fs_read_fat
+    jc .failure
     mov bx, 2
 
 .find_free_cluster:
+    mov ax, [fs_total_clus]
+    add ax, 2
+    cmp bx, ax
+    jae .failure
     mov ax, bx
     call fs_fat12_cluster_offset   ; ax = byte offset in FAT, dx = 0 (even) or 1 (odd)
     mov si, disk_buffer
@@ -2673,26 +2732,13 @@ fs_create_directory:
 .blanked:
 
     cmp word [current_dir_cluster], 0
-    jne .create_entry_in_subdir
-
+    jne .reload_parent
     call fs_read_root_dir
-    mov di, disk_buffer
-    mov cx, [fs_root_ents]
+    jc .failure
+    jmp .fill_entry
 
-.find_free_entry:
-    mov al, [di]
-    cmp al, 0
-    je .found_entry
-    cmp al, 0E5h
-    je .found_entry
-    add di, 32
-    loop .find_free_entry
-    jmp .failure
-
-.create_entry_in_subdir:
-    mov ax, [current_dir_cluster]
-    mov [.parent_cluster], ax
-    call fs_cluster_lba
+.reload_parent:
+    mov ax, [.entry_lba]
     call fs_convert_l2hts
     mov bx, disk_buffer
     mov ah, 2
@@ -2701,21 +2747,9 @@ fs_create_directory:
     int 13h
     jc .failure
 
+.fill_entry:
     mov di, disk_buffer
-    mov cx, 16
-
-.find_free_entry_sub:
-    mov al, [di]
-    cmp al, 0
-    je .found_entry_sub
-    cmp al, 0E5h
-    je .found_entry_sub
-    add di, 32
-    loop .find_free_entry_sub
-    jmp .failure
-
-.found_entry_sub:
-.found_entry:
+    add di, [.entry_off]
     mov si, [.dirname_converted]
     mov cx, 11
     rep movsb
@@ -2742,8 +2776,7 @@ fs_create_directory:
     jmp .mkdir_done
 
 .write_entry_sub:
-    mov ax, [.parent_cluster]
-    call fs_cluster_lba
+    mov ax, [.entry_lba]
     call fs_convert_l2hts
     mov bx, disk_buffer
     mov ah, 3
@@ -2767,7 +2800,8 @@ fs_create_directory:
 .dirname_converted  dw 0
 .name_fcb           times 12 db 0
 .cluster            dw 0
-.parent_cluster     dw 0
+.entry_lba          dw 0
+.entry_off          dw 0
 .dir_lba            dw 0
 .dir_left           dw 0
 .dir_name_buffer    times 32 db 0
@@ -3441,6 +3475,12 @@ fs_parent_directory_body:
 
 save_current_dir:
     pusha
+    push ds
+    push es
+    mov ax, KERNEL_DATA_SEG
+    mov ds, ax
+    mov es, ax
+    cld
     mov al, [current_disk]
     mov [saved_disk], al
     mov al, [current_drive_char]
@@ -3457,11 +3497,19 @@ save_current_dir:
     cmp al, 0
     jne .copy_path
 
+    pop es
+    pop ds
     popa
     ret
 
 restore_current_dir:
     pusha
+    push ds
+    push es
+    mov ax, KERNEL_DATA_SEG
+    mov ds, ax
+    mov es, ax
+    cld
     mov al, [saved_disk]
     mov [current_disk], al
     mov al, [saved_drive_char]
@@ -3480,6 +3528,8 @@ restore_current_dir:
     cmp al, 0
     jne .copy_path
 
+    pop es
+    pop ds
     popa
     ret
 
@@ -3552,6 +3602,7 @@ fs_init_drives:
     pusha
     push es
     mov byte [drive_count], 0
+    call fs_boot_disk_check
     mov di, drives_table
 
     ; --- Floppy slots 0x00 and 0x01 ---
@@ -3657,11 +3708,20 @@ fs_init_drives:
     mov al, dl
     cmp al, 0x80
     jae .ad_hdd
+    cmp byte [fs_boot_hdd], 0
+    je .ad_floppy
+    cmp al, [boot_drive]
+    jne .ad_floppy
+    mov al, 'C'                   ; hard disk image booted as a floppy
+    mov dh, 2
+    jmp .ad_store
+.ad_floppy:
     add al, 'A'                   ; 0x00 -> A, 0x01 -> B
     jmp .ad_store
 .ad_hdd:
     sub al, 0x80
     add al, 'C'                   ; 0x80 -> C, 0x81 -> D, ...
+    add al, [fs_boot_hdd]
 .ad_store:
     mov [di], al
     mov [di+1], dl
@@ -3669,6 +3729,105 @@ fs_init_drives:
     add di, 3
     inc byte [drive_count]
 .ad_full:
+    ret
+
+; ========================================================================
+; FS_BOOT_DISK_CHECK - Set fs_boot_hdd when the BIOS hands over a boot disk
+;                      bigger than 2.88 MB as a floppy (USB floppy emulation)
+; ========================================================================
+fs_boot_disk_check:
+    pusha
+    push es
+    mov byte [fs_boot_hdd], 0
+    cmp byte [boot_drive], 0x80
+    jae .done
+    push ds
+    pop es
+    mov si, 3
+.read:
+    mov ax, 0x0201
+    mov cx, 0x0001
+    xor dh, dh
+    mov dl, [boot_drive]
+    mov bx, disk_buffer
+    int 13h
+    jnc .check
+    xor ah, ah
+    mov dl, [boot_drive]
+    int 13h
+    dec si
+    jnz .read
+    jmp .done
+.check:
+    cmp word [disk_buffer + 510], 0xAA55
+    jne .done
+    cmp word [disk_buffer + 0x0B], 512
+    jne .done
+    mov ax, [disk_buffer + 0x13]
+    test ax, ax
+    jnz .count
+    cmp word [disk_buffer + 0x22], 0
+    jne .hdd
+    mov ax, [disk_buffer + 0x20]
+.count:
+    cmp ax, 5760
+    jbe .done
+.hdd:
+    mov byte [fs_boot_hdd], 1
+.done:
+    pop es
+    popa
+    ret
+
+; ========================================================================
+; FS_CURRENT_REMOVABLE - CF = 1 if the current drive is a floppy, 0 if it
+;                        is a hard disk (including one booted as a floppy)
+; ========================================================================
+fs_current_removable:
+    push ax
+    mov al, [current_disk]
+    cmp al, 0x80
+    jae .fixed
+    cmp byte [fs_boot_hdd], 0
+    je .floppy
+    cmp al, [boot_drive]
+    je .fixed
+.floppy:
+    pop ax
+    stc
+    ret
+.fixed:
+    pop ax
+    clc
+    ret
+
+; ========================================================================
+; FS_DRIVE_LETTER_OF - Find the letter given to a BIOS drive
+; IN : AL = BIOS drive number
+; OUT : AL = drive letter, CF = 1 if the drive is not in drives_table
+; ========================================================================
+fs_drive_letter_of:
+    push cx
+    push si
+    mov si, drives_table
+    movzx cx, byte [drive_count]
+.scan:
+    jcxz .none
+    cmp al, [si + 1]
+    je .found
+    add si, 3
+    dec cx
+    jmp .scan
+.found:
+    mov al, [si]
+    pop si
+    pop cx
+    clc
+    ret
+.none:
+    pop si
+    pop cx
+    stc
     ret
 
 ; ========================================================================
@@ -4008,6 +4167,7 @@ drive_dirs times FS_DIR_SLOTS * 66 db 0
 ; ========================================================================
 fs_change_drive_letter:
     pusha
+    push es
     
     cmp al, 'a'
     jb .find_drive
@@ -4074,11 +4234,13 @@ fs_change_drive_letter:
     call fs_reset_floppy
     call fs_update_geometry
 
+    pop es
     popa
     clc
     ret
 
 .not_found:
+    pop es
     popa
     stc
     ret
@@ -4291,6 +4453,7 @@ MAX_HDD      equ 14
 MAX_DRIVES   equ 16
 
 drive_count db 0
+fs_boot_hdd db 0
 drives_table times (MAX_DRIVES * 3) db 0
 
 ; ========================================================================
@@ -4314,7 +4477,7 @@ FST_ENT    equ 28
 FSTF_USED  equ 0x01
 FSTF_DIRTY equ 0x02         ; the file was written and needs its entry updated
 
-FS_STREAM_SECTOR equ disk_buffer + 0x1200
+FS_STREAM_SECTOR equ disk_buffer + 0x1800
 
 ; ==================================================================
 ; fs_stream_sector_of - which sector of a file a byte offset falls in.

@@ -52,23 +52,39 @@ physical address = segment * 16 + offset
 
 
 ================================================================
-  Segment 15C0h  (DOS arena)      program_seg = DOSMEM_BASE = 0x15C0
+  Segment 15C0h  (DOS data)       DOSDATA_SEG = 0x15C0
 ================================================================
 
-  Calculated: FONT_SEG + 0x0100 = 0x15C0
+  Calculated: FONT_SEG + 0x0100 = 0x15C0, DOSDATA_PARAS = 0x0180 (6 KiB)
+
+  Segment          Description
+  ---------------------------------------------------------------
+  15C0             copy of the interrupt vector table, taken when a
+                   COM/EXE program starts and put back when it ends
+  1600             DOSVARS_SEG: List of Lists, NUL/CON/CLOCK headers,
+                   DPBs, CDS, SFT (5 devices + DOSF_SLOTS files) and
+                   the DOS-owned MCB that starts the chain
+
+
+================================================================
+  Segment 1740h  (DOS arena)      DOSMEM_BASE = 0x1740
+================================================================
+
+  Calculated: DOSDATA_SEG + DOSDATA_PARAS = 0x1740, program_seg = 0x1741
 
   The MS-DOS compatibility layer owns everything from here up to the
   top of conventional memory while a COM/EXE program runs.
 
   Segment          Description
   ---------------------------------------------------------------
-  15C0             COM program: PSP, entry at 0100h, stack at FFFEh,
-                   64 KiB block; its environment follows at 25C0h
-  15C0             EXE program: environment block (DOSMEM_ENV_PARAS)
-  1600             EXE_PSP_SEG
-  1610             EXE_LOAD_SEG
+  1740             MCB of the first block
+  1741             COM program: PSP, entry at 0100h, stack at FFFEh,
+                   64 KiB block; its environment follows at 2742h
+  1741             EXE program: environment block (DOSMEM_ENV_PARAS)
+  1782             EXE_PSP_SEG
+  1792             EXE_LOAD_SEG
 
-  EXE programs get 0x9FC0 - 0x1600 = 551 KiB
+  EXE programs get 0x9FC0 - 0x1782 = 545 KiB
 
 
 ================================================================
@@ -95,7 +111,7 @@ physical address = segment * 16 + offset
 
 
 ================================================================
-  Segment 3000h - A000h  (kernel heap)
+  Segment 3000h - 0x9FFFF (kernel heap)
 ================================================================
 
   Physical: 0x30000 - 0x9FFFF (~448 KiB)

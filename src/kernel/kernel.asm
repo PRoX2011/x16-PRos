@@ -68,11 +68,14 @@ FS_STAGE_SEG         equ KERNEL_WORK_SEG
 FS_STAGE_OFF         equ 0x3800
 
 FONT_SEG             equ KERNEL_DATA_SEG + (KERNEL_WORK_END_OFF >> 4)
+DOSDATA_SEG          equ FONT_SEG + 0x0100      ; IVT copy + DOS structures
+DOSDATA_PARAS        equ 0x0180
+DOSVARS_SEG          equ DOSDATA_SEG + 0x0040
 
 disk_buffer          equ DISK_BUFFER_OFF
 dirlist              equ DIRLIST_OFF
 command_history      equ COMMAND_HISTORY_OFF
-program_seg          equ FONT_SEG + 0x0100
+program_seg          equ DOSDATA_SEG + DOSDATA_PARAS + 1
 
 
 section .text
@@ -1090,14 +1093,19 @@ execute_com:
     mov byte [com_active], 1
     mov ax, [program_seg_runtime]
     mov [dos_current_psp], ax
+    mov [dta_segment], ax
+    mov word [dta_offset], 0x0080
     mov [dosmem_prog_base], ax
     mov word [dosmem_prog_paras], 0x1000
-    add ax, 0x1000
+    add ax, 0x1000 + 1
     mov [dosmem_env_seg], ax
 
     mov ax, [dosmem_top_seg]
     mov [exe_mem_top], ax
 
+    mov word [exe_name_ptr], command
+    mov word [exe_parent_psp], 0
+    mov word [exe_tail_seg], 0
     mov ax, [program_seg_runtime]
     mov si, [param_list]
     call exe_build_psp
@@ -2363,7 +2371,7 @@ info db 10, 13
      db '  Support project:  DALink (https://dalink.to/PRoXdev)', 10, 13
      db '  Source code:      GitHub (https://github.com/PRoX2011/x16-PRos)', 10, 13
      db '  License:          MIT', 10, 13
-     db '  OS version:       1.0', 10, 13
+     db '  OS version:       1.1-dev', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.3', 10, 13, 0

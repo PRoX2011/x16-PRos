@@ -36,6 +36,7 @@
 ;                 DI = source offset) returns AX = bytes actually written
 ;         AL=0x03 seek  (BX = handle, DX = position low, CX = position high)
 ;         AL=0x04 close (BX = handle)
+;   0x16: Get system drive letter (returns AL = drive letter)
 ; ==================================================================
 
 [BITS 16]
@@ -140,6 +141,8 @@ int22_handler:
     je .get_current_drive
     cmp al, 0x15
     je .stream
+    cmp al, 0x16
+    je .get_system_drive
     stc
     jmp .done
 
@@ -306,6 +309,12 @@ int22_handler:
 
 .get_current_drive:
     mov al, [current_drive_char]
+    mov bp, sp
+    mov [bp+18], al
+    jmp .done
+
+.get_system_drive:
+    mov al, [sys_drive_char]
     mov bp, sp
     mov [bp+18], al
     jmp .done

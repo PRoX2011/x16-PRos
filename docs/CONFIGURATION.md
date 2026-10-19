@@ -14,6 +14,7 @@ x16-PRos uses configuration files stored in `CONF.DIR` (except `SYSTEM.CFG`, whi
 | `THEME.CFG` | Terminal color palette | 16 lines of `index, r, g, b` |
 | `TIMEZONE.CFG` | Timezone offset | Integer hours from UTC |
 | `FONT.CFG` | Active font filename | Plain text, max 15 chars |
+| `XMS.CFG` | Load the XMS driver at boot | `ON` or `OFF` |
 
 ---
 
@@ -97,6 +98,17 @@ Controls first-boot setup behavior.
 
 - `1` -> run setup flow (`SETUP.BIN`)
 - `0` -> normal boot
+
+---
+
+## XMS.CFG
+
+Controls the XMS extended memory driver (`PLE.DIR/XMS.PLE`).
+
+- `ON` -> the kernel runs `XMS.PLE LOAD` at boot and the driver stays resident
+- `OFF` or a missing file -> the driver is not loaded
+
+`XMS.PLE ON` and `XMS.PLE OFF` write this file themselves.
 
 ---
 

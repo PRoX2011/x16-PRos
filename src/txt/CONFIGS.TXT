@@ -87,6 +87,13 @@ FONT.CFG - Terminal font
 
   Change it with FONT.BIN program or edit the file directly.
 
+XMS.CFG - XMS memory driver
+-------------------------------------------
+  ON  = load the XMS driver at boot
+  OFF = do not load it
+
+  Change it with XMS.PLE ON or XMS.PLE OFF.
+
 FIRST_B.CFG - First boot flag
 -------------------------------------------
   Contains a single digit:

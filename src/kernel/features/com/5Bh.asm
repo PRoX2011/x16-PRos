@@ -4,7 +4,7 @@ com_5Bh:
 
     mov byte [cs:dosf_access], 2
     mov al, 2
-    call dosfile_open
+    call dosfile_open_handle
     jc .fail
 
     and word [bp+6], 0xFFFE

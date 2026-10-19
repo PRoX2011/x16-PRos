@@ -6,7 +6,7 @@
 ;       store whole files, so an open file is held
 ;       in a RAM buffer taken from the DOS arena (see dosmem.asm)
 
-DOSF_SLOTS       equ 15
+DOSF_SLOTS       equ 60
 DOSF_FIRST       equ 5
 DOSF_MAXPARAS    equ DOSMEM_TOP - DOSMEM_BASE
 DOSF_NEWPARAS    equ 0x0400
@@ -23,12 +23,16 @@ DF_POS           equ DF_STREAM + FSS_POS
 DF_FIRST         equ DF_STREAM + FSS_FIRST
 DF_CCLUS         equ DF_STREAM + FSS_CCLUS
 DF_CIDX          equ DF_STREAM + FSS_CIDX
-DF_ENT           equ 36
+DF_REFS          equ 36
+DF_DIR           equ 37
+DF_DRIVE         equ 39
+DF_ENT           equ 40
 
 DFF_USED         equ 0x01
 DFF_DIRTY        equ 0x02
 DFF_BUF          equ 0x04
 DFF_STREAM       equ 0x08
+DFF_NOINHERIT    equ 0x10
 
 ; ==================================================================
 ; dosfile_init - drop every opened handle
@@ -298,7 +302,7 @@ dosfile_grow:
     jnc .in_place
 
     mov bx, [cs:.want]
-    call dosmem_alloc
+    call dosfile_alloc
     jnc .moved
 
     mov ax, [cs:.want]
@@ -401,6 +405,7 @@ dosfile_grow:
 dosfile_spill:
     pusha
     push es
+    call dosfile_swap_dir
 
     mov ax, KERNEL_DATA_SEG
     mov es, ax
@@ -438,12 +443,14 @@ dosfile_spill:
     and byte [si + DF_FLAGS], ~(DFF_BUF | DFF_DIRTY) & 0xFF
     or byte [si + DF_FLAGS], DFF_STREAM
 
+    call dosfile_swap_dir
     pop es
     popa
     clc
     ret
 
 .fail:
+    call dosfile_swap_dir
     pop es
     popa
     stc
@@ -464,6 +471,7 @@ dosfile_materialise:
 
     pusha
     push es
+    call dosfile_swap_dir
 
     mov ax, [si + DF_SIZE]
     mov dx, [si + DF_SIZE + 2]
@@ -474,7 +482,7 @@ dosfile_materialise:
     jae .alloc
     mov bx, DOSF_NEWPARAS
 .alloc:
-    call dosmem_alloc
+    call dosfile_alloc
     jnc .got
 
     mov ax, [si + DF_SIZE]
@@ -482,7 +490,7 @@ dosfile_materialise:
     call dosfile_paras_for
     jc .fail
     mov bx, ax
-    call dosmem_alloc
+    call dosfile_alloc
     jc .fail
 
 .got:
@@ -512,12 +520,14 @@ dosfile_materialise:
 .filled:
     or byte [si + DF_FLAGS], DFF_BUF
 
+    call dosfile_swap_dir
     pop es
     popa
     clc
     ret
 
 .fail:
+    call dosfile_swap_dir
     pop es
     popa
     stc
@@ -546,6 +556,13 @@ path_split:
     push di
     push es
 
+    mov si, com_path_buffer
+    call dos_path_drive
+    jc .no_drive
+    mov [cs:path_saved_drive], al
+    mov byte [cs:path_active], 1
+
+    push si
     mov ax, [current_dir_cluster]
     mov [cs:path_saved_cluster], ax
     push ds
@@ -555,23 +572,8 @@ path_split:
     mov cx, 64
     cld
     rep movsb
+    pop si
 
-    mov si, com_path_buffer
-
-    cmp byte [si + 1], ':'
-    jne .no_drive
-    mov al, [si]
-    cmp al, 'a'
-    jb .letter_ready
-    cmp al, 'z'
-    ja .letter_ready
-    sub al, 'a' - 'A'
-.letter_ready:
-    cmp al, [current_drive_char]
-    jne .fail
-    add si, 2
-
-.no_drive:
     cmp byte [si], '\'
     je .from_root
     cmp byte [si], '/'
@@ -620,6 +622,7 @@ path_split:
 
 .fail:
     call path_restore
+.no_drive:
     pop es
     pop di
     pop cx
@@ -629,6 +632,10 @@ path_split:
     ret
 
 path_restore:
+    pushf
+    cmp byte [cs:path_active], 0
+    je .done
+    mov byte [cs:path_active], 0
     push ax
     push cx
     push si
@@ -643,15 +650,171 @@ path_restore:
     mov cx, 64
     cld
     rep movsb
+    mov al, [cs:path_saved_drive]
+    call dos_drive_back
     pop es
     pop di
     pop si
     pop cx
     pop ax
+.done:
+    popf
     ret
 
 path_saved_cluster dw 0
+path_saved_drive   db 0
+path_active        db 0
 path_saved_path    times 64 db 0
+
+; ==================================================================
+; dos_file_name_ok - check that the name path_split left names a file
+; IN : SI = name
+;      DS = KERNEL_DATA_SEG
+; OUT: CF = 1, AX = 3 if the name is empty, 5 if it is a directory
+; ==================================================================
+dos_file_name_ok:
+    mov ax, 0x0003
+    cmp byte [si], 0
+    je .bad
+    mov ax, si
+    call fs_is_directory
+    mov ax, 0x0005
+    jnc .bad
+    clc
+    ret
+.bad:
+    stc
+    ret
+
+; ==================================================================
+; dos_path_drive - make the drive a path starts with current
+; IN : SI = path in a kernel buffer
+;      DS = KERNEL_DATA_SEG
+; OUT: SI = the path after "X:"
+;      AL = the drive to go back to with dos_drive_back
+;      CF = 1 if there is no such drive
+; ==================================================================
+dos_path_drive:
+    xor al, al
+    cmp byte [si + 1], ':'
+    jne dos_drive_select
+    mov al, [si]
+    add si, 2
+    cmp al, 'a'
+    jb dos_drive_select
+    cmp al, 'z'
+    ja dos_drive_select
+    sub al, 'a' - 'A'
+
+; ==================================================================
+; dos_drive_select - make a drive current for the length of a call
+; IN : AL = drive letter, 0 for the current drive
+; OUT: AL = the drive to go back to with dos_drive_back, 0 if none
+;      CF = 1 if there is no such drive
+; ==================================================================
+dos_drive_select:
+    push bx
+    push ds
+    mov bx, KERNEL_DATA_SEG
+    mov ds, bx
+    mov bl, [current_drive_char]
+    test al, al
+    jz .same
+    cmp al, bl
+    je .same
+    call fs_change_drive_letter
+    jc .missing
+    mov al, bl
+    jmp .done
+.same:
+    xor al, al
+.done:
+    pop ds
+    pop bx
+    ret
+.missing:
+    xor al, al
+    stc
+    jmp .done
+
+; ==================================================================
+; dos_drive_back - return to the drive dos_drive_select left; flags
+;                  are kept
+; IN : AL = what dos_drive_select returned
+; ==================================================================
+dos_drive_back:
+    pushf
+    test al, al
+    jz .done
+    push ds
+    push bx
+    mov bx, KERNEL_DATA_SEG
+    mov ds, bx
+    call fs_change_drive_letter
+    pop bx
+    pop ds
+.done:
+    popf
+    ret
+
+; ==================================================================
+; dosfile_drive_of - the drive a system file lives on
+; IN : BX = system file number
+; OUT: AL = drive letter, 0 for a device
+; ==================================================================
+dosfile_drive_of:
+    push si
+    push ds
+    mov si, KERNEL_DATA_SEG
+    mov ds, si
+    call dosfile_slot
+    mov al, 0
+    jc .done
+    mov al, [si + DF_DRIVE]
+.done:
+    pop ds
+    pop si
+    ret
+
+; ==================================================================
+; dos_exact_dirname - make the kernel's directory calls take a name as
+;                     it is: no .DIR is added and a short extension is
+;                     padded to three characters
+; IN : SI = ASCIIZ name in a kernel buffer with room for 4 more bytes
+; ==================================================================
+dos_exact_dirname:
+    push ax
+    push cx
+    push di
+    mov di, si
+.find:
+    mov al, [di]
+    test al, al
+    jz .no_dot
+    inc di
+    cmp al, '.'
+    jne .find
+    mov cx, 3
+.ext:
+    cmp byte [di], 0
+    je .pad
+    inc di
+    loop .ext
+    jmp .done
+.no_dot:
+    mov byte [di], '.'
+    inc di
+    mov cx, 3
+.pad:
+    mov byte [di], ' '
+    inc di
+    loop .pad
+    mov byte [di], 0
+.done:
+    pop di
+    pop cx
+    pop ax
+    ret
 
 ; ==================================================================
 ; dosfile_open - shared body of AH=3Dh and AH=3Ch.
@@ -679,6 +842,8 @@ dosfile_open:
 
     call path_split
     jc .not_found
+    call dos_file_name_ok
+    jc .bad_name
     mov [.name], si
 
     call dosfile_free_slot
@@ -732,6 +897,10 @@ dosfile_open:
 .finish:
     mov si, [.slot]
     call dosfile_store_name
+    mov ax, [current_dir_cluster]
+    mov [si + DF_DIR], ax
+    mov al, [current_drive_char]
+    mov [si + DF_DRIVE], al
 
     mov ax, [.buf_seg]
     mov [si + DF_SEG], ax
@@ -753,12 +922,14 @@ dosfile_open:
     mov [si + DF_DATE], ax
 
     mov al, [.newflags]
+    test byte [cs:dosf_access], 0x80
+    jz .inheritable
+    or al, DFF_NOINHERIT
+.inheritable:
     mov [si + DF_FLAGS], al
+    mov byte [si + DF_REFS], 1
 
-    cmp byte [cs:dosfile_nobuf], 0
-    jne .leave_on_volume
     call dosfile_materialise
-.leave_on_volume:
     call dosvars_sync_sft
     call path_restore
 
@@ -768,6 +939,9 @@ dosfile_open:
 .too_many:
     call path_restore
     mov ax, 0x0004                  ; too many open files
+    jmp .err
+.bad_name:
+    call path_restore
     jmp .err
 .not_found:
     call path_restore
@@ -812,21 +986,6 @@ dosfile_open:
 .buf_paras  dw 0
 
 ; ==================================================================
-; dosfile_open_stream - open a file and leave it on the volume
-; IN : DS:DX = path
-; OUT: AX = handle
-;      CF = 1 on failure (AX = DOS error code)
-; ==================================================================
-dosfile_open_stream:
-    mov byte [cs:dosfile_nobuf], 1
-    xor al, al
-    call dosfile_open
-    mov byte [cs:dosfile_nobuf], 0
-    ret
-
-dosfile_nobuf db 0
-
-; ==================================================================
 ; dosfile_close_slot - flush a dirty buffer back to disk and release it.
 ; IN : SI = slot
 ;      DS = KERNEL_DATA_SEG
@@ -836,9 +995,13 @@ dosfile_close_slot:
     mov byte [cs:dosf_flush_failed], 0
     pusha
     push es
+    mov al, [si + DF_DRIVE]
+    call dos_drive_select
+    push ax
 
     mov ax, KERNEL_DATA_SEG
     mov es, ax
+    call dosfile_swap_dir
 
     test byte [si + DF_FLAGS], DFF_DIRTY
     jz .no_flush
@@ -867,9 +1030,6 @@ dosfile_close_slot:
     jmp .no_flush
 
 .not_streamed:
-    test byte [si + DF_FLAGS], DFF_DIRTY
-    jz .no_flush
-
     push si
     mov di, com_path_buffer
     mov cx, 13
@@ -887,6 +1047,7 @@ dosfile_close_slot:
     mov byte [cs:dosf_flush_failed], 1
 
 .no_flush:
+    call dosfile_swap_dir
     mov ax, [si + DF_SEG]
     test ax, ax
     jz .no_buffer
@@ -897,6 +1058,8 @@ dosfile_close_slot:
     mov word [si + DF_SEG], 0
     mov word [si + DF_PARAS], 0
 
+    pop ax
+    call dos_drive_back
     pop es
     popa
 
@@ -929,6 +1092,279 @@ dosfile_close_all:
     add si, DF_ENT
     loop .scan
 
+    pop ds
+    popa
+    ret
+
+; ==================================================================
+; dosfile_swap_dir - swap the current directory with the one the
+;                    slot's file lives in; a second call swaps back.
+; IN : SI = slot
+;      DS = KERNEL_DATA_SEG
+; ==================================================================
+dosfile_swap_dir:
+    push ax
+    mov ax, [si + DF_DIR]
+    xchg ax, [current_dir_cluster]
+    mov [si + DF_DIR], ax
+    pop ax
+    ret
+
+; ==================================================================
+; dosfile_alloc - dosmem_alloc for a file buffer. The system owns it,
+;                 so it outlives the process that opened the file.
+; ==================================================================
+dosfile_alloc:
+    call dosmem_alloc
+    jc .done
+    push bx
+    mov bx, 0x0008
+    call dosmem_set_owner
+    pop bx
+.done:
+    ret
+
+; ==================================================================
+; dosfile_addref - count one more handle on a system file.
+; IN : AL = system file number
+; ==================================================================
+dosfile_addref:
+    push bx
+    push si
+    push ds
+    mov bx, KERNEL_DATA_SEG
+    mov ds, bx
+    mov bl, al
+    mov bh, 0
+    call dosfile_slot
+    jc .done
+    inc byte [si + DF_REFS]
+.done:
+    pop ds
+    pop si
+    pop bx
+    ret
+
+; ==================================================================
+; dosfile_inherit_ref - count a handle a new process inherits.
+; IN : AL = system file number
+; OUT: AL = 0xFF if the file was opened as not inheritable
+; ==================================================================
+dosfile_inherit_ref:
+    push bx
+    push si
+    push ds
+    mov bx, KERNEL_DATA_SEG
+    mov ds, bx
+    mov bl, al
+    mov bh, 0
+    call dosfile_slot
+    jc .done
+    test byte [si + DF_FLAGS], DFF_NOINHERIT
+    jz .count
+    mov al, 0xFF
+    jmp .done
+.count:
+    inc byte [si + DF_REFS]
+.done:
+    pop ds
+    pop si
+    pop bx
+    ret
+
+; ==================================================================
+; dosfile_release - drop one handle on a system file, closing the
+;                   file with the last one.
+; IN : AL = system file number
+; OUT: CF = 1 if the file could not be written back
+; ==================================================================
+dosfile_release:
+    push bx
+    push si
+    push ds
+    mov bx, KERNEL_DATA_SEG
+    mov ds, bx
+    mov bl, al
+    mov bh, 0
+    call dosfile_slot
+    jc .kept
+    cmp byte [si + DF_REFS], 1
+    jbe .close
+    dec byte [si + DF_REFS]
+    clc
+    jmp .sync
+.close:
+    call dosfile_close_slot
+.sync:
+    pushf
+    call dosvars_sync_sft
+    popf
+    jmp .done
+.kept:
+    clc
+.done:
+    pop ds
+    pop si
+    pop bx
+    ret
+
+; ==================================================================
+; dosfile_jft_entry - find a handle in the current process's table.
+; IN : BX = handle
+; OUT: ES:DI = its entry
+;      CF = 1 if BX is past the end of the table
+; ==================================================================
+dosfile_jft_entry:
+    push ds
+    mov ds, [cs:dos_current_psp]
+    cmp bx, [0x32]
+    cmc
+    jc .done
+    les di, [0x34]
+    lea di, [bx + di]
+.done:
+    pop ds
+    ret
+
+; ==================================================================
+; dosfile_handle - map a handle of the current process to its
+;                  system file number.
+; IN : BX = handle
+; OUT: BX = system file number
+;      CF = 1 if the handle is not open
+; ==================================================================
+dosfile_handle:
+    push di
+    push es
+    call dosfile_jft_entry
+    jc .done
+    mov bl, [es:di]
+    mov bh, 0
+    cmp bl, 0xFF
+    cmc
+.done:
+    pop es
+    pop di
+    ret
+
+; ==================================================================
+; dosfile_jft_alloc - give a system file a free handle in the current
+;                     process.
+; IN : AL = system file number
+; OUT: AX = handle
+;      CF = 1 if the table is full (AX unchanged)
+; ==================================================================
+dosfile_jft_alloc:
+    push bx
+    push cx
+    push di
+    push es
+    push ds
+    mov ds, [cs:dos_current_psp]
+    mov cx, [0x32]
+    les di, [0x34]
+    pop ds
+    mov bx, di
+    push ax
+    mov al, 0xFF
+    cld
+    jcxz .full
+    repne scasb
+    jne .full
+    pop ax
+    dec di
+    mov [es:di], al
+    xchg ax, di
+    sub ax, bx
+    jmp .done
+.full:
+    pop ax
+    stc
+.done:
+    pop es
+    pop di
+    pop cx
+    pop bx
+    ret
+
+; ==================================================================
+; dosfile_open_handle - dosfile_open that also gives the file a
+;                       handle in the current process.
+; ==================================================================
+dosfile_open_handle:
+    call dosfile_open
+    jc .done
+    call dosfile_jft_alloc
+    jnc .done
+    call dosfile_release
+    mov ax, 0x0004
+    stc
+.done:
+    ret
+
+; ==================================================================
+; dosfile_close_psp - close every handle a process still holds.
+; IN : AX = PSP
+; ==================================================================
+dosfile_close_psp:
+    pusha
+    push ds
+    push es
+    mov ds, ax
+    mov cx, [0x32]
+    les di, [0x34]
+    jcxz .done
+.next:
+    mov al, 0xFF
+    xchg al, [es:di]
+    call dosfile_release
+    inc di
+    loop .next
+.done:
+    pop es
+    pop ds
+    popa
+    ret
+
+; ==================================================================
+; dosfile_inherit - fill the handle table of a new PSP.
+; IN : ES = new PSP
+;      AX = PSP to copy the handles from, 0 for the standard devices
+; ==================================================================
+dosfile_inherit:
+    pusha
+    push ds
+    cld
+    mov di, 0x18
+    test ax, ax
+    jz .devices
+    mov ds, ax
+    mov cx, [0x32]
+    lds si, [0x34]
+    cmp cx, 20
+    jbe .copy_n
+    mov cx, 20
+.copy_n:
+    jcxz .pad
+.copy:
+    lodsb
+    call dosfile_inherit_ref
+    stosb
+    loop .copy
+    jmp .pad
+.devices:
+    stosb
+    inc ax
+    cmp al, DOSF_FIRST
+    jb .devices
+.pad:
+    mov cx, 0x18 + 20
+    sub cx, di
+    mov al, 0xFF
+    rep stosb
+    mov word [es:0x32], 20
+    mov word [es:0x34], 0x18
+    mov [es:0x36], es
     pop ds
     popa
     ret

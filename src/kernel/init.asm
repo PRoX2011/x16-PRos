@@ -18,6 +18,7 @@ init_system:
     call init_configs
     call init_display
     call init_security
+    call init_modules
     call init_autoexec
     ret
 
@@ -39,17 +40,12 @@ init_disks:
     call fs_init_drives
 
     mov al, [boot_drive]
-    cmp al, 0x80
-    jb .boot_floppy
-    sub al, 0x80
-    add al, 'C'
-    jmp .boot_select
-.boot_floppy:
-    add al, 'A'
-.boot_select:
+    call fs_drive_letter_of
+    jc .boot_fallback
     mov [sys_drive_char], al
     call fs_change_drive_letter
     jnc .boot_ready
+.boot_fallback:
     mov al, 'A'
     mov [sys_drive_char], al
     call fs_change_drive_letter
@@ -143,6 +139,37 @@ init_security:
     mov si, security_init_msg
     call log_okay
 
+    ret
+
+init_modules:
+    call load_xms_cfg
+    jc .skip
+
+    call save_current_dir
+    mov byte [current_directory], 0
+    mov word [current_dir_cluster], 0
+    mov ax, ple_dir_name
+    call fs_change_directory
+    jc .fail
+    mov ax, xms_ple_file
+    call ple_load
+    jc .fail
+    call restore_current_dir
+
+    mov word [ple_param_ptr], xms_load_arg
+    xor bl, bl
+    call ple_run_loaded
+    mov word [ple_param_ptr], ple_no_params
+
+    mov si, xms_load_msg
+    call log_okay
+    ret
+
+.fail:
+    call restore_current_dir
+    mov si, xms_load_msg
+    call log_error
+.skip:
     ret
 
 init_autoexec:
@@ -985,6 +1012,40 @@ load_prompt_cfg:
     stc
     ret
 
+load_xms_cfg:
+    pusha
+    mov ax, conf_dir_name
+    call fs_change_directory
+    jc .fail
+
+    mov ax, xms_cfg_file
+    mov cx, CFG_SCRATCH_OFF
+    mov dx, CFG_SCRATCH_SEG
+    call fs_load_huge_file
+    pushf
+    push ax
+    call fs_parent_directory
+    pop ax
+    popf
+    jc .fail
+    cmp ax, 2
+    jb .fail
+
+    push ds
+    mov bx, CFG_SCRATCH_SEG
+    mov ds, bx
+    cmp word [CFG_SCRATCH_OFF], 'ON'
+    pop ds
+    jne .fail
+    popa
+    clc
+    ret
+
+.fail:
+    popa
+    stc
+    ret
+
 ; Load PASSWORD.CFG
 load_password_cfg:
     pusha
@@ -1035,6 +1096,7 @@ display_init_msg         db 'Display initialization', 0
 mouse_init_msg           db 'Mouse driver loaded', 0
 security_init_msg        db 'Security check', 0
 shell_init_msg           db 'Shell initialization', 0
+xms_load_msg             db 'XMS driver (PLE.DIR/XMS.PLE)', 0
 
 ; Boot process messages
 first_boot_detected_msg  db 'First boot detected', 0
@@ -1058,3 +1120,7 @@ logo_missed              db 'LOGO.BMP not found', 0
 user_cfg_size            dw 0
 prompt_cfg_size          dw 0
 password_cfg_size        dw 0
+
+xms_cfg_file             db 'XMS.CFG', 0
+xms_ple_file             db 'XMS.PLE', 0
+xms_load_arg             db 'LOAD', 0

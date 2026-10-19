@@ -27,6 +27,14 @@ find_resolve_dir:
     push dx
     push di
 
+    mov si, com_path_buffer
+    call dos_path_drive
+    jc .no_drive
+    mov [cs:find_back_drive], al
+    mov al, [current_drive_char]
+    mov [cs:find_drive], al
+
+    push si
     mov ax, [current_dir_cluster]
     mov [cs:find_saved_cluster], ax
     push ds
@@ -36,22 +44,8 @@ find_resolve_dir:
     mov cx, 64
     cld
     rep movsb
+    pop si
 
-    mov si, com_path_buffer
-
-    cmp byte [si + 1], ':'
-    jne .no_drive
-    mov al, [si]
-    cmp al, 'a'
-    jb .letter_ready
-    cmp al, 'z'
-    ja .letter_ready
-    sub al, 'a' - 'A'
-.letter_ready:
-    cmp al, [current_drive_char]
-    jne .fail
-    add si, 2
-.no_drive:
     cmp byte [si], '\'
     je .from_root
     cmp byte [si], '/'
@@ -101,6 +95,8 @@ find_resolve_dir:
     cld
     rep movsb
     pop si
+    mov al, [cs:find_back_drive]
+    call dos_drive_back
 
     pop di
     pop dx
@@ -112,6 +108,9 @@ find_resolve_dir:
 
 .fail:
     call .restore_only
+    mov al, [cs:find_back_drive]
+    call dos_drive_back
+.no_drive:
     pop di
     pop dx
     pop cx
@@ -135,6 +134,8 @@ find_resolve_dir:
     ret
 
 find_dir_cluster    dw 0
+find_drive          db 0
+find_back_drive     db 0
 find_saved_cluster  dw 0
 find_saved_path     times 64 db 0
 
@@ -288,6 +289,15 @@ find_make_template:
 ;      CF = 1 when none is left
 ; ==================================================================
 find_step:
+    push ax
+    mov al, [cs:find_drive]
+    call dos_drive_select
+    call find_step_here
+    call dos_drive_back
+    pop ax
+    ret
+
+find_step_here:
     push ax
     push bx
     push cx

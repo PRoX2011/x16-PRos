@@ -357,6 +357,9 @@ print_ok "THEME.CFG copied successfully"
 mcopy -i disk_img/x16pros.img src/kernel/configs/FONT.CFG ::/CONF.DIR/
 check_error "FONT.CFG copy failed"
 print_ok "FONT.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/XMS.CFG ::/CONF.DIR/
+check_error "XMS.CFG copy failed"
+print_ok "XMS.CFG copied successfully"
 mcopy -i disk_img/x16pros.img src/kernel/configs/gui/IC_ROUND.CFG ::/CONF.DIR/GUI.DIR/
 check_error "IC_ROUND.CFG copy failed"
 print_ok "IC_ROUND.CFG copied successfully"
@@ -510,6 +513,7 @@ programs_ple=(
     "programs/PLE/src/hello.asm HELLO.PLE"
     "programs/PLE/src/clock.asm CLOCK.PLE"
     "programs/PLE/src/gui/gui.asm GUI.PLE"
+    "programs/PLE/src/xms.asm XMS.PLE"
 )
 
 for prog in "${programs_ple[@]}"; do

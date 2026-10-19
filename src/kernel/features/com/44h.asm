@@ -17,6 +17,8 @@ com_44h:
     je .handle_local
     cmp al, 0x0B
     je .leave_ok
+    cmp al, 0x0D
+    je .generic
     cmp al, 0x0E
     je .logical
     jmp .unsupported
@@ -79,12 +81,70 @@ com_44h:
 
 .unsupported:
     mov ax, 0x0001
+.fail:
     or word [bp+6], 1
     pop ds
     pop cx
     pop bx
     pop bp
     iret
+
+.generic:
+    cmp cx, 0x0860
+    jne .unsupported
+    push es
+    push si
+    push di
+    push dx
+    mov di, dx
+    push ds
+    pop es
+    mov ax, KERNEL_DATA_SEG
+    mov ds, ax
+    call save_current_dir
+    mov al, bl
+    add al, 'A' - 1
+    test bl, bl
+    jnz .have_drive
+    mov al, [current_drive_char]
+.have_drive:
+    call fs_change_drive_letter
+    jc .no_drive
+
+    mov word [es:di + 1], 0x0007
+    mov byte [es:di + 3], 0
+    call fs_current_removable
+    jc .removable_disk
+    mov word [es:di + 1], 0x0105
+.removable_disk:
+    mov ax, [SecsPerTrack]
+    mul word [Sides]
+    xchg ax, cx
+    mov ax, [disk_buffer + 0x13]
+    xor dx, dx
+    div cx
+    mov [es:di + 4], ax
+    mov byte [es:di + 6], 0
+    add di, 7
+    mov si, disk_buffer + 0x0B
+    mov cx, 31
+    cld
+    rep movsb
+    call restore_current_dir
+    pop dx
+    pop di
+    pop si
+    pop es
+    jmp .leave_ok
+
+.no_drive:
+    call restore_current_dir
+    pop dx
+    pop di
+    pop si
+    pop es
+    mov ax, 0x000F
+    jmp .fail
 
 .current_drive:
     push ds
