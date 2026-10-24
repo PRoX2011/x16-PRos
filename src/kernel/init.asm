@@ -40,12 +40,17 @@ init_disks:
     call fs_init_drives
 
     mov al, [boot_drive]
-    call fs_drive_letter_of
-    jc .boot_fallback
+    cmp al, 0x80
+    jb .boot_floppy
+    sub al, 0x80
+    add al, 'C'
+    jmp .boot_select
+.boot_floppy:
+    add al, 'A'
+.boot_select:
     mov [sys_drive_char], al
     call fs_change_drive_letter
     jnc .boot_ready
-.boot_fallback:
     mov al, 'A'
     mov [sys_drive_char], al
     call fs_change_drive_letter

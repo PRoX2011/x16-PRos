@@ -317,6 +317,10 @@ fs_load_huge_file:
     push es
     push ds
 
+    mov bx, [fs_huge_max_secs]
+    mov [.huge_max], bx
+    mov word [fs_huge_max_secs], 0
+
     mov [.huge_offset], cx
     mov [.huge_segment], dx
 
@@ -453,6 +457,13 @@ fs_load_huge_file:
     shl dx, cl
     or ax, dx
     mov [.huge_secs_left], ax
+    mov ax, [.huge_max]
+    test ax, ax
+    jz .no_cap
+    cmp ax, [.huge_secs_left]
+    jae .no_cap
+    mov [.huge_secs_left], ax
+.no_cap:
 
     call fs_read_fat
 
@@ -654,6 +665,7 @@ fs_load_huge_file:
     ret
 
 .huge_filename       dw 0
+.huge_max            dw 0
 .huge_segment        dw 0
 .huge_offset         dw 0
 .huge_filesize_low   dw 0
@@ -3602,7 +3614,6 @@ fs_init_drives:
     pusha
     push es
     mov byte [drive_count], 0
-    call fs_boot_disk_check
     mov di, drives_table
 
     ; --- Floppy slots 0x00 and 0x01 ---
@@ -3708,20 +3719,11 @@ fs_init_drives:
     mov al, dl
     cmp al, 0x80
     jae .ad_hdd
-    cmp byte [fs_boot_hdd], 0
-    je .ad_floppy
-    cmp al, [boot_drive]
-    jne .ad_floppy
-    mov al, 'C'                   ; hard disk image booted as a floppy
-    mov dh, 2
-    jmp .ad_store
-.ad_floppy:
     add al, 'A'                   ; 0x00 -> A, 0x01 -> B
     jmp .ad_store
 .ad_hdd:
     sub al, 0x80
     add al, 'C'                   ; 0x80 -> C, 0x81 -> D, ...
-    add al, [fs_boot_hdd]
 .ad_store:
     mov [di], al
     mov [di+1], dl
@@ -3729,105 +3731,6 @@ fs_init_drives:
     add di, 3
     inc byte [drive_count]
 .ad_full:
-    ret
-
-; ========================================================================
-; FS_BOOT_DISK_CHECK - Set fs_boot_hdd when the BIOS hands over a boot disk
-;                      bigger than 2.88 MB as a floppy (USB floppy emulation)
-; ========================================================================
-fs_boot_disk_check:
-    pusha
-    push es
-    mov byte [fs_boot_hdd], 0
-    cmp byte [boot_drive], 0x80
-    jae .done
-    push ds
-    pop es
-    mov si, 3
-.read:
-    mov ax, 0x0201
-    mov cx, 0x0001
-    xor dh, dh
-    mov dl, [boot_drive]
-    mov bx, disk_buffer
-    int 13h
-    jnc .check
-    xor ah, ah
-    mov dl, [boot_drive]
-    int 13h
-    dec si
-    jnz .read
-    jmp .done
-.check:
-    cmp word [disk_buffer + 510], 0xAA55
-    jne .done
-    cmp word [disk_buffer + 0x0B], 512
-    jne .done
-    mov ax, [disk_buffer + 0x13]
-    test ax, ax
-    jnz .count
-    cmp word [disk_buffer + 0x22], 0
-    jne .hdd
-    mov ax, [disk_buffer + 0x20]
-.count:
-    cmp ax, 5760
-    jbe .done
-.hdd:
-    mov byte [fs_boot_hdd], 1
-.done:
-    pop es
-    popa
-    ret
-
-; ========================================================================
-; FS_CURRENT_REMOVABLE - CF = 1 if the current drive is a floppy, 0 if it
-;                        is a hard disk (including one booted as a floppy)
-; ========================================================================
-fs_current_removable:
-    push ax
-    mov al, [current_disk]
-    cmp al, 0x80
-    jae .fixed
-    cmp byte [fs_boot_hdd], 0
-    je .floppy
-    cmp al, [boot_drive]
-    je .fixed
-.floppy:
-    pop ax
-    stc
-    ret
-.fixed:
-    pop ax
-    clc
-    ret
-
-; ========================================================================
-; FS_DRIVE_LETTER_OF - Find the letter given to a BIOS drive
-; IN : AL = BIOS drive number
-; OUT : AL = drive letter, CF = 1 if the drive is not in drives_table
-; ========================================================================
-fs_drive_letter_of:
-    push cx
-    push si
-    mov si, drives_table
-    movzx cx, byte [drive_count]
-.scan:
-    jcxz .none
-    cmp al, [si + 1]
-    je .found
-    add si, 3
-    dec cx
-    jmp .scan
-.found:
-    mov al, [si]
-    pop si
-    pop cx
-    clc
-    ret
-.none:
-    pop si
-    pop cx
-    stc
     ret
 
 ; ========================================================================
@@ -4265,49 +4168,63 @@ fs_update_geometry:
     mov dl, [current_disk]
     int 13h
     pop es
-    jc .keep_default
+    jc .read_bpb
     test ah, ah
-    jnz .keep_default
-
-    push cx
+    jnz .read_bpb
     and cl, 0x3F
+    jz .read_bpb
     xor ch, ch
-    test cx, cx
-    jz .pop_default
     mov [SecsPerTrack], cx
-    pop cx
-
     xor ax, ax
     mov al, dh
     inc ax
     mov [Sides], ax
 
+.read_bpb:
     push es
-    mov ax, ds 
-    mov es, ax
-    mov ah, 02h
-    mov al, 1
-    mov ch, 0
-    mov cl, 1
-    mov dh, 0
+    push ds
+    pop es
+    mov si, 3
+.read_boot:
+    mov ax, 0x0201
+    mov cx, 0x0001
+    xor dh, dh
     mov dl, [current_disk]
     mov bx, disk_buffer
+    stc
     int 13h
+    jnc .boot_read
+    xor ah, ah
+    mov dl, [current_disk]
+    int 13h
+    dec si
+    jnz .read_boot
     pop es
-    jc .error
+    jmp .keep_default
+.boot_read:
+    pop es
 
     call fs_layout_from_bpb
     jc .keep_default
 
+    cmp byte [current_disk], 0x80
+    jae .done
+    mov ax, [disk_buffer + 24]
+    test ax, ax
+    jz .done
+    cmp ax, 63
+    ja .done
+    mov bx, [disk_buffer + 26]
+    test bx, bx
+    jz .done
+    cmp bx, 255
+    ja .done
+    mov [SecsPerTrack], ax
+    mov [Sides], bx
+.done:
     popa
     ret
 
-.error:
-    popa
-    ret
-
-.pop_default:
-    pop cx
 .keep_default:
     call fs_set_floppy_layout
     popa
@@ -4453,7 +4370,7 @@ MAX_HDD      equ 14
 MAX_DRIVES   equ 16
 
 drive_count db 0
-fs_boot_hdd db 0
+fs_huge_max_secs dw 0
 drives_table times (MAX_DRIVES * 3) db 0
 
 ; ========================================================================

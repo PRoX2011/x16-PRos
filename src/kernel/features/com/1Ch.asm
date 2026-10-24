@@ -14,8 +14,8 @@ com_1Ch:
     jc .no_drive
 
     mov byte [dos_media_id], 0xF0
-    call fs_current_removable
-    jc .removable
+    cmp byte [current_disk], 0x80
+    jb .removable
     mov byte [dos_media_id], 0xF8
 .removable:
     mov al, [fs_spc]

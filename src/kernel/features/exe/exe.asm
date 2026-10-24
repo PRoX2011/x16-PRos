@@ -39,12 +39,20 @@ exe_execute:
     mov bx, [dosmem_top_seg]
     mov [exe_mem_end], bx
 .layout_ready:
+    mov bx, [exe_mem_end]
+    sub bx, [exe_load_seg]
+    jbe .load_failed
+    mov cl, 5
+    shr bx, cl
+    jz .load_failed
+    mov [fs_huge_max_secs], bx
 
     xor cx, cx
     mov dx, [exe_load_seg]
     call fs_load_huge_file
     jnc .loaded
 
+.load_failed:
     pop ax
     mov si, exe_load_failed_msg
     call print_string_red
@@ -79,6 +87,29 @@ exe_execute:
     mov ax, [es:MZ_OVERLAY_NUM]
     test ax, ax
     jnz .bad_sig
+
+    mov ax, [es:MZ_PAGE_COUNT]
+    cmp ax, 0x0800
+    jae .image_sized
+    mov cl, 5
+    shl ax, cl
+    mov bx, [es:MZ_LAST_PAGE_BYTES]
+    and bx, 0x01FF
+    jz .whole_pages
+    sub ax, 32
+    add bx, 15
+    mov cl, 4
+    shr bx, cl
+    add ax, bx
+.whole_pages:
+    cmp ax, [exe_total_paras]
+    jae .image_sized
+    mov [exe_total_paras], ax
+.image_sized:
+    mov ax, [exe_mem_end]
+    sub ax, [exe_load_seg]
+    cmp ax, [exe_total_paras]
+    jb .too_big
 
     mov ax, [es:MZ_HEADER_PARAS]
     mov [exe_hdr_paras], ax
@@ -232,6 +263,13 @@ exe_execute:
 
 .bad_sig:
     mov si, exe_bad_sig_msg
+    call print_string_red
+    call print_newline
+    stc
+    ret
+
+.too_big:
+    mov si, exe_no_mem_msg
     call print_string_red
     call print_newline
     stc
@@ -563,6 +601,7 @@ exe_env_strings_len equ $ - exe_env_strings
 
 exe_bad_sig_msg     db 'Not an EXE file (bad signature)', 10, 13, 0
 exe_load_failed_msg db 'EXE load failed', 10, 13, 0
+exe_no_mem_msg      db 'Not enough memory for EXE', 10, 13, 0
 
 exe_env_drive       db 'A'
 
