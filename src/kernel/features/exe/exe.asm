@@ -89,6 +89,8 @@ exe_execute:
     jnz .bad_sig
 
     mov ax, [es:MZ_PAGE_COUNT]
+    test ax, ax
+    jz .image_sized
     cmp ax, 0x0800
     jae .image_sized
     mov cl, 5
@@ -102,6 +104,8 @@ exe_execute:
     shr bx, cl
     add ax, bx
 .whole_pages:
+    cmp ax, [es:MZ_HEADER_PARAS]
+    jbe .image_sized
     cmp ax, [exe_total_paras]
     jae .image_sized
     mov [exe_total_paras], ax
