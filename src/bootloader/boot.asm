@@ -10,7 +10,7 @@
 [ORG 0x0000]
 [CPU 8086]
 
-start: jmp main
+start: jmp near main
 
 ; ========================= DISK PARAMETERS ========================
 
@@ -27,7 +27,7 @@ start: jmp main
 ; bpbHeadsPerCylinder  - Number of heads (2)
 ; bpbHiddenSectors     - Hidden sectors (0)
 ; bpbTotalSectorsBig   - Large sector count (0)
-; bsDriveNumber        - Drive number (0 = auto)
+; bsDriveNumber        - Drive number (taken at boot)
 ; bsUnused             - Reserved (0)
 ; bsExtBootSignature   - Extended boot sig (0x29)
 ; bsSerialNumber       - Volume serial number
@@ -67,27 +67,12 @@ Print:
 PrintDone:
     ret
 
-absoluteSector db 0x00
-absoluteHead db 0x00
-absoluteTrack dw 0x0000
-
 ClusterLBA:
     sub ax, 0x0002
     xor cx, cx
     mov cl, BYTE [bpbSectorsPerCluster]
     mul cx
     add ax, WORD [datasector]
-    ret
-
-LBACHS:
-    xor dx, dx
-    div WORD [bpbSectorsPerTrack]
-    inc dl
-    mov BYTE [absoluteSector], dl
-    xor dx, dx
-    div WORD [bpbHeadsPerCylinder]
-    mov BYTE [absoluteHead], dl
-    mov WORD [absoluteTrack], ax
     ret
 
 ReadSectors:
@@ -97,14 +82,17 @@ ReadSectors:
     push ax
     push bx
     push cx
-    call LBACHS
-    mov ax, WORD [absoluteTrack]
-    mov cl, 6
-    shl ah, cl
+    xor dx, dx
+    div WORD [bpbSectorsPerTrack]
+    inc dx
+    mov cl, dl
+    xor dx, dx
+    div WORD [bpbHeadsPerCylinder]
+    mov dh, dl
     mov ch, al
-    mov cl, ah
-    or cl, BYTE [absoluteSector]
-    mov dh, BYTE [absoluteHead]
+    ror ah, 1
+    ror ah, 1
+    or cl, ah
     mov dl, BYTE [bsDriveNumber]
     mov ax, 0x0201
     int 0x13
@@ -140,12 +128,11 @@ main:
     mov es, ax
     ;mov fs, ax
     ;mov gs, ax
-    mov ax, 0x0000
+    xor ax, ax
     mov ss, ax
     mov sp, 0xFFFF
     sti
 
-    or dl, BYTE [bsDriveNumber]
     mov BYTE [bsDriveNumber], dl
     mov si, msgLoading
     call Print
@@ -189,7 +176,7 @@ LOAD_FAT:
     call ReadSectors
     mov ax, 0x2000
     mov es, ax
-    mov bx, 0x0000
+    xor bx, bx
     push bx
 
 LOAD_IMAGE:
@@ -241,10 +228,13 @@ REBOOT:
 datasector dw 0x0000
 cluster dw 0x0000
 ImageName db "KERNEL  BIN"
-msgLoading db 0x0D, 0x0A, "Loading Boot Image ", 0x00
+msgLoading db 0x0D, 0x0A, "Loading kernel", 0x00
 msgCRLF db 0x0D, 0x0A, 0x00
 msgProgress db ".", 0x00
-msgFailure db 0x0D, 0x0A, "KERNEL.BIN not found. Press Any Key to Reboot", 0x0D, 0x0A, 0x00
+msgFailure db 0x0D, 0x0A, "No KERNEL.BIN, press a key", 0x00
 
+%if ($-$$) > 0x1BE
+%error boot code runs into the partition table
+%endif
 TIMES 510-($-$$) DB 0
 DW 0xAA55

@@ -1039,6 +1039,7 @@ install_format_target:
     mov word [install_sector_buf + 32], 0
     mov word [install_sector_buf + 34], 0
     mov al, [install_target_bios]
+    and al, 0x80
     mov [install_sector_buf + 36], al
 
     mov ax, [install_tgt_heads]
