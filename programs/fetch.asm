@@ -120,6 +120,10 @@ start:
     mov si, host_name_msg
     int 0x21
 
+    call smbios_host
+    mov si, host_buf
+    jnc .print_host
+
     ; Get PC type
     push es
     mov ax, 0F000h
@@ -540,6 +544,52 @@ start:
     ; -----------------------------------------
     mov ah, 0x05
     int 0x21
+
+    mov ah, 0x03
+    xor bh, bh
+    int 0x10
+    mov dl, 40
+    mov ah, 0x02
+    xor bh, bh
+    int 0x10
+
+    ; ---------------- Memory -----------------
+    mov ah, 0x03
+    mov si, memory_msg
+    int 0x21
+
+    mov ah, 0x03
+    int 0x23
+    mov cl, 10
+    shr ax, cl
+    mov cl, 6
+    shl dx, cl
+    or ax, dx
+    mov [mem_free_kb], ax
+
+    int 0x12
+    mov [mem_total_kb], ax
+
+    call add_xms_memory
+
+    mov cx, [mem_total_kb]
+    sub cx, [mem_free_kb]
+    call print_number
+
+    mov ah, 0x01
+    mov si, kib_sep_str
+    int 0x21
+
+    mov cx, [mem_total_kb]
+    call print_number
+
+    mov ah, 0x01
+    mov si, kib_str
+    int 0x21
+    ; -----------------------------------------
+
+    mov ah, 0x05
+    int 0x21
     mov ah, 0x05
     int 0x21
 
@@ -632,6 +682,277 @@ print_resolution:
     pop ax
     ret
 
+SMB_MAX         equ 4096
+HOST_MAX        equ 33
+
+smbios_host:
+    pushad
+    push es
+    mov ax, 0xF000
+    mov es, ax
+    xor di, di
+.scan:
+    cmp dword [es:di], 0x5F4D535F
+    jne .next
+    mov cl, [es:di + 5]
+    cmp cl, 0x1E
+    jb .next
+    xor ch, ch
+    xor al, al
+    mov si, di
+.sum:
+    add al, [es:si]
+    inc si
+    loop .sum
+    test al, al
+    jz .found
+.next:
+    add di, 16
+    jnz .scan
+    jmp .fail
+
+.found:
+    mov eax, [es:di + 0x18]
+    mov cx, [es:di + 0x16]
+    cmp cx, SMB_MAX
+    jbe .len_ok
+    mov cx, SMB_MAX
+.len_ok:
+    mov [smb_len], cx
+    push cs
+    pop es
+    movzx ecx, cx
+    add ecx, eax
+    cmp ecx, 0x100000
+    ja .high
+
+    mov si, ax
+    and si, 0x000F
+    shr eax, 4
+    mov cx, [smb_len]
+    mov di, smb_buf
+    push ds
+    mov ds, ax
+    rep movsb
+    pop ds
+    jmp .parse
+
+.high:
+    mov word [smb_gdt + 0x10], 0xFFFF
+    mov [smb_gdt + 0x12], ax
+    shr eax, 16
+    mov [smb_gdt + 0x14], al
+    mov byte [smb_gdt + 0x15], 0x93
+    mov [smb_gdt + 0x17], ah
+    xor eax, eax
+    mov ax, cs
+    shl eax, 4
+    add eax, smb_buf
+    mov word [smb_gdt + 0x18], 0xFFFF
+    mov [smb_gdt + 0x1A], ax
+    shr eax, 16
+    mov [smb_gdt + 0x1C], al
+    mov byte [smb_gdt + 0x1D], 0x93
+    mov [smb_gdt + 0x1F], ah
+    mov cx, [smb_len]
+    inc cx
+    shr cx, 1
+    mov si, smb_gdt
+    mov ah, 0x87
+    int 0x15
+    jc .fail
+
+.parse:
+    mov si, smb_buf
+    mov bx, si
+    add bx, [smb_len]
+.struct:
+    lea ax, [si + 4]
+    cmp ax, bx
+    ja .fail
+    cmp byte [si], 127
+    je .fail
+    movzx cx, byte [si + 1]
+    cmp cx, 4
+    jb .fail
+    cmp byte [si], 1
+    je .type1
+    add si, cx
+.skip:
+    lea ax, [si + 1]
+    cmp ax, bx
+    jae .fail
+    cmp word [si], 0
+    je .skipped
+    inc si
+    jmp .skip
+.skipped:
+    add si, 2
+    jmp .struct
+
+.type1:
+    cmp cx, 7
+    jb .fail
+    mov dx, [si + 5]
+    add si, cx
+    mov di, host_buf
+    mov al, dl
+    call smb_string
+    jc .fail
+    call smb_append
+    mov al, dh
+    call smb_string
+    jc .trim
+    push bp
+    mov bp, space_str
+    call smb_append
+    pop bp
+    call smb_append
+.trim:
+    cmp di, host_buf
+    jbe .ok
+    cmp byte [di - 1], ' '
+    jne .ok
+    dec di
+    mov byte [di], 0
+    jmp .trim
+.ok:
+    clc
+    jmp .out
+.fail:
+    stc
+.out:
+    pop es
+    popad
+    ret
+
+smb_string:
+    push ax
+    push cx
+    push si
+    test al, al
+    jz .none
+    movzx cx, al
+.find:
+    dec cx
+    jz .got
+.skip:
+    cmp si, bx
+    jae .none
+    lodsb
+    test al, al
+    jnz .skip
+    cmp byte [si], 0
+    je .none
+    jmp .find
+.got:
+    cmp si, bx
+    jae .none
+    cmp byte [si], 0
+    je .none
+    mov bp, si
+    call smb_placeholder
+    jc .none
+    clc
+    jmp .out
+.none:
+    stc
+.out:
+    pop si
+    pop cx
+    pop ax
+    ret
+
+smb_placeholder:
+    push ax
+    push si
+    push di
+    mov di, smb_placeholders
+.entry:
+    cmp byte [di], 0
+    je .no
+    mov si, bp
+.cmp:
+    mov al, [si]
+    cmp al, 'a'
+    jb .upper
+    cmp al, 'z'
+    ja .upper
+    sub al, 0x20
+.upper:
+    cmp al, [di]
+    jne .skip_entry
+    test al, al
+    jz .yes
+    inc si
+    inc di
+    jmp .cmp
+.skip_entry:
+    cmp byte [di], 0
+    je .next_entry
+    inc di
+    jmp .skip_entry
+.next_entry:
+    inc di
+    jmp .entry
+.yes:
+    stc
+    jmp .out
+.no:
+    clc
+.out:
+    pop di
+    pop si
+    pop ax
+    ret
+
+smb_append:
+    push ax
+    push si
+    mov si, bp
+.copy:
+    cmp di, host_buf + HOST_MAX
+    jae .end
+    lodsb
+    test al, al
+    jz .end
+    mov [di], al
+    inc di
+    jmp .copy
+.end:
+    mov byte [di], 0
+    pop si
+    pop ax
+    ret
+
+add_xms_memory:
+    pushad
+    push es
+    mov ax, 0x4300
+    int 0x2F
+    cmp al, 0x80
+    jne .done
+    mov ax, 0x4310
+    int 0x2F
+    mov [xms_entry], bx
+    mov [xms_entry + 2], es
+    mov ah, 0x88
+    call far [xms_entry]
+    cmp bl, 0x80
+    je .done
+    cmp bl, 0x81
+    je .done
+    add [mem_free_kb], dx
+    mov eax, ecx
+    inc eax
+    shr eax, 10
+    sub ax, 1024
+    add [mem_total_kb], ax
+.done:
+    pop es
+    popad
+    ret
+
 print_number:
     push ax
     push bx
@@ -702,6 +1023,7 @@ cpu_msg          db 'CPU: ', 0
 vesa_msg         db 'VESA: ', 0
 resolution_msg   db 'Resolution: ', 0
 bios_release_msg db 'BIOS release date: ', 0
+memory_msg       db 'Memory: ', 0
 
 os_name        db 'PRos', 0
 os_full_name   db 'x16-PRos', 0
@@ -719,6 +1041,18 @@ conf_dir       db 'CONF.DIR', 0
 
 block_char     db 0xDB, 0
 x_char         db 'x', 0
+kib_sep_str    db 'KiB / ', 0
+kib_str        db 'KiB', 0
+mem_free_kb    dw 0
+mem_total_kb   dw 0
+xms_entry      dd 0
+
+host_buf       times HOST_MAX + 1 db 0
+space_str      db ' ', 0
+smb_len        dw 0
+smb_gdt        times 48 db 0
+smb_placeholders db 'TO BE FILLED BY O.E.M.', 0, 'DEFAULT STRING', 0, 'SYSTEM PRODUCT NAME', 0
+                 db 'SYSTEM VERSION', 0, 'NOT SPECIFIED', 0, 'NOT APPLICABLE', 0, 'NONE', 0, 0
 
 ascii_art      db '                   .l.    lo,                 ', 13, 10
                db '                   ;ll.  ,lll.                ', 13, 10
@@ -785,3 +1119,4 @@ bios_char_tmp db 0, 0
 
 buffer resb 32
 vesa_buffer resb 512
+smb_buf:
