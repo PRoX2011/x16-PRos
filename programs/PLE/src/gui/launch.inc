@@ -51,6 +51,7 @@ open_window:
     mov bl, [.slot]
     mov [w_task + bx], al
     mov byte [w_open + bx], 1
+    mov [kbd_slot], bl
 
     mov ah, 0x0F
     int 0x22
@@ -305,6 +306,7 @@ adopt_one:
     mov al, [adopt_tasks.id]
     mov [w_task + bx], al
     mov byte [w_open + bx], 1
+    mov [kbd_slot], bl
 
     mov bl, [adopt_tasks.id]
     mov di, adopt_name

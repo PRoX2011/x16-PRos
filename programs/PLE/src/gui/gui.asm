@@ -31,7 +31,7 @@ PLE_LOGO          "logo/gui.raw"
 %define MAX_ICONS   16
 %define MAX_TASKS   8
 %define LOGO_LOAD_OFF   0x4000
-%define LOGO_LOAD_MAX   0x4000
+%define LOGO_HDR_BYTES  (0x40 + 4096)
 %define LOGO_CACHE_OFF  0x8000
 %define LOGO_PX         32
 %define POPUP_BUF_OFF   0xC000
@@ -103,6 +103,7 @@ start:
     mov byte [prev_lmb], 0
     mov byte [closing], 0
     mov byte [close_slot], 0xFF
+    mov byte [kbd_slot], 0xFF
     mov word [last_icon], 0xFFFF
     mov word [last_tick], 0
     mov byte [last_title_slot], 0xFF
@@ -153,6 +154,7 @@ start:
     call menu_handle_press
     jc .after_edge
     call win_at
+    call kbd_focus_hit
     cmp byte [hit_kind], 0
     je .press_icons
     cmp byte [hit_kind], 1
@@ -282,6 +284,8 @@ start:
     mov [prev_lmb], al
     cmp byte [want_quit], 0
     jne gui_quit
+    call kbd_route
+    jc .delay
     mov ah, 0x01
     int 0x16
     jz .delay

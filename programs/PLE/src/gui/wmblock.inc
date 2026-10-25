@@ -192,6 +192,8 @@ wm_sweep:
     mov si, ax
     mov byte [es:si + WM_E_FLAGS], 0
     mov byte [es:si + WM_E_CLIPN], 0
+    mov word [es:si + WM_E_KEY], 0
+    mov byte [es:si + WM_E_WANT], 0
 .next:
     inc bl
     jmp .slot
@@ -201,3 +203,62 @@ wm_sweep:
     ret
 
 wm_seg dw 0
+
+; ========================================================================
+; KBD_FOCUS_HIT - give the keyboard to the window under a press
+; IN : [hit_kind], [hit_slot] from win_at
+; OUT : [kbd_slot] = that window, or 0xFF for the desktop
+; ========================================================================
+kbd_focus_hit:
+    push ax
+    mov al, 0xFF
+    cmp byte [hit_kind], 0
+    je .set
+    mov al, [hit_slot]
+.set:
+    mov [kbd_slot], al
+    pop ax
+    ret
+
+; ========================================================================
+; KBD_ROUTE - hand a waiting key to the focused window if it reads keys
+; IN : nothing
+; OUT : CF = 1 if the keyboard belongs to that window (the key is taken,
+;       or left waiting while its previous key is unread), CF = 0 for the GUI
+; ========================================================================
+kbd_route:
+    pusha
+    push es
+    xor bh, bh
+    mov bl, [kbd_slot]
+    cmp bl, MAX_WIN
+    jae .gui
+    cmp byte [w_open + bx], 0
+    je .gui
+    mov ax, [wm_seg]
+    test ax, ax
+    jz .gui
+    mov es, ax
+    mov bl, [w_task + bx]
+    call wm_entry
+    mov di, ax
+    test byte [es:di + WM_E_WANT], WM_W_KEYS
+    jz .gui
+    mov ah, 0x01
+    int 0x16
+    jz .mine
+    cmp word [es:di + WM_E_KEY], 0
+    jne .mine
+    mov ah, 0x00
+    int 0x16
+    mov [es:di + WM_E_KEY], ax
+.mine:
+    pop es
+    popa
+    stc
+    ret
+.gui:
+    pop es
+    popa
+    clc
+    ret

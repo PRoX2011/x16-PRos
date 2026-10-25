@@ -203,17 +203,20 @@ cache_logos:
     add si, ax
     mov [.fn], si
 
-    mov ah, 0x08
+    mov ax, 0x1500
     int 0x22
     jc .next
-    cmp bx, LOGO_LOAD_MAX
-    ja .next
-
-    mov si, [.fn]
-    mov cx, LOGO_LOAD_OFF
-    mov ah, 0x02
+    mov cx, LOGO_HDR_BYTES
+    mov dx, ds
+    mov di, LOGO_LOAD_OFF
+    mov ax, 0x1501
     int 0x22
-    jc .next
+    push ax
+    mov ax, 0x1504
+    int 0x22
+    pop ax
+    cmp ax, LOGO_HDR_BYTES
+    jb .next
 
     cmp byte [LOGO_LOAD_OFF + 0], 'P'
     jne .next
