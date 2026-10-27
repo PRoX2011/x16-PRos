@@ -39,14 +39,20 @@ init_segments:
 init_disks:
     call fs_init_drives
 
-    mov al, [boot_drive]
-    cmp al, 0x80
-    jb .boot_floppy
-    sub al, 0x80
-    add al, 'C'
-    jmp .boot_select
-.boot_floppy:
-    add al, 'A'
+    mov al, 'A'
+    mov ah, [boot_drive]
+    mov si, drives_table
+    xor cx, cx
+    mov cl, [drive_count]
+.find_boot:
+    jcxz .boot_select
+    cmp ah, [si + 1]
+    je .boot_found
+    add si, 3
+    dec cx
+    jmp .find_boot
+.boot_found:
+    mov al, [si]
 .boot_select:
     mov [sys_drive_char], al
     call fs_change_drive_letter

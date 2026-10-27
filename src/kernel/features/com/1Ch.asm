@@ -14,7 +14,7 @@ com_1Ch:
     jc .no_drive
 
     mov byte [dos_media_id], 0xF0
-    cmp byte [current_disk], 0x80
+    cmp byte [current_drive_char], 'C'
     jb .removable
     mov byte [dos_media_id], 0xF8
 .removable:

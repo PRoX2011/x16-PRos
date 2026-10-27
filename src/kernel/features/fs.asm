@@ -3614,6 +3614,7 @@ fs_init_drives:
     pusha
     push es
     mov byte [drive_count], 0
+    mov byte [.next_hdd], 'C'
     mov di, drives_table
 
     ; --- Floppy slots 0x00 and 0x01 ---
@@ -3621,14 +3622,14 @@ fs_init_drives:
     call .probe_present
     jc .floppy_b
     mov dl, 0x00
-    mov dh, 1
+    call .floppy_kind
     call .add_drive
 .floppy_b:
     mov dl, 0x01
     call .probe_present
     jc .hdd_enum
     mov dl, 0x01
-    mov dh, 1
+    call .floppy_kind
     call .add_drive
 .hdd_enum:
     push es
@@ -3681,6 +3682,45 @@ fs_init_drives:
     pop es
     popa
     ret
+
+.floppy_kind:
+    push ax
+    push bx
+    push cx
+    push es
+    push dx
+    push ds
+    pop es
+    mov ax, 0x0201
+    mov cx, 0x0001
+    xor dh, dh
+    mov bx, disk_buffer
+    stc
+    int 13h
+    pop dx
+    mov dh, 1
+    jc .fk_done
+    cmp word [disk_buffer + 11], 512
+    jne .fk_done
+    cmp byte [disk_buffer + 21], 0xF8
+    je .fk_hdd
+    mov ax, [disk_buffer + 19]
+    test ax, ax
+    jnz .fk_size
+    cmp word [disk_buffer + 34], 0
+    jne .fk_hdd
+    mov ax, [disk_buffer + 32]
+.fk_size:
+    cmp ax, 5760
+    jbe .fk_done
+.fk_hdd:
+    mov dh, 2
+.fk_done:
+    pop es
+    pop cx
+    pop bx
+    pop ax
+    ret
 .probe_present:
     push ax
     push bx
@@ -3717,13 +3757,11 @@ fs_init_drives:
     cmp byte [drive_count], MAX_DRIVES
     jae .ad_full
     mov al, dl
-    cmp al, 0x80
-    jae .ad_hdd
     add al, 'A'                   ; 0x00 -> A, 0x01 -> B
-    jmp .ad_store
-.ad_hdd:
-    sub al, 0x80
-    add al, 'C'                   ; 0x80 -> C, 0x81 -> D, ...
+    cmp dh, 2
+    jne .ad_store
+    mov al, [.next_hdd]
+    inc byte [.next_hdd]
 .ad_store:
     mov [di], al
     mov [di+1], dl
@@ -3732,6 +3770,7 @@ fs_init_drives:
     inc byte [drive_count]
 .ad_full:
     ret
+.next_hdd db 'C'
 
 ; ========================================================================
 ; FS_LIST_DRIVES - Prints available drives with filesystem details
@@ -4155,6 +4194,15 @@ fs_update_geometry:
     pusha
 
     call fs_set_floppy_layout
+    xor ax, ax
+    mov di, geo_bios
+    mov cx, 4
+    push es
+    push ds
+    pop es
+    cld
+    rep stosw
+    pop es
 
     mov ah, 0
     mov dl, [current_disk]
@@ -4174,11 +4222,11 @@ fs_update_geometry:
     and cl, 0x3F
     jz .read_bpb
     xor ch, ch
-    mov [SecsPerTrack], cx
+    mov [geo_bios], cx
     xor ax, ax
     mov al, dh
     inc ax
-    mov [Sides], ax
+    mov [geo_bios + 2], ax
 
 .read_bpb:
     push es
@@ -4207,21 +4255,20 @@ fs_update_geometry:
     call fs_layout_from_bpb
     jc .keep_default
 
-    cmp byte [current_disk], 0x80
-    jae .done
     mov ax, [disk_buffer + 24]
     test ax, ax
-    jz .done
+    jz .pick
     cmp ax, 63
-    ja .done
+    ja .pick
     mov bx, [disk_buffer + 26]
     test bx, bx
-    jz .done
+    jz .pick
     cmp bx, 255
-    ja .done
-    mov [SecsPerTrack], ax
-    mov [Sides], bx
-.done:
+    ja .pick
+    mov [geo_bpb], ax
+    mov [geo_bpb + 2], bx
+.pick:
+    call fs_pick_geometry
     popa
     ret
 
@@ -4246,6 +4293,142 @@ fs_set_floppy_layout:
     mov word [fs_spc], 1
     mov word [fs_clus_base], 31
     mov word [fs_total_clus], 2847
+    ret
+
+fs_pick_geometry:
+    pusha
+    mov si, geo_bios
+    mov di, geo_bpb
+    cmp byte [current_disk], 0x80
+    jae .ordered
+    xchg si, di
+.ordered:
+    mov ax, [si]
+    mov [.cand], ax
+    mov ax, [si + 2]
+    mov [.cand + 2], ax
+    mov ax, [di]
+    mov [.cand + 4], ax
+    mov ax, [di + 2]
+    mov [.cand + 6], ax
+    mov word [.first], 0
+
+    mov ax, [.cand]
+    cmp ax, [.cand + 4]
+    jne .try_all
+    mov ax, [.cand + 2]
+    cmp ax, [.cand + 6]
+    jne .try_all
+    mov si, .cand
+    jmp .take
+
+.try_all:
+    mov si, .cand
+    mov cx, 3
+.try:
+    mov ax, [si]
+    test ax, ax
+    jz .next
+    mov [SecsPerTrack], ax
+    mov ax, [si + 2]
+    mov [Sides], ax
+    cmp word [.first], 0
+    jne .check
+    mov [.first], si
+.check:
+    call fs_geometry_check
+    jnc .done
+.next:
+    add si, 4
+    loop .try
+    mov si, [.first]
+    test si, si
+    jz .floppy
+
+.take:
+    mov ax, [si]
+    test ax, ax
+    jz .floppy
+    mov [SecsPerTrack], ax
+    mov ax, [si + 2]
+    mov [Sides], ax
+.done:
+    popa
+    ret
+.floppy:
+    mov word [SecsPerTrack], 18
+    mov word [Sides], 2
+    popa
+    ret
+
+.cand  dw 0, 0, 0, 0, 63, 255
+.first dw 0
+
+; ========================================================================
+; FS_GEOMETRY_CHECK - Does the current geometry read the volume right?
+; ========================================================================
+fs_geometry_check:
+    pusha
+    push es
+    push ds
+    pop es
+
+    call fs_read_root_dir
+    jc .bad
+
+    mov si, disk_buffer
+    mov cx, [fs_root_ents]
+    xor dx, dx
+.scan:
+    mov al, [si]
+    test al, al
+    jz .scanned
+    cmp al, 0xE5
+    je .next
+    cmp al, '.'
+    je .next
+    mov al, [si + 11]
+    test al, 0x10
+    jz .next
+    test al, 0x08
+    jnz .next
+    mov ax, [si + 26]
+    cmp ax, 2
+    jb .next
+    mov bx, [fs_total_clus]
+    inc bx
+    cmp ax, bx
+    ja .next
+    cmp ax, dx
+    jbe .next
+    mov dx, ax
+.next:
+    add si, 32
+    loop .scan
+.scanned:
+    test dx, dx
+    jz .bad
+
+    mov ax, dx
+    call fs_cluster_lba
+    call fs_convert_l2hts
+    mov bx, disk_buffer
+    call fs_read_sector_retry
+    jc .bad
+    cmp word [disk_buffer], '. '
+    jne .bad
+    test byte [disk_buffer + 11], 0x10
+    jz .bad
+
+.good:
+    pop es
+    popa
+    clc
+    ret
+.bad:
+    pop es
+    popa
+    stc
     ret
 
 ; ========================================================================
@@ -4371,6 +4554,8 @@ MAX_DRIVES   equ 16
 
 drive_count db 0
 fs_huge_max_secs dw 0
+geo_bios dw 0, 0
+geo_bpb  dw 0, 0
 drives_table times (MAX_DRIVES * 3) db 0
 
 ; ========================================================================

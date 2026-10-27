@@ -113,7 +113,7 @@ com_44h:
 
     mov word [es:di + 1], 0x0007
     mov byte [es:di + 3], 0
-    cmp byte [current_disk], 0x80
+    cmp byte [current_drive_char], 'C'
     jb .removable_disk
     mov word [es:di + 1], 0x0105
 .removable_disk:

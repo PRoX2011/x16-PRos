@@ -164,6 +164,7 @@ install_init_index:
 install_probe_drives:
     pusha
     mov byte [install_count], 0
+    mov byte [install_next_hdd], 'C'
 
     ; --- Floppy slots ---
     mov dl, 0x00
@@ -240,13 +241,39 @@ install_probe_one:
     mov dl, [.in_dl]
     cmp dl, 0x80
     jae .hdd_letter
+    push bx
+    push es
+    push ds
+    pop es
+    mov ax, 0x0201
+    mov cx, 0x0001
+    xor dh, dh
+    mov bx, install_sector_buf
+    stc
+    int 0x13
+    pop es
+    pop bx
+    jc .floppy_letter
+    cmp word [install_sector_buf + 11], 512
+    jne .floppy_letter
+    cmp byte [install_sector_buf + 21], 0xF8
+    je .hdd_letter
+    mov ax, [install_sector_buf + 19]
+    test ax, ax
+    jnz .volume_size
+    cmp word [install_sector_buf + 34], 0
+    jne .hdd_letter
+    mov ax, [install_sector_buf + 32]
+.volume_size:
+    cmp ax, 5760
+    ja .hdd_letter
+.floppy_letter:
     mov al, 'A'
-    add al, dl
+    add al, [.in_dl]
     jmp .set_letter
 .hdd_letter:
-    mov al, dl
-    sub al, 0x80
-    add al, 'C'
+    mov al, [install_next_hdd]
+    inc byte [install_next_hdd]
 .set_letter:
     mov [bx+0], al
     mov dl, [.in_dl]
@@ -1537,6 +1564,7 @@ install_fat_secs:
 section .data
 
 install_count            db 0
+install_next_hdd         db 'C'
 install_index            db 0
 install_current_letter   db 'A'
 install_chosen_letter    db 'A'

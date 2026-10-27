@@ -12,8 +12,27 @@ com_0Eh:
     call fs_change_drive_letter
     jc .bad_drive
 
+    push cx
+    push si
+    mov al, 5
+    mov si, drives_table
+    xor cx, cx
+    mov cl, [drive_count]
+.top:
+    jcxz .counted
+    mov ah, [si]
+    sub ah, 'A' - 1
+    cmp ah, al
+    jbe .next
+    mov al, ah
+.next:
+    add si, 3
+    dec cx
+    jmp .top
+.counted:
+    pop si
+    pop cx
     xor ah, ah
-    mov al, [drive_count]
     clc
     jmp .done
 
