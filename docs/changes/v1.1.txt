@@ -1,0 +1,63 @@
+----------------------- Key changes x16-PRos v1.1 ----------------------
+
+This release is mostly about MS-DOS compatibility. x16-PRos can now run
+the original Microsoft Windows 3.11 and the original DOOM. The GUI got
+its first text editor and new GUI elements for programs.
+                                        -- PRoX
+
+=======================================================================================
+
+1. MS-DOS compatibility
+1) The kernel moved lower in memory, so MS-DOS programs now get
+   551 KiB of free conventional memory
+2) XMS driver (XMS.PLE)
+   - Gives MS-DOS programs extended memory above 1 MiB
+3) Better EXEC
+4) More MS-DOS functions are emulated and many existing ones were fixed
+5) Now runs
+   - Microsoft Windows 3.11
+   - The original DOOM
+   - Wolfenstein 3D
+
+=======================================================================================
+
+2. GUI
+1) New NOTEPAD.PLE program - a simple text editor
+   - Open, edit and save text files
+2) New GUI elements for programs (in surf.inc)
+   - Text field and multi-line text editor field
+   - Scroll bar that can be dragged with the mouse
+   - File selection dialog
+3) GUI windows now get keyboard input
+4) Desktop icons of big PLE programs are shown correctly
+
+=======================================================================================
+
+3. FETCH update
+1) Shows the computer model (hostname) correctly
+2) Shows the memory: used / total
+
+=======================================================================================
+
+4. SETUP update
+1) Five new command prompt styles to choose from (thanks to NeoriAKM)
+2) A system installed on a hard disk now boots on more computers
+
+=======================================================================================
+
+5. Bug fixes
+1) Booting from a USB flash drive now could not wipe the root directory
+2) DOOM and other big EXE programs now works fine on modern computers
+3) "Disk changed" is no longer printed when the drive did not change (thanks to ZypherCode)
+4) Fixed an issue where emulators and certain BIOS versions would incorrectly 
+   read the geometry of the system disk.
+5) Disk geometry is now read correctly from USB drives booted as floppies
+
+=======================================================================================
+
+6. New run-linux-dosbox.sh script
+1) Add new script for running x16-PRos on DOSbox emulator (run-linux-dosbox.sh)
+
+=======================================================================================
+
+Copyright (C) 2024-2026 PRoX2011
