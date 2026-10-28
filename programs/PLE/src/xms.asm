@@ -9,7 +9,7 @@
 
 %include "ple.inc"
 
-PLE_HEADER start, "XMS extended memory driver", "PRoX-dev" ;, PLE_FLAG_NO_SPLASH
+PLE_HEADER start, "XMS extended memory driver", "PRoX-dev", PLE_FLAG_NO_WAIT ;, PLE_FLAG_NO_SPLASH
 PLE_LOGO   "logo/xms.raw"
 
 XMS_MAX_KB       equ 15360
