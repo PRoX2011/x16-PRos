@@ -5,7 +5,7 @@
 <h1>x16-PRos Operating System</h1>
 
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE.TXT)
-[![Version](https://img.shields.io/badge/version-1.0-blue?style=for-the-badge)](docs/changes/v1.0.txt)
+[![Version](https://img.shields.io/badge/version-1.1-blue?style=for-the-badge)](docs/changes/v1.1.txt)
 
 [![GitHub stars](https://img.shields.io/github/stars/PRoX2011/x16-PRos?style=flat-square)](https://github.com/PRoX2011/x16-PRos/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/PRoX2011/x16-PRos?style=flat-square)](https://github.com/PRoX2011/x16-PRos/commits)
@@ -50,7 +50,7 @@ Also it`s a platform for low-level programming enthusiasts to explore developmen
 
 ## Key Features
 
-- **MS-DOS Compatibility**: Native support for running standard MS-DOS `.COM` and `.EXE` executables - Windows 1.01, DOOM and Turbo C 2.0 runs on x16-PRos
+- **MS-DOS Compatibility**: Native support for running standard MS-DOS `.COM` and `.EXE` executables - Windows 3.11, DOOM and Turbo C 2.0 runs on x16-PRos
 - **Multitasking**: Cooperative multitasking support for `.PLE` programs
 - **GUI**: Customizable graphical user interface for windowed `.PLE` programs
 - **Native assembler**: Intel syntax assembler with which you can create programs directly in the operating system  
