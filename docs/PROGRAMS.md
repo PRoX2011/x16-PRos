@@ -8,9 +8,9 @@
     Window manager: desktop with icons, draggable and resizable windows
   </td>
   <td width="33%" align="center">
-    <img src="screenshots/programs/GUI/SETTINGS.png" width="100%"><br>
-    <b>SETTINGS.PLE</b><br>
-    GUI settings: icon corners, label gap and wallpaper
+    <img src="screenshots/programs/GUI/NOTEPAD.png" width="100%"><br>
+    <b>NOTEPAD.PLE</b><br>
+    Simple text editor
   </td>
   <td width="33%" align="center">
     <img src="screenshots/programs/GUI/CALC.png" width="100%"><br>
@@ -33,6 +33,13 @@
     <img src="screenshots/programs/GUI/HELLO.png" width="100%"><br>
     <b>HELLO.PLE</b><br>
     Just another hello world :)
+  </td>
+</tr>
+<tr>
+  <td width="33%" align="center">
+    <img src="screenshots/programs/GUI/SETTINGS.png" width="100%"><br>
+    <b>SETTINGS.PLE</b><br>
+    GUI settings: icon corners, label gap and wallpaper
   </td>
 </tr>
 <tr>
@@ -255,5 +262,19 @@
     <b>TETRIS2.BIN</b><br>
     Tetris, but 2
   </td>
+</tr>
+</table>
+
+# Drivers
+
+<table>
+<tr>
+  <td width="33%" align="center">
+    <img src="screenshots/programs/XMS.png" width="100%"><br>
+    <b>XMS.PLE</b><br>
+    Extended memory driver
+  </td>
+  <td width="33%"></td>
+  <td width="33%"></td>
 </tr>
 </table>
