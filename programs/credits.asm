@@ -152,6 +152,8 @@ name_vokichhh      db 'Vokichhh', 0
 name_ayano4ka1338  db 'ayano4ka1338', 0
 name_nortyashka    db 'Nortyashka', 0
 name_qqq           db 'QQQ', 0
+name_leonid        db 'Leonid', 0
+name_vasily        db 'Vasily Novosad',0
 
 entries:
     dw name_hanakbe,      role_contributor
@@ -183,6 +185,8 @@ entries:
     dw name_ayano4ka1338, role_sponsor
     dw name_nortyashka,   role_sponsor
     dw name_qqq,          role_sponsor
+    dw name_leonid,       role_sponsor
+    dw name_vasily,       role_sponsor
 entries_end:
 
 entries_count equ (entries_end - entries) / ENTRY_SIZE
