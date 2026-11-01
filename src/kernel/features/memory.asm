@@ -30,7 +30,9 @@ mem_init:
     rep stosb
 
     mov word [mem_table + MEM_OFF_START], HEAP_BASE_SEG
-    mov word [mem_table + MEM_OFF_PARAS], HEAP_TOTAL_PARAS
+    mov ax, [dosmem_top_seg]
+    sub ax, HEAP_BASE_SEG
+    mov [mem_table + MEM_OFF_PARAS], ax
     mov byte [mem_table + MEM_OFF_USED],  0
 
     pop es
@@ -152,6 +154,116 @@ mem_free:
     pop cx
     pop bx
     stc
+    ret
+
+; ==================================================================
+; mem_alloc_top - take a block from the free block that ends at DX.
+; IN : BX = paragraphs
+;      DX = segment the block has to end at
+; OUT: AX = segment
+;      CF = 0 on success
+;      CF = 1 if the memory right below DX is not free or too small
+; ==================================================================
+mem_alloc_top:
+    push bx
+    push cx
+    push si
+    push di
+
+    test bx, bx
+    jz .fail
+
+    mov si, mem_table
+    mov cx, MEM_SLOT_COUNT
+.scan:
+    cmp byte [si + MEM_OFF_USED], 0
+    jne .next
+    mov ax, [si + MEM_OFF_PARAS]
+    test ax, ax
+    jz .next
+    add ax, [si + MEM_OFF_START]
+    cmp ax, dx
+    je .found
+.next:
+    add si, MEM_SLOT_SIZE
+    loop .scan
+    jmp .fail
+
+.found:
+    mov ax, [si + MEM_OFF_PARAS]
+    cmp ax, bx
+    jb .fail
+    je .take
+
+    mov di, mem_table
+    mov cx, MEM_SLOT_COUNT
+.find_empty:
+    cmp word [di + MEM_OFF_PARAS], 0
+    je .split
+    add di, MEM_SLOT_SIZE
+    loop .find_empty
+    jmp .fail
+
+.split:
+    sub [si + MEM_OFF_PARAS], bx
+    mov ax, dx
+    sub ax, bx
+    mov [di + MEM_OFF_START], ax
+    mov [di + MEM_OFF_PARAS], bx
+    mov si, di
+
+.take:
+    mov byte [si + MEM_OFF_USED], 1
+    mov ax, [si + MEM_OFF_START]
+    pop di
+    pop si
+    pop cx
+    pop bx
+    clc
+    ret
+
+.fail:
+    xor ax, ax
+    pop di
+    pop si
+    pop cx
+    pop bx
+    stc
+    ret
+
+; ==================================================================
+; mem_block_size - size of an allocated block.
+; IN : AX = segment returned by mem_alloc or mem_alloc_top
+; OUT: BX = paragraphs
+;      CF = 1 if AX is not an allocated block
+; ==================================================================
+mem_block_size:
+    push cx
+    push si
+
+    mov si, mem_table
+    mov cx, MEM_SLOT_COUNT
+.find:
+    cmp byte [si + MEM_OFF_USED], 0
+    je .next
+    cmp word [si + MEM_OFF_PARAS], 0
+    je .next
+    cmp [si + MEM_OFF_START], ax
+    je .hit
+.next:
+    add si, MEM_SLOT_SIZE
+    loop .find
+
+    pop si
+    pop cx
+    stc
+    ret
+
+.hit:
+    mov bx, [si + MEM_OFF_PARAS]
+    pop si
+    pop cx
+    clc
     ret
 
 ; ==================================================================

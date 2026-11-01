@@ -53,7 +53,7 @@ com_5Ah:
 
     mov byte [cs:dosf_access], 2
     mov al, 1
-    call dosfile_open
+    call dosfile_open_handle
     jc .fail
 
     pop es

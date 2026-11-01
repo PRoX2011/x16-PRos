@@ -6,6 +6,7 @@ com_43h:
     jne .set_ok
 
     call com_copy_path_from_caller
+    push bx
     push ds
     push es
     push si
@@ -17,8 +18,22 @@ com_43h:
     call path_split
     jc .missing_pop
 
+    mov cx, 0x0010
+    cmp byte [si], 0
+    je .have_attr
+    mov [cs:.name], si
     mov ax, si
     call fs_file_exists
+    jc .looked
+    mov cx, 0x0020
+    mov ax, [cs:.name]
+    call fs_is_directory
+    jc .have_attr
+    xor ah, ah
+    mov cx, ax
+.have_attr:
+    clc
+.looked:
     pushf
     call path_restore
     popf
@@ -28,8 +43,8 @@ com_43h:
     pop si
     pop es
     pop ds
+    pop bx
 
-    mov cx, 0x0020
     mov ax, cx
     jmp .ok
 
@@ -38,6 +53,7 @@ com_43h:
     pop si
     pop es
     pop ds
+    pop bx
     jmp .missing
 
 .set_ok:
@@ -52,3 +68,5 @@ com_43h:
     or word [bp+6], 1
     pop bp
     iret
+
+.name dw 0

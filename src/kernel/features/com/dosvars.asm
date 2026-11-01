@@ -46,7 +46,8 @@ SFT_ENTRY        equ 0x35
 SFT_DEVS         equ 5
 SFT_COUNT        equ SFT_DEVS + DOSF_SLOTS
 SFT_FIRST        equ DOSVARS_SFT + 6
-DOSVARS_MCB      equ 0x0860
+DOSVARS_MCB      equ (SFT_FIRST + SFT_COUNT * SFT_ENTRY + 15) & ~15
+DOSVARS_SIZE     equ DOSVARS_MCB + 0x10
 
 SFTE_REFS        equ 0x00
 SFTE_MODE        equ 0x02
@@ -85,7 +86,7 @@ dosvars_init:
     call dosvars_seg
 
     xor di, di
-    mov cx, 2048
+    mov cx, DOSVARS_SIZE / 2
     xor ax, ax
     cld
     rep stosw
@@ -119,12 +120,14 @@ dosvars_init:
     call dosvars_devhdr
 
     mov di, DOSVARS_MCB
-    mov byte [es:di], 'Z'
+    mov byte [es:di], 'M'
     mov word [es:di + 1], 0x0008
-    mov word [es:di + 3], 0x0001
     mov ax, es
     add ax, DOSVARS_MCB >> 4
     mov [es:DOSVARS_SYSVARS - 2], ax
+    mov bx, DOSMEM_BASE - 1
+    sub bx, ax
+    mov [es:di + 3], bx
 
     mov word [es:DOSVARS_SFT], 0xFFFF
     mov word [es:DOSVARS_SFT + 2], 0xFFFF
@@ -208,19 +211,14 @@ dosvars_devhdr:
 
 dosvars_seg:
     push ax
-    push cx
-    mov ax, dosvars_block
-    mov cl, 4
-    shr ax, cl
-    mov cx, cs
-    add ax, cx
+    mov ax, DOSVARS_SEG
     mov es, ax
-    pop cx
     pop ax
     ret
 
-align 16
-dosvars_block times 4096 db 0
+%if (DOSVARS_SEG - DOSDATA_SEG) * 16 + DOSVARS_SIZE > DOSDATA_PARAS * 16
+%error "the DOS structures do not fit in the DOS data area"
+%endif
 
 ; ==================================================================
 ; DOSVARS_SYNC_DRIVES - refresh the DPB chain and the CDS array
@@ -475,7 +473,9 @@ dosvars_sync_sft:
     test byte [si + DF_FLAGS], DFF_USED
     jz .next
 
-    mov word [es:di + SFTE_REFS], 1
+    mov al, [si + DF_REFS]
+    mov ah, 0
+    mov [es:di + SFTE_REFS], ax
     mov word [es:di + SFTE_MODE], 2
     mov byte [es:di + SFTE_ATTR], 0x20
     mov al, [current_drive_char]

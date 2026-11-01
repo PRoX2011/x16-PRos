@@ -20,8 +20,8 @@ fcb_to_path_buffer:
     inc si              ; skip drive byte, SI = filename field
 
     ; DS = caller segment (for reading FCB)
-    ; ES = 0x2000 (for writing com_path_buffer)
-    mov ax, 0x2000
+    ; ES = KERNEL_DATA_SEG (for writing com_path_buffer)
+    mov ax, KERNEL_DATA_SEG
     mov es, ax
     mov di, com_path_buffer
 
@@ -72,8 +72,8 @@ fcb_str_to_normal:
     push ds             ; save caller DS
 
     ; DS = caller segment (for reading)
-    ; ES = 0x2000 (for writing)
-    mov ax, 0x2000
+    ; ES = KERNEL_DATA_SEG (for writing)
+    mov ax, KERNEL_DATA_SEG
     mov es, ax
     mov di, com_path_buffer2
 

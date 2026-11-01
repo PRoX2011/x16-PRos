@@ -8,6 +8,11 @@
 ;   0x01: Allocate memory (BX = bytes; returns AX = segment, CF on fail)
 ;   0x02: Free memory (AX = segment; CF on unknown segment)
 ;   0x03: Get free bytes (returns DX:AX = free bytes)
+;   0x04: Reserve resident memory at the top of conventional memory
+;         (BX = paragraphs, rounded up to whole KiB; returns AX = segment,
+;         CF on fail)
+;   0x05: Release resident memory (BX = segment from 0x04, must be the
+;         lowest reserved block; CF on fail)
 ;   0x10: Execute PLE program foreground (SI = filename, CF on load failure)
 ;   0x11: Execute PLE program background (SI = filename; returns AX = task id, CF on load / no-slot failure)
 ;   0x12: Terminate current task (does not return)
@@ -92,6 +97,10 @@ int23_handler:
     je .mem_free_sys
     cmp ah, 0x03
     je .mem_get_free_sys
+    cmp ah, 0x04
+    je .res_alloc
+    cmp ah, 0x05
+    je .res_free
     cmp ah, 0x20
     je .mouse_get_state
     cmp ah, 0x21
@@ -147,6 +156,42 @@ int23_handler:
     mov [bp+18], ax
     mov [bp+14], dx
     clc
+    jmp .done
+
+.res_alloc:
+    add bx, 0x003F
+    jc .res_alloc_fail
+    and bx, 0xFFC0
+    jz .res_alloc_fail
+    mov dx, [dosmem_top_seg]
+    call mem_alloc_top
+    jc .res_alloc_fail
+    mov [dosmem_top_seg], ax
+    call api_sys_sync_bda
+    mov bp, sp
+    mov [bp+18], ax
+    clc
+    jmp .done
+.res_alloc_fail:
+    mov bp, sp
+    mov word [bp+18], 0
+    stc
+    jmp .done
+
+.res_free:
+    mov ax, bx
+    cmp ax, [dosmem_top_seg]
+    jne .res_free_fail
+    call mem_block_size
+    jc .res_free_fail
+    call mem_free
+    jc .res_free_fail
+    add [dosmem_top_seg], bx
+    call api_sys_sync_bda
+    clc
+    jmp .done
+.res_free_fail:
+    stc
     jmp .done
 
 .exec_ple:
@@ -357,6 +402,22 @@ int23_handler:
     pop ds
     popa
     iret
+
+; ==================================================================
+; api_sys_sync_bda -- publish the top of conventional memory in the BDA word INT 0x12 returns
+; IN : [dosmem_top_seg] = new top segment
+; ==================================================================
+api_sys_sync_bda:
+    push ax
+    push es
+    mov ax, 0x0040
+    mov es, ax
+    mov ax, [dosmem_top_seg]
+    shr ax, 6
+    mov [es:0x0013], ax
+    pop es
+    pop ax
+    ret
 
 ; ==================================================================
 ; copy_caller_string_si_23 -- copy NUL-terminated string from

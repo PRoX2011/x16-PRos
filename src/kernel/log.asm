@@ -1,8 +1,10 @@
 log_buf         times 1024 db 0
 log_buf_used    dw 0
+log_file_ready  db 0
 
 log_clear_on_boot:
     pusha
+    mov byte [log_file_ready], 1
     mov word [log_buf_used], 0
     mov ax, log_filename
     mov bx, log_buf
@@ -70,6 +72,10 @@ log_delay:
     ret
 
 log_write_to_file:
+    cmp byte [log_file_ready], 0
+    jne .ready
+    ret
+.ready:
     pusha
 
     mov di, log_buf

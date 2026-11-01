@@ -169,6 +169,7 @@ directory:
 
   HELLO.PLE     "Hello, world" PLE demo
   CLOCK.PLE     Background clock
+  XMS.PLE       XMS extended memory driver: XMS.PLE ON / XMS.PLE OFF
 
   To see running tasks: PS
   To stop a task:       KILL <id>

@@ -9,6 +9,7 @@ close_slot      db 0xFF
 drag_slot       db 0
 hit_slot        db 0xFF
 hit_kind        db 0
+kbd_slot        db 0xFF
 dragdx          dw 0
 dragdy          dw 0
 dragx           dw 0

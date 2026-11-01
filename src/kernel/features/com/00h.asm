@@ -1,2 +1,3 @@
 com_00h:
-    jmp dos_terminate
+    xor al, al
+    jmp com_4Ch

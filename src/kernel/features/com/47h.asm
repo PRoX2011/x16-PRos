@@ -30,13 +30,23 @@ com_47h:
     test cx, cx
     jz .bad_drive
     cmp al, [si]
-    je .drive_ok
+    je .found
     add si, 3
     dec cx
     jmp .scan
 
+.found:
+    cmp al, [current_drive_char]
+    je .drive_ok
+    push di
+    call fs_dir_slot
+    lea si, [di + 2]
+    pop di
+    jmp .from_si
+
 .drive_ok:
     mov si, current_directory
+.from_si:
     mov cx, 63
 .copy:
     lodsb

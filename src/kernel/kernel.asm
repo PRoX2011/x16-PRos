@@ -45,15 +45,16 @@ COM_EXIT_OPCODE      equ 0xCD
 COM_STACK_TOP        equ 0xFFFE
 COM_ENTRY_OFFSET     equ 0x0100
 
-KERNEL_DATA_SEG      equ 0x2000
-FONT_SEG             equ 0x1000
+KERNEL_DATA_SEG      equ 0x0500
+KERNEL_STACK_SEG     equ 0x0000
+KERNEL_STACK_TOP     equ 0x5000
 
-PROGRAM_LOAD_SEG     equ 0x1000
+PROGRAM_LOAD_SEG     equ 0x2000
 PROGRAM_LOAD_OFF     equ 0x8000
 PROGRAM_THUNK_OFF    equ 0x7FF0
 PROGRAM_PARAMS_OFF   equ 0x7F00
 
-CFG_SCRATCH_SEG      equ FONT_SEG
+CFG_SCRATCH_SEG      equ PROGRAM_LOAD_SEG
 CFG_SCRATCH_OFF      equ 0x1000
 
 KERNEL_WORK_SEG      equ 0x0060
@@ -66,23 +67,50 @@ KERNEL_WORK_END_OFF  equ DISK_BUFFER_OFF + DISK_BUFFER_SIZE  ; 0xFC00
 FS_STAGE_SEG         equ KERNEL_WORK_SEG
 FS_STAGE_OFF         equ 0x3800
 
+FONT_SEG             equ KERNEL_DATA_SEG + (KERNEL_WORK_END_OFF >> 4)
+DOSDATA_SEG          equ FONT_SEG + 0x0100      ; IVT copy + DOS structures
+DOSDATA_PARAS        equ 0x0180
+DOSVARS_SEG          equ DOSDATA_SEG + 0x0040
+
 disk_buffer          equ DISK_BUFFER_OFF
 dirlist              equ DIRLIST_OFF
 command_history      equ COMMAND_HISTORY_OFF
-program_seg          equ 0x2FC0
+program_seg          equ DOSDATA_SEG + DOSDATA_PARAS + 1
 
 
 section .text
 
 start:
     cli
-    mov [cs:boot_drive], dl         ; the bootloader leaves it in DL
 
     ; ------ Stack installation ------
-    xor ax, ax
+    mov ax, KERNEL_STACK_SEG
     mov ss, ax
-    mov sp, 0x0FFFF
+    mov sp, KERNEL_STACK_TOP
     ; --------------------------------
+
+    mov ax, cs
+    cmp ax, KERNEL_DATA_SEG
+    je .relocated
+    mov ds, ax
+    mov ax, KERNEL_DATA_SEG
+    mov es, ax
+    xor si, si
+    xor di, di
+    mov cx, section..bss.start
+    cld
+    rep movsb
+    mov cx, kernel_end
+    sub cx, di
+    xor al, al
+    rep stosb
+    jmp KERNEL_DATA_SEG:.relocated
+
+.relocated:
+    mov ax, cs
+    mov ds, ax
+    mov es, ax
+    mov [boot_drive], dl
 
     call set_video_mode        ; Set video mode
     call init_system           ; Init system (segments, timer, api, configs, display, security, start autoexec)
@@ -476,13 +504,16 @@ get_cmd:
 
     mov al, [si]
     call fs_change_drive_letter
+    jc .bad_drive_letter
+
     call print_newline
     mov si, .success_disk_change_msg
     call print_string_green
     call print_newline
     call print_newline
-    jnc get_cmd
+    jmp get_cmd
 
+.bad_drive_letter:
     mov si, bad_drive_msg
     call print_string_red
     call print_newline
@@ -1015,6 +1046,7 @@ launch_bin_program:
     mov [bin_stack_save], sp
     mov [bin_ss_save], ss
 
+    call install_program_thunk
     call DisableMouse
 
     test si, si
@@ -1064,14 +1096,19 @@ execute_com:
     mov byte [com_active], 1
     mov ax, [program_seg_runtime]
     mov [dos_current_psp], ax
+    mov [dta_segment], ax
+    mov word [dta_offset], 0x0080
     mov [dosmem_prog_base], ax
     mov word [dosmem_prog_paras], 0x1000
-    add ax, 0x1000
+    add ax, 0x1000 + 1
     mov [dosmem_env_seg], ax
 
     mov ax, [dosmem_top_seg]
     mov [exe_mem_top], ax
 
+    mov word [exe_name_ptr], command
+    mov word [exe_parent_psp], 0
+    mov word [exe_tail_seg], 0
     mov ax, [program_seg_runtime]
     mov si, [param_list]
     call exe_build_psp
@@ -2301,7 +2338,7 @@ bg_command:
 ; ===================== Data Section =====================
 section .data
 ; ------ Header ------
-header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v1.0', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
+header db 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xDB, 0xDB, ' ', 'x16 PRos v1.1', ' ', 0xDB, 0xDB, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB2, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0xB0, 0
 
 ; ------ Help ------
 kshell_comands db 'HELP               - get list of commands', 10, 13
@@ -2337,7 +2374,7 @@ info db 10, 13
      db '  Support project:  DALink (https://dalink.to/PRoXdev)', 10, 13
      db '  Source code:      GitHub (https://github.com/PRoX2011/x16-PRos)', 10, 13
      db '  License:          MIT', 10, 13
-     db '  OS version:       1.0', 10, 13
+     db '  OS version:       1.1', 10, 13
      db 0
 
 version_msg db 'PRos Terminal v0.3', 10, 13, 0

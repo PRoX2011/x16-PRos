@@ -1,11 +1,16 @@
 com_4Ch:
+    push es
     push ds
+    push bp
+    push di
+    push si
+    push dx
+    push cx
+    push bx
     push ax
-    mov ax, KERNEL_DATA_SEG
-    mov ds, ax
-    pop ax
+    mov bx, KERNEL_DATA_SEG
+    mov ds, bx
     mov [last_return_code], al
     mov byte [last_return_type], 0
-    pop ds
 
     jmp dos_terminate

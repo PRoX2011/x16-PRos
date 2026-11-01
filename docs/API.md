@@ -285,7 +285,7 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
 - **Input**:
     - `AH` = 0x07
     - `SI` = Pointer to null-terminated old filename (8.3 format)
-    - `BX` = Pointer to null-terminated new filename (8.3 format)
+    - `DI` = Pointer to null-terminated new filename (8.3 format)
 - **Output**: Carry flag set on error
 - **Preserves**: All registers
 - **Error Handling**: Sets CF if the old file is not found, the new filename is invalid, or disk write fails
@@ -463,6 +463,12 @@ filenames are in 8.3 format (e.g., `FILENAME.EXT`) and converts them to uppercas
     - `BX` = Handle
 - **Output**: Carry flag set if the handle is not open or the directory entry could not be written
 
+### Function 0x16: Get system drive letter
+
+- **Description**: Returns the drive x16-PRos booted from.
+- **Input**: `AH` = 0x16
+- **Output**: `AL` = system drive letter
+
 ---
 
 ## INT 0x23 - System API
@@ -471,7 +477,7 @@ INT 0x23 is where the "operating system" part of x16-PRos lives: a heap allocato
 the hooks for launching PLE programs and steering the cooperative scheduler, and a
 handful of mouse calls.
 
-The functions fall into three groups: memory (`0x00`–`0x03`), tasks and PLE
+The functions fall into three groups: memory (`0x00`–`0x05`), tasks and PLE
 (`0x10`–`0x19` plus `0x34`), and mouse (`0x20`–`0x26`).
 
 ### Function 0x00: Get Version
@@ -524,6 +530,29 @@ biggest allocation you can actually make may be smaller once the heap is fragmen
     - `AH` = 0x03
 - **Output**:
     - `DX:AX` = Free bytes (`DX` high word, `AX` low word)
+
+### Function 0x04: Reserve Resident Memory
+
+Takes a block from the very top of conventional memory for code that has to stay
+resident (e.g XMS.PLE). The size is rounded up to 1KiB.
+
+- **Input**:
+    - `AH` = 0x04
+    - `BX` = Size in paragraphs
+- **Output**:
+    - `AX` = Segment of the block, or 0 on failure
+    - `CF` = 1 if the memory right below the current top is in use or too small
+
+### Function 0x05: Release Resident Memory
+
+Gives a block from `0x04` back. Blocks are released in the reverse order they were
+reserved, so only the lowest one (the most recent) can go.
+
+- **Input**:
+    - `AH` = 0x05
+    - `BX` = Segment returned by `0x04`
+- **Output**:
+    - `CF` = 1 if `BX` is not the lowest reserved block
 
 ### Function 0x10: Execute PLE Program
 

@@ -27,6 +27,8 @@ WM_E_Y          equ 0x04
 WM_E_W          equ 0x06
 WM_E_H          equ 0x08
 WM_E_CLIP       equ 0x0A
+WM_E_KEY        equ 0x3A
+WM_E_WANT       equ 0x3C
 
 WM_CLIP_MAX     equ 6
 WM_TASK_MAX     equ 8
@@ -35,6 +37,8 @@ WM_BLOCK_SIZE   equ (WM_OFF_ENTRIES + WM_TASK_MAX * WM_ENTRY_SIZE)
 WM_F_WINDOWED   equ 0x01
 WM_F_CLOSE      equ 0x02
 WM_F_DIRTY      equ 0x04
+
+WM_W_KEYS       equ 0x01
 
 ; ========================================================================
 ; wm_entry - offset of a task's entry inside the block

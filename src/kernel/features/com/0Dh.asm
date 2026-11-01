@@ -1,7 +1,7 @@
 com_0Dh:
     push ax
     push ds
-    mov ax, 0x2000
+    mov ax, KERNEL_DATA_SEG
     mov ds, ax
     push es
     mov es, ax

@@ -5,6 +5,9 @@
 [     DONE    ] GUI
 [     DONE    ] RUN DOOM!
 [     DONE    ] Run Microsoft Windows 1x
+[     DONE    ] Run Microsoft Windows 3x
+[     DONE    ] Run Wolf3D
+[     DONE    ] XMS
 
 [     TODO    ] Midi driver
 [     TODO    ] VESA
@@ -15,7 +18,4 @@
 [     TODO    ] I/O redirection and pipes (cmd > file, cmd1 | cmd2)
 [     TODO    ] Batch script support (.BAT / .SH style)
 [     TODO    ] System uptime counter and INT 0x23 syscall to query it
-[     TODO    ] Run Microsoft Windows 3x
-[     TODO    ] Run Wolf3D
 [     TODO    ] DPMI
-[     TODO    ] XMS

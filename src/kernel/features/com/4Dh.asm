@@ -1,6 +1,6 @@
 com_4Dh:
     push ds
-    mov ax, 0x2000
+    mov ax, KERNEL_DATA_SEG
     mov ds, ax
 
     mov al, [last_return_code]

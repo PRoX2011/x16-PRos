@@ -12,6 +12,8 @@ com_57h:
     mov ds, ax
     pop ax
 
+    cmp bx, DOSF_FIRST
+    jb .device
     call dosfile_slot
     jc .bad_handle
 
@@ -25,6 +27,13 @@ com_57h:
 .store:
     mov [si + DF_TIME], cx
     mov [si + DF_DATE], dx
+    jmp .ok
+
+.device:
+    cmp al, 0x01
+    je .ok
+    xor cx, cx
+    mov dx, 0x0021
 
 .ok:
     and word [bp+6], 0xFFFE

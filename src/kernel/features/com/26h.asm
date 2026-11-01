@@ -41,11 +41,8 @@ com_26h:
 
     mov ax, [cs:dos_current_psp]
     mov [es:0x16], ax
-
-    mov word [es:0x32], 20
-    mov word [es:0x34], 0x0018
-    mov ax, es
-    mov [es:0x36], ax
+    mov word [es:0x30], 0
+    call dosfile_inherit
 
     mov byte [es:0x50], 0xCD
     mov byte [es:0x51], 0x21
