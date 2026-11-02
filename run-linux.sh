@@ -19,7 +19,9 @@ print_msg() {
 
 print_msg "$NC" ""
 print_msg "$GREEN" "Starting emulator..."
+
 mkdir -p lpt
+
 qemu-system-x86_64 \
     -display gtk \
     -fda disk_img/x16pros.img \
@@ -29,4 +31,6 @@ qemu-system-x86_64 \
     -drive format=raw,file=disk_img/FLOPPY2.img,if=floppy,index=1 \
     -drive format=raw,file=disk_img/HDD.img,if=ide,index=0,media=disk \
     -boot order=a \
-    -parallel file:lpt/output.txt
+    -parallel file:lpt/output.txt \
+    -device ne2k_isa,iobase=0x300,irq=9,netdev=net0 \
+    -netdev user,id=net0
