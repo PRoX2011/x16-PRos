@@ -230,15 +230,19 @@ prog_err_msg db 'Error: Program not found', 10, 13, 0
 
 bin_dir_name db 'BIN.DIR', 0
 
+; === Type names ===
 txt_str db 'TXT', 0
 imf_str db 'IMF', 0
 wav_str db 'WAV', 0
 asm_str db 'ASM', 0
+;type_str db 'TYP', 0 ; from the docs
 
+; === Type programs ===
 txt_bin db 'WRITER.BIN', 0
 imf_bin db 'IMFPLAY.BIN', 0
 wav_bin db 'WAVPLAY.BIN', 0
 asm_bin db 'PRASM.BIN', 0
+;type_bin db 'PROGRAM.BIN', 0 ; from the docs
 
 file dw 0
 type dw 0
