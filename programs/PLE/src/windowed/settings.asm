@@ -966,6 +966,10 @@ restart_gui:
     int 0x23
     mov [.parent], dl
 
+    mov bh, 0xFF
+    mov ah, 0x34
+    int 0x23
+    jc .done
     mov ah, 0x18
     int 0x23
 
@@ -978,17 +982,27 @@ restart_gui:
     mov ah, 0x09
     mov si, ple_dir_name
     int 0x22
-    jc .restore
+    jc .launch_failed
 
     mov ah, 0x11
     mov si, gui_file
     int 0x23
-    jc .restore
+    jc .launch_failed
 
     mov bl, al
     mov bh, [.parent]
     cmp bh, 0xFF
     je .restore
+    mov ah, 0x34
+    int 0x23
+    jmp .restore
+.launch_failed:
+    cmp byte [.parent], 0xFF
+    je .restore
+    mov ah, 0x15
+    int 0x23
+    mov bl, al
+    mov bh, [.parent]
     mov ah, 0x34
     int 0x23
 .restore:

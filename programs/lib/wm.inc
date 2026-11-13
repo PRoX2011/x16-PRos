@@ -14,6 +14,7 @@ WM_OFF_MAGIC    equ 0x00
 WM_OFF_VERSION  equ 0x02
 WM_OFF_OWNER    equ 0x03
 WM_OFF_SLOTS    equ 0x04
+WM_OFF_CAPS     equ 0x05
 WM_OFF_OWNSEG   equ 0x06
 WM_OFF_ENTRIES  equ 0x08
 
@@ -32,13 +33,19 @@ WM_E_WANT       equ 0x3C
 
 WM_CLIP_MAX     equ 6
 WM_TASK_MAX     equ 8
-WM_BLOCK_SIZE   equ (WM_OFF_ENTRIES + WM_TASK_MAX * WM_ENTRY_SIZE)
+WM_REQ_SIZE     equ 4
+WM_REQ_W        equ 0
+WM_REQ_H        equ 2
+WM_OFF_REQUESTS equ (WM_OFF_ENTRIES + WM_TASK_MAX * WM_ENTRY_SIZE)
+WM_BLOCK_SIZE   equ (WM_OFF_REQUESTS + WM_TASK_MAX * WM_REQ_SIZE)
 
 WM_F_WINDOWED   equ 0x01
 WM_F_CLOSE      equ 0x02
 WM_F_DIRTY      equ 0x04
 
 WM_W_KEYS       equ 0x01
+WM_W_SIZE       equ 0x02
+WM_CAP_SIZE     equ 0x01
 
 ; ========================================================================
 ; wm_entry - offset of a task's entry inside the block
@@ -50,6 +57,18 @@ wm_entry:
     mov al, bl
     shl ax, WM_ENTRY_SHIFT
     add ax, WM_OFF_ENTRIES
+    ret
+
+; ========================================================================
+; wm_req_entry - offset of a task's requested outer window size
+; IN:  BL = task id
+; OUT: AX = offset of the {width, height} pair
+; ========================================================================
+wm_req_entry:
+    xor ah, ah
+    mov al, bl
+    shl ax, 2
+    add ax, WM_OFF_REQUESTS
     ret
 
 ; ========================================================================

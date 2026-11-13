@@ -24,13 +24,15 @@
 ;   0x17: Query task slot (BL = id; OUT AL = state, AH = flags, CX = base_seg
 ;         (kernel's CS for slot 0), DL = parent id (0xFF = none);
 ;         CF on bad id)
-;         States: 0=free, 1=ready, 2=running, 3=sleeping
-;         Flags : bit0=background, bit7=kernel
+;         States: 0=free, 1=ready, 2=running, 3=sleeping, 4=waiting, 5=paused
+;         Flags : bit0=background, bit1=paused, bit7=kernel
 ;   0x18: Kill task by id (BL = id; CF on failure -
 ;         cannot kill kernel slot, self, free slot, or bad id)
 ;   0x19: Copy task name into caller's buffer (BL = id, DI = dest offset
 ;         in caller's DS; buffer must be >= 16 bytes; result is
 ;         NUL-terminated; CF on bad id)
+;   0x1A: Pause or resume task (BL = id, AL = 1 pause / 0 resume;
+;         cannot change kernel slot, self, free slot, or bad id)
 ;   0x20: Mouse get state (returns AX=X, BX=Y, CL=buttons, CH=visible)
 ;   0x21: Mouse get text cell (returns AX=col, BX=row)
 ;   0x22: Mouse hide cursor
@@ -88,6 +90,8 @@ int23_handler:
     je .task_kill
     cmp ah, 0x19
     je .task_get_name
+    cmp ah, 0x1A
+    je .task_set_paused
 
     cmp ah, 0x00
     je .get_version
@@ -270,6 +274,10 @@ int23_handler:
 
 .task_kill:
     call sched_task_kill
+    jmp .done
+
+.task_set_paused:
+    call sched_task_set_paused
     jmp .done
 
 .task_get_name:

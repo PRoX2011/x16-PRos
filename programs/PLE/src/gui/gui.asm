@@ -304,6 +304,7 @@ start:
     jne .skip_reap
     call reap_dead_windows
 .skip_reap:
+    call wm_handle_size_requests
     call tick_clock
     call menu_tick
     call sync_overlay_clip

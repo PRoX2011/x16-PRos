@@ -29,6 +29,22 @@ surf_keys     db 0
 surf_mouse_on db 0
 surf_key      dw 0
 
+surf_req_w       dw 0
+surf_req_h       dw 0
+surf_req_pending db 0
+
+; ========================================================================
+; surf_request_size - ask for a new window size
+; IN:  CX = requested width
+;      DX = requested height
+; OUT: nothing
+; ========================================================================
+surf_request_size:
+    mov [surf_req_w], cx
+    mov [surf_req_h], dx
+    mov byte [surf_req_pending], 1
+    ret
+
 ; ========================================================================
 ; surf_sync - query the WM for this task's window and update the surface
 ; IN:  nothing
@@ -80,6 +96,21 @@ surf_sync:
     mov word [es:di + WM_E_KEY], 0
     mov [surf_key], ax
 .nkeys:
+    cmp byte [surf_req_pending], 0
+    je .n_size
+    test byte [es:WM_OFF_CAPS], WM_CAP_SIZE
+    jz .n_size
+    push di
+    call wm_req_entry
+    mov di, ax
+    mov ax, [surf_req_w]
+    mov [es:di + WM_REQ_W], ax
+    mov ax, [surf_req_h]
+    mov [es:di + WM_REQ_H], ax
+    pop di
+    or byte [es:di + WM_E_WANT], WM_W_SIZE
+    mov byte [surf_req_pending], 0
+.n_size:
     mov ax, [es:di + WM_E_X]
     mov [surf_ox], ax
     mov ax, [es:di + WM_E_Y]
@@ -770,6 +801,162 @@ surf_print:
 .r     dw 0
 .c     dw 0
 .run   dw 0
+
+; ========================================================================
+; surf_print_scaled - draw a NUL-terminated string at scale
+; IN:  CX = x (top-left, surface-relative)
+;      DX = y
+;      SI = string pointer
+;      AL = colour (0..15)
+;      BL = scale factor (1..4; 1 = normal 8x16)
+; OUT: nothing (all registers preserved)
+; ========================================================================
+surf_print_scaled:
+    pusha
+    call surf_font_get
+    mov [.color], al
+    mov [.penx], cx
+    mov [.peny], dx
+    mov [.sptr], si
+    xor bh, bh
+    cmp bl, 1
+    jge .scale_ok
+    mov bl, 1
+.scale_ok:
+    cmp bl, 4
+    jle .scale_cap
+    mov bl, 4
+.scale_cap:
+    mov [.scale], bx
+.ch:
+    mov si, [.sptr]
+    mov al, [si]
+    test al, al
+    jz .done
+    inc si
+    mov [.sptr], si
+    cmp al, ' '
+    je .advance
+    xor ah, ah
+    shl ax, 4
+    add ax, [surf_font_off]
+    mov [.gptr], ax
+    mov word [.r], 0
+.row:
+    cmp word [.r], 16
+    jae .advance
+    push es
+    mov es, [surf_font_seg]
+    mov bx, [.gptr]
+    add bx, [.r]
+    mov al, [es:bx]
+    pop es
+    mov [.gbyte], al
+    mov word [.c], 0
+    mov word [.run], SURF_NO_RUN
+.col:
+    cmp word [.c], 8
+    jae .nextrow
+    mov cl, [.c]
+    mov ah, 0x80
+    shr ah, cl
+    test [.gbyte], ah
+    jz .gap
+    cmp word [.run], SURF_NO_RUN
+    jne .nextcol
+    mov ax, [.c]
+    mov [.run], ax
+    jmp .nextcol
+.gap:
+    call .flush
+.nextcol:
+    inc word [.c]
+    jmp .col
+.nextrow:
+    call .flush
+    inc word [.r]
+    jmp .row
+.advance:
+    mov ax, [.scale]
+    shl ax, 3
+    add [.penx], ax
+    jmp .ch
+.done:
+    popa
+    ret
+.flush:
+    cmp word [.run], SURF_NO_RUN
+    je .flush_ret
+    mov ax, [.c]
+    sub ax, [.run]
+    mul word [.scale]
+    mov si, ax
+    mov ax, [.run]
+    mul word [.scale]
+    add ax, [.penx]
+    mov cx, ax
+    mov ax, [.r]
+    mul word [.scale]
+    add ax, [.peny]
+    mov dx, ax
+    mov di, [.scale]
+    mov al, [.color]
+    call surf_fill_rect
+    mov word [.run], SURF_NO_RUN
+.flush_ret:
+    ret
+.color db 0
+.penx  dw 0
+.peny  dw 0
+.sptr  dw 0
+.gptr  dw 0
+.gbyte db 0
+.r     dw 0
+.c     dw 0
+.run   dw 0
+.scale dw 1
+
+; ========================================================================
+; surf_print_big - draw a NUL-terminated string at 2x scale
+; IN:  CX = x (top-left, surface-relative)
+;      DX = y
+;      SI = string pointer
+;      AL = colour (0..15)
+; OUT: nothing (all registers preserved)
+; ========================================================================
+surf_print_big:
+    push bx
+    mov bl, 2
+    call surf_print_scaled
+    pop bx
+    ret
+
+; ========================================================================
+; surf_text_w_scaled - pixel width of a NUL-terminated string at scale
+; IN:  SI = string pointer
+;      BL = scale factor (1..4)
+; OUT: AX = width in pixels (length * 8 * scale)
+; ========================================================================
+surf_text_w_scaled:
+    push si
+    push cx
+    push bx
+    xor cx, cx
+.l:
+    cmp byte [si], 0
+    je .d
+    inc si
+    inc cx
+    jmp .l
+.d:
+    mov ax, cx
+    shl ax, 3
+    xor bh, bh
+    mul bx
+    pop bx
+    pop cx
+    pop si
+    ret
 
 ; ========================================================================
 ; surf_font_get - resolve the active 8x16 font once and cache it

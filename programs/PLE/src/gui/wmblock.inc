@@ -26,6 +26,7 @@ wm_create:
     mov word [es:WM_OFF_MAGIC], WM_MAGIC
     mov byte [es:WM_OFF_VERSION], WM_VERSION
     mov byte [es:WM_OFF_SLOTS], WM_TASK_MAX
+    mov byte [es:WM_OFF_CAPS], WM_CAP_SIZE
 
     mov ax, es
     xor cx, cx
@@ -45,6 +46,12 @@ wm_create:
     xor al, al
     cld
     rep stosb
+    test byte [es:WM_OFF_CAPS], WM_CAP_SIZE
+    jz .requests_done
+    mov di, WM_OFF_REQUESTS
+    mov cx, WM_TASK_MAX * WM_REQ_SIZE
+    rep stosb
+.requests_done:
 
     mov ah, 0x15
     int 0x23
@@ -194,6 +201,12 @@ wm_sweep:
     mov byte [es:si + WM_E_CLIPN], 0
     mov word [es:si + WM_E_KEY], 0
     mov byte [es:si + WM_E_WANT], 0
+    test byte [es:WM_OFF_CAPS], WM_CAP_SIZE
+    jz .next
+    call wm_req_entry
+    mov si, ax
+    mov word [es:si + WM_REQ_W], 0
+    mov word [es:si + WM_REQ_H], 0
 .next:
     inc bl
     jmp .slot
@@ -201,6 +214,95 @@ wm_sweep:
     pop es
     popa
     ret
+
+; ========================================================================
+; WM_HANDLE_SIZE_REQUESTS - apply pending outer sizes from hosted tasks
+; IN : nothing
+; OUT: changed windows are clamped to the screen and repainted
+; ========================================================================
+wm_handle_size_requests:
+    pusha
+    push es
+    call overlay_state
+    test al, al
+    jnz .done
+    cmp byte [dragging], 0
+    jne .done
+    mov ax, [wm_seg]
+    test ax, ax
+    jz .done
+    mov es, ax
+    test byte [es:WM_OFF_CAPS], WM_CAP_SIZE
+    jz .done
+    mov byte [.changed], 0
+    mov word [.slot], 0
+.scan:
+    mov bx, [.slot]
+    cmp bx, MAX_WIN
+    jae .repaint
+    cmp byte [w_open + bx], 0
+    je .next
+    mov bl, [w_task + bx]
+    call wm_entry
+    mov di, ax
+    test byte [es:di + WM_E_WANT], WM_W_SIZE
+    jz .next
+    and byte [es:di + WM_E_WANT], ~WM_W_SIZE & 0xFF
+    call wm_req_entry
+    mov si, ax
+    mov cx, [es:si + WM_REQ_W]
+    mov dx, [es:si + WM_REQ_H]
+    mov word [es:si + WM_REQ_W], 0
+    mov word [es:si + WM_REQ_H], 0
+
+    mov bx, [.slot]
+    mov si, bx
+    shl bx, 1
+    cmp cx, MIN_WW
+    jge .width_min
+    mov cx, MIN_WW
+.width_min:
+    cmp cx, 640
+    jle .width_ready
+    mov cx, 640
+.width_ready:
+    cmp dx, MIN_WH
+    jge .height_min
+    mov dx, MIN_WH
+.height_min:
+    cmp dx, 480 - MENUBAR_H
+    jle .height_ready
+    mov dx, 480 - MENUBAR_H
+.height_ready:
+    mov ax, 640
+    sub ax, cx
+    cmp [w_x + bx], ax
+    jle .x_ready
+    mov [w_x + bx], ax
+.x_ready:
+    mov ax, 480
+    sub ax, dx
+    cmp [w_y + bx], ax
+    jle .y_ready
+    mov [w_y + bx], ax
+.y_ready:
+    mov [w_w + bx], cx
+    mov [w_h + bx], dx
+    mov byte [w_max + si], 0
+    mov byte [.changed], 1
+.next:
+    inc word [.slot]
+    jmp .scan
+.repaint:
+    cmp byte [.changed], 0
+    je .done
+    call full_repaint
+.done:
+    pop es
+    popa
+    ret
+.changed db 0
+.slot dw 0
 
 wm_seg dw 0
 

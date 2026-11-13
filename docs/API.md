@@ -478,7 +478,7 @@ the hooks for launching PLE programs and steering the cooperative scheduler, and
 handful of mouse calls.
 
 The functions fall into three groups: memory (`0x00`–`0x05`), tasks and PLE
-(`0x10`–`0x19` plus `0x34`), and mouse (`0x20`–`0x26`).
+(`0x10`–`0x1A` plus `0x34`), and mouse (`0x20`–`0x26`).
 
 ### Function 0x00: Get Version
 
@@ -585,7 +585,7 @@ often (`0x13`, `0x14`, `0x16`); a task that never yields will starve everything 
     - `AH` = 0x11
     - `DS:SI` = Pointer to a null-terminated 8.3 filename
 - **Output**:
-    - `AX` = Id of the new task (1..3) on success
+    - `AX` = Id of the new task (1..7) on success
     - `CF` = 1 if the program couldn't be loaded, the header is invalid, or no
       background slot is free (red diagnostic on load failure)
 
@@ -630,7 +630,7 @@ Tells you which scheduler slot you're running in.
 - **Input**:
     - `AH` = 0x15
 - **Output**:
-    - `AL` = Task id (0 = kernel context, 1..3 = user tasks)
+    - `AL` = Task id (0 = kernel context, 1..7 = user tasks)
     - `AH` = 0
 
 ### Function 0x16: Blocking Key Read with Yield
@@ -647,46 +647,62 @@ empty instead of spinning. Once a key shows up it's consumed and returned exactl
 
 ### Function 0x17: Query Task Slot
 
-Looks up the state, flags, and arena segment of a given slot - handy for a task
-manager or a `ps`-style listing.
+Looks up the state, flags, and arena segment of a given slot.
 
 - **Input**:
     - `AH` = 0x17
-    - `BL` = Task id (0..3)
+    - `BL` = Task id (0..7)
 - **Output**:
-    - `AL` = State: 0 = free, 1 = ready, 2 = running, 3 = sleeping
-    - `AH` = Flags: bit 0 = background, bit 7 = kernel slot
+    - `AL` = State: 0 = free, 1 = ready, 2 = running, 3 = sleeping, 4 = waiting, 5 = paused
+    - `AH` = Flags: bit 0 = background, bit 1 = paused, bit 7 = kernel slot
     - `CX` = Base segment of the task's arena (kernel `CS` for slot 0, 0 for a free slot)
     - `DL` = Parent task id, or `0xFF` when the task has no parent
     - `CF` = 1 if `BL` is out of range
 
 ### Function 0x18: Kill Task by Id
 
-Terminates another task by id, freeing its arena and releasing the slot. To end
-*yourself*, use `0x12` or `retf` instead - this call deliberately refuses to kill the kernel
-slot, the caller, or a slot that's already free.
+Terminates another task by id, freeing its arena and releasing the slot. A foreground
+parent waiting for the task is made ready again. To end *yourself*, use `0x12` or
+`retf` instead - this call deliberately refuses to kill the kernel slot, the caller,
+or a slot that's already free.
 
 - **Input**:
     - `AH` = 0x18
-    - `BL` = Task id (0..3)
+    - `BL` = Task id (0..7)
 - **Output**:
     - `CF` = 0 on success
-    - `CF` = 1 on failure (kernel slot, self, or a free slot)
+    - `CF` = 1 on failure (kernel slot, self, a free slot, or a bad id)
 
 ### Function 0x19: Get Task Name
 
-Copies a task's executable filename —-the one it was launched with - into a buffer
+Copies a task's executable filename (the one it was launched) with-into a buffer
 you supply. The name is written into your own data segment, NUL-terminated, and
 truncated to 15 characters plus the terminator, so the buffer needs to be at least
 16 bytes. Slot 0 reports back as `KERNEL`.
 
 - **Input**:
     - `AH` = 0x19
-    - `BL` = Task id (0..3)
+    - `BL` = Task id (0..7)
     - `DI` = Offset of the destination buffer in your `DS` (≥ 16 bytes)
 - **Output**:
     - Buffer at `DS:DI` filled with the NUL-terminated name
     - `CF` = 1 if `BL` is out of range
+
+### Function 0x1A: Pause or Resume Task by Id
+
+Pauses or resumes another task. A paused task keeps its memory, name, parent link,
+and underlying scheduler state, but is skipped when the scheduler picks the next
+task. Sleep deadlines continue to elapse while paused. Resuming makes the task
+eligible to run again in its previous state. The kernel slot, the caller, free slots,
+and bad ids are rejected.
+
+- **Input**:
+    - `AH` = 0x1A
+    - `AL` = 1 to pause, 0 to resume
+    - `BL` = Task id (0..7)
+- **Output**:
+    - `CF` = 0 on success
+    - `CF` = 1 on failure
 
 ### Function 0x20: Mouse Get State
 

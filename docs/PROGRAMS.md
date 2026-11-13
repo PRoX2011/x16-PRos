@@ -41,6 +41,16 @@
     <b>SETTINGS.PLE</b><br>
     GUI settings: icon corners, label gap and wallpaper
   </td>
+  <td width="33%" align="center">
+    <img src="screenshots/programs/GUI/TASKMAN.png" width="100%"><br>
+    <b>TASKMAN.PLE</b><br>
+    Process manager
+  </td>
+  <td width="33%" align="center">
+    <img src="screenshots/programs/GUI/INFO.png" width="100%"><br>
+    <b>INFO.PLE</b><br>
+    About x16-PRos
+  </td>
 </tr>
 <tr>
   <td width="33%" align="center">

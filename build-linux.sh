@@ -317,6 +317,11 @@ mcopy -i disk_img/x16pros.img assets/fonts/ITALIC.FNT ::/FONTS.DIR/
 check_error "ITALIC.FNT copy failed"
 print_ok "ITALIC.FNT copied successfully"
 
+print_info "Copying ROUND.FNT to disk..."
+mcopy -i disk_img/x16pros.img assets/fonts/ROUND.FNT ::/FONTS.DIR/
+check_error "ROUND.FNT copy failed"
+print_ok "ROUND.FNT copied successfully"
+
 print_info "Copying DOTS.FNT to disk..."
 mcopy -i disk_img/x16pros.img assets/fonts/DOTS.FNT ::/FONTS.DIR/
 check_error "DOTS.FNT copy failed"
@@ -541,6 +546,8 @@ programs_ple_gui=(
     "programs/PLE/src/windowed/calc.asm CALC.PLE"
     "programs/PLE/src/windowed/settings.asm SETTINGS.PLE"
     "programs/PLE/src/windowed/notepad.asm NOTEPAD.PLE"
+    "programs/PLE/src/windowed/taskman.asm TASKMAN.PLE"
+    "programs/PLE/src/windowed/info.asm INFO.PLE"
 )
 
 for prog in "${programs_ple_gui[@]}"; do

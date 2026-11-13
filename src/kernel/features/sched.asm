@@ -22,8 +22,10 @@ TASK_S_READY         equ 1
 TASK_S_RUNNING       equ 2
 TASK_S_SLEEPING      equ 3
 TASK_S_WAITING       equ 4       ; blocked until a foreground child exits
+TASK_S_PAUSED        equ 5       ; reported by the query API while paused
 
 TASK_F_BACKGROUND    equ 0x01
+TASK_F_PAUSED        equ 0x02
 TASK_F_KERNEL        equ 0x80
 
 ; ==================================================================
@@ -378,7 +380,8 @@ sched_exit:
 
 ; ==================================================================
 ; sched_pick_next - wake any due sleepers, then round-robin scan
-; starting after sched_cur_task. Falls back to slot 0 (kernel).
+; starting after sched_cur_task. Falls back to slot 0 except while it
+; waits for a paused foreground child; then halts until a sleeper wakes.
 ; OUT: AL = chosen task id (0..TASK_SLOT_COUNT-1)
 ; ==================================================================
 sched_pick_next:
@@ -403,6 +406,8 @@ sched_pick_next:
     shl bx, 4
     cmp byte [sched_tasks + bx + TASK_STATE], TASK_S_READY
     jne .skip
+    test byte [sched_tasks + bx + TASK_FLAGS], TASK_F_PAUSED
+    jnz .skip
     ; Sanity check: slot must have a valid base segment. A stray READY
     ; state with TASK_BASE_SEG = 0 means the slot was clobbered or never
     ; properly initialised - skipping it avoids iret-to-garbage.
@@ -411,6 +416,28 @@ sched_pick_next:
 .skip:
     loop .scan
 
+    cmp byte [sched_tasks + TASK_STATE], TASK_S_WAITING
+    jne .kernel
+    mov bx, TASK_SLOT_SIZE
+.paused_scan:
+    test byte [sched_tasks + bx + TASK_FLAGS], TASK_F_PAUSED
+    jz .next_slot
+    cmp byte [sched_tasks + bx + TASK_PARENT], 0
+    je .paused
+.next_slot:
+    add bx, TASK_SLOT_SIZE
+    cmp bx, TASK_SLOT_COUNT * TASK_SLOT_SIZE
+    jb .paused_scan
+    jmp .kernel
+.paused:
+    sti
+.idle:
+    hlt
+    call sched_wake_sleepers
+    mov al, [sched_cur_task]
+    mov cx, TASK_SLOT_COUNT
+    jmp .scan
+.kernel:
     xor al, al
 .found:
     pop si
@@ -555,6 +582,10 @@ sched_task_query:
     shl bx, 4
     mov al, [sched_tasks + bx + TASK_STATE]
     mov ah, [sched_tasks + bx + TASK_FLAGS]
+    test ah, TASK_F_PAUSED
+    jz .state_done
+    mov al, TASK_S_PAUSED
+.state_done:
     mov cx, [sched_tasks + bx + TASK_BASE_SEG]
     mov dl, [sched_tasks + bx + TASK_PARENT]
     pop bx
@@ -565,9 +596,9 @@ sched_task_query:
     ret
 
 ; ==================================================================
-; sched_task_kill - terminate a task by id. Frees the task's arena
-; and marks the slot free. Cannot kill the kernel slot (0), the
-; calling task, or a slot that is already free.
+; sched_task_kill - terminate a task by id. Frees the task's arena,
+; marks the slot free and wakes a foreground parent. Cannot kill the
+; kernel slot (0), the calling task, or a slot that is already free.
 ; IN : BL = task id
 ; OUT: CF = 0 on success, CF = 1 on failure
 ; ==================================================================
@@ -586,22 +617,71 @@ sched_task_kill:
     mov ax, [sched_tasks + bx + TASK_BASE_SEG]
     cmp ax, 0xFFFF
     je .kbad_pop
+    mov al, [sched_tasks + bx + TASK_PARENT]
+    mov [.parent_tmp], al
     push bx
     call mem_free
     pop bx
     mov byte [sched_tasks + bx + TASK_STATE], TASK_S_FREE
     mov word [sched_tasks + bx + TASK_BASE_SEG], 0
     mov byte [sched_tasks + bx + TASK_FLAGS], 0
+    mov byte [sched_tasks + bx + TASK_PARENT], 0xFF
     mov ax, bx
     mov cl, 4
     shr ax, cl
     call sched_task_clear_name
+    mov al, [.parent_tmp]
+    cmp al, 0xFF
+    je .kdone
+    xor bh, bh
+    mov bl, al
+    shl bx, 4
+    cmp byte [sched_tasks + bx + TASK_STATE], TASK_S_WAITING
+    jne .kdone
+    mov byte [sched_tasks + bx + TASK_STATE], TASK_S_READY
+.kdone:
     pop bx
     clc
     ret
 .kbad_pop:
     pop bx
 .kbad:
+    stc
+    ret
+.parent_tmp db 0
+
+; ==================================================================
+; sched_task_set_paused - pause or resume a task without losing its
+; underlying ready, sleeping or waiting state.
+; IN : BL = task id
+;      AL = 1 to pause, 0 to resume
+; OUT: CF = 0 on success, CF = 1 on failure
+; ==================================================================
+sched_task_set_paused:
+    cmp bl, TASK_SLOT_COUNT
+    jae .bad
+    cmp bl, 0
+    je .bad
+    cmp bl, [sched_cur_task]
+    je .bad
+    push bx
+    xor bh, bh
+    shl bx, 4
+    cmp byte [sched_tasks + bx + TASK_STATE], TASK_S_FREE
+    je .bad_pop
+    test al, al
+    jz .resume
+    or byte [sched_tasks + bx + TASK_FLAGS], TASK_F_PAUSED
+    jmp .done
+.resume:
+    and byte [sched_tasks + bx + TASK_FLAGS], ~TASK_F_PAUSED & 0xFF
+.done:
+    pop bx
+    clc
+    ret
+.bad_pop:
+    pop bx
+.bad:
     stc
     ret
 
