@@ -449,6 +449,7 @@ programs=(
     "programs/calendar.asm CALENDAR.BIN"
     "programs/settings.asm SETTINGS.BIN"
     "programs/prasm.asm PRASM.BIN"
+    "programs/open.asm OPEN.BIN"
 )
 
 for prog in "${programs[@]}"; do
