@@ -154,6 +154,11 @@ name_nortyashka    db 'Nortyashka', 0
 name_qqq           db 'QQQ', 0
 name_leonid        db 'Leonid', 0
 name_vasily        db 'Vasily Novosad',0
+name_pushnyasha    db 'pushnyasha', 0
+name_theBIT5       db 'theBIT5', 0
+name_MSTendo64     db 'MSTendo64', 0
+name_CleFer        db 'CleFer', 0
+name_debagr        db 'debagr', 0
 
 entries:
     dw name_hanakbe,      role_contributor
@@ -187,6 +192,11 @@ entries:
     dw name_qqq,          role_sponsor
     dw name_leonid,       role_sponsor
     dw name_vasily,       role_sponsor
+    dw name_pushnyasha,   role_sponsor
+    dw name_theBIT5,      role_sponsor
+    dw name_MSTendo64,    role_sponsor
+    dw name_CleFer,       role_sponsor
+    dw name_debagr,       role_sponsor
 entries_end:
 
 entries_count equ (entries_end - entries) / ENTRY_SIZE
