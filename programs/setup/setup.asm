@@ -496,15 +496,10 @@ setup:
 
     mov si, 43008
     call string_to_int
-    cmp ax, 0
-    je .default_programs
     cmp ax, 2
     je .essential_programs
     cmp ax, 3
     je .minimal_programs
-    jmp .default_programs
-
-.default_programs:
     jmp .save_settings
 
 .essential_programs:
@@ -512,96 +507,21 @@ setup:
     mov si, bin_dir_name
     int 0x22
 
-    mov ah, 0x06
-    mov si, brainf_file
-    int 0x22
-    mov si, bchart_file
-    int 0x22
-    mov si, credits_file
-    int 0x22
-    mov si, hello_file
-    int 0x22
-    mov si, imfplay_file
-    int 0x22
-    mov si, mandel_file
-    int 0x22
-    mov si, mine_file
-    int 0x22
-    mov si, paint_file
-    int 0x22
-    mov si, piano_file
-    int 0x22
-    mov si, pong_file
-    int 0x22
-    mov si, space_file
-    int 0x22
-    mov si, tetris_file
-    int 0x22
-    mov si, chars_file
-    int 0x22
-
-    mov ah, 0x0A
-    int 0x22
-
-    jmp .save_settings
+    mov si, essential_remove_list
+    call remove_file_list
+    jmp .leave_bin_dir
 
 .minimal_programs:
     mov ah, 0x09
     mov si, bin_dir_name
     int 0x22
 
-    mov ah, 0x06
-    mov si, brainf_file
-    int 0x22
-    mov si, bchart_file
-    int 0x22
-    mov si, credits_file
-    int 0x22
-    mov si, hello_file
-    int 0x22
-    mov si, imfplay_file
-    int 0x22
-    mov si, mandel_file
-    int 0x22
-    mov si, mine_file
-    int 0x22
-    mov si, paint_file
-    int 0x22
-    mov si, piano_file
-    int 0x22
-    mov si, pong_file
-    int 0x22
-    mov si, space_file
-    int 0x22
-    mov si, tetris_file
-    int 0x22
-    mov si, theme_file
-    int 0x22
-    mov si, calc_file
-    int 0x22
-    mov si, clock_file
-    int 0x22
-    mov si, fetch_file
-    int 0x22
-    mov si, fnt_test_file
-    int 0x22
-    mov si, grep_file
-    int 0x22
-    mov si, hexedit_file
-    int 0x22
-    mov si, memory_file
-    int 0x22
-    mov si, procentc_file
-    int 0x22
-    mov si, snake_file
-    int 0x22
-    mov si, writer_file
-    int 0x22
-    mov si, chars_file
-    int 0x22
-    mov si, help_file
-    int 0x22
+    mov si, essential_remove_list
+    call remove_file_list
+    mov si, minimal_remove_list
+    call remove_file_list
 
+.leave_bin_dir:
     mov ah, 0x0A
     int 0x22
 
@@ -660,6 +580,25 @@ setup:
     mov ah, 0x06
     int 0x21
 
+    ret
+
+remove_file_list:
+    push ax
+    push si
+    cld
+.next:
+    cmp byte [si], 0
+    je .done
+    mov ah, 0x06
+    int 0x22
+.skip:
+    lodsb
+    test al, al
+    jnz .skip
+    jmp .next
+.done:
+    pop si
+    pop ax
     ret
 
 setup_draw_stage_ui:
@@ -875,31 +814,22 @@ theme_ocean_data:
     db '15,58,60,63', 0
 theme_ocean_size equ $ - theme_ocean_data
 
-; Program file names
-brainf_file        db 'BRAINF.BIN', 0
-bchart_file        db 'BCHART.BIN', 0
-calc_file          db 'CALC.BIN', 0
-chars_file         db 'CHARS.BIN', 0
-clock_file         db 'CLOCK.BIN', 0
-credits_file       db 'CREDITS.BIN', 0
-fetch_file         db 'FETCH.BIN', 0
-fnt_test_file      db 'FNT_TEST.BIN', 0
-grep_file          db 'GREP.BIN', 0
-hello_file         db 'HELLO.BIN', 0
-help_file          db 'HELP.BIN', 0
-hexedit_file       db 'HEXEDIT.BIN', 0
-imfplay_file       db 'IMFPLAY.BIN', 0
-mandel_file        db 'MANDEL.BIN', 0
-memory_file        db 'MEMORY.BIN', 0
-mine_file          db 'MINE.BIN', 0
-paint_file         db 'PAINT.BIN', 0
-piano_file         db 'PIANO.BIN', 0
-pong_file          db 'PONG.BIN', 0
-procentc_file      db 'PROCENTC.BIN', 0
-snake_file         db 'SNAKE.BIN', 0
-space_file         db 'SPACE.BIN', 0
-tetris_file        db 'TETRIS.BIN', 0
-theme_file         db 'THEME.BIN', 0
-writer_file        db 'WRITER.BIN', 0
+; Program removal tables for Essential [2] and Minimal [3] modes
+essential_remove_list:
+    db 'BCHART.BIN', 0, 'BRAINF.BIN', 0, 'CHARS.BIN', 0, 'CREDITS.BIN', 0
+    db 'EYE.BIN', 0, 'HELLO.BIN', 0, 'IMFPLAY.BIN', 0, 'MANDEL.BIN', 0
+    db 'MINE.BIN', 0, 'PAINT.BIN', 0, 'PIANO.BIN', 0, 'PONG.BIN', 0
+    db 'PROCENTC.BIN', 0, 'SNAKE.BIN', 0, 'SPACE.BIN', 0, 'TETRIS.BIN', 0
+    db 'TETRIS2.BIN', 0, 'WAVPLAY.BIN', 0
+    db 0
+
+minimal_remove_list:
+    db 'CALC.BIN', 0, 'CALENDAR.BIN', 0, 'CLOCK.BIN', 0, 'CPU.BIN', 0
+    db 'DLIST.BIN', 0, 'ED.BIN', 0, 'FDISK.BIN', 0, 'FETCH.BIN', 0
+    db 'FONT.BIN', 0, 'GREP.BIN', 0, 'HEAD.BIN', 0, 'HELP.BIN', 0
+    db 'HEXEDIT.BIN', 0, 'KILL.BIN', 0, 'LAUNCH.BIN', 0, 'MEMORY.BIN', 0
+    db 'PRASM.BIN', 0, 'PRINT.BIN', 0, 'PS.BIN', 0, 'SETTINGS.BIN', 0
+    db 'TAIL.BIN', 0, 'THEME.BIN', 0, 'TREE.BIN', 0, 'WRITER.BIN', 0
+    db 0
 
 setup_stage_current db 0
