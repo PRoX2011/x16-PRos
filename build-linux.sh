@@ -444,6 +444,7 @@ programs=(
     "programs/calendar.asm CALENDAR.BIN"
     "programs/settings.asm SETTINGS.BIN"
     "programs/prasm.asm PRASM.BIN"
+    "programs/vesa_test.asm VESA.BIN"
 )
 
 for prog in "${programs[@]}"; do
