@@ -2327,6 +2327,7 @@ bg_command:
 
 ; ====== DRIVERS ======
 %INCLUDE "src/drivers/ps2_mouse.asm"                ; Mouse driver
+%INCLUDE "src/drivers/vesa.asm"                     ; Vesa driver
 ; =====================
 
 ; ====== API ======
