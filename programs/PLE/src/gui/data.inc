@@ -73,7 +73,7 @@ icon_has_logo   times MAX_ICONS    db 0
 bg_style        db  0
 bg_is_pcx       db  1
 bg_cache_ready  db  0
-bg_pcx_path     db 'WALL.PCX', 0
+bg_pcx_path     db 'FIELD.PCX', 0
                 times 64 - ($ - bg_pcx_path) db 0
 bg_pattern      db 0x88, 0x00, 0x22, 0x00, 0x88, 0x00, 0x22, 0x00
 

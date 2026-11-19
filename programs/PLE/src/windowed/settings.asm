@@ -1629,7 +1629,7 @@ task_name_buf   times 16 db 0
 cfg_round       dw 2
 cfg_gap         dw 6
 cfg_variant     db 1
-cfg_image       db 'WALL.PCX', 0
+cfg_image       db 'FIELD.PCX', 0
                 times 64 - ($ - cfg_image) db 0
 cfg_wall        db 0x88, 0x00, 0x22, 0x00, 0x88, 0x00, 0x22, 0x00
 wall_tmp        times TILE_N db 0

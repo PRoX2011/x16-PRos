@@ -626,10 +626,13 @@ for file in "${image_files[@]}"; do
     print_ok "$file copied successfully"
 done
 
-print_info "Copying WALL.PCX to PLE.DIR/GUI.DIR/IMAGES.DIR..."
-mcopy -i disk_img/x16pros.img assets/images/WALL.PCX ::/PLE.DIR/GUI.DIR/IMAGES.DIR/
-check_error "WALL.PCX copy failed"
-print_ok "WALL.PCX copied successfully"
+for pcx in assets/images/*.PCX; do
+    fname=$(basename "$pcx")
+    print_info "Copying $fname to PLE.DIR/GUI.DIR/IMAGES.DIR..."
+    mcopy -i disk_img/x16pros.img "$pcx" ::/PLE.DIR/GUI.DIR/IMAGES.DIR/
+    check_error "$fname copy failed"
+    print_ok "$fname copied successfully"
+done
 
 # Copy music files
 if [ $FLAG_NO_MUSIC == 0 ]; then
