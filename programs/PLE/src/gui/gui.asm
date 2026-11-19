@@ -30,13 +30,24 @@ PLE_LOGO          "logo/gui.raw"
 %define ICON_COLS   6
 %define MAX_ICONS   16
 %define MAX_TASKS   8
-%define LOGO_LOAD_OFF   0x4000
+%define LOGO_LOAD_OFF   0x6000
 %define LOGO_HDR_BYTES  (0x40 + 4096)
 %define LOGO_CACHE_OFF  0x8000
 %define LOGO_PX         32
 %define POPUP_BUF_OFF   0xC000
 %define POPUP_MAX_BPR   16
 %define POPUP_MAX_ROWS  (MAX_FONTS * 16)
+
+%define SURF_TEXT
+%define SURF_PICK
+%define surf_pick_list  0x6000
+
+%define DESKTOP_H       (480 - MENUBAR_H)
+%define WP_VRAM_OFF     0x9600
+%define WP_VRAM_ROWS    339
+%define WP_RAM_SEG      0x2200
+%define WP_RAM_ROWS     (DESKTOP_H - WP_VRAM_ROWS)
+%define WP_RAM_PLANE_SZ (WP_RAM_ROWS * 80)
 
 %define ICON_ROUND_MAX  16 ; corner chamfer ceiling
 %define NAME_GAP_MAX    24 ; icon to label gap ceiling
@@ -64,7 +75,7 @@ PLE_LOGO          "logo/gui.raw"
 %define FONT_MENU_IW  110
 %define MAX_FONTS     12
 
-%define WPMENU_N   8
+%define WPMENU_N   9
 %define WPMENU_IW  110
 %define WPMENU_IH  16
 %define WPMENU_X   (MENU_X + MENU_IW)
@@ -107,6 +118,7 @@ start:
     mov word [last_icon], 0xFFFF
     mov word [last_tick], 0
     mov byte [last_title_slot], 0xFF
+    mov byte [surf_keys], 1
     xor bx, bx
 .clrw:
     cmp bx, MAX_WIN
@@ -125,9 +137,9 @@ start:
     int 0x23
 
     call wm_create
-    call load_gui_configs
     call enumerate_ple
     call cache_logos
+    call load_gui_configs
     call adopt_tasks
     call full_repaint
 
@@ -449,6 +461,7 @@ gui_quit:
 %include "wm.inc"
 %include "wmblock.inc"
 %include "windows.inc"
+%include "wallpaper.asm"
 %include "launch.inc"
 %include "bar.inc"
 %include "icons.inc"
@@ -461,7 +474,12 @@ gui_quit:
 %include "data.inc"
 
 %include "grafx.inc"
+%include "surf.inc"
 %include "win.inc"
 %include "font.inc"
+
+%if ($ - $$) > LOGO_LOAD_OFF
+    %error "GUI code/data exceeds LOGO_LOAD_OFF"
+%endif
 
 PLE_END

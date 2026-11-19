@@ -27,10 +27,7 @@ open_window:
 
     mov ah, 0x0E
     int 0x22
-.ow_root:
-    mov ah, 0x0A
-    int 0x22
-    jnc .ow_root
+    call wp_to_root
     mov ah, 0x09
     mov si, pledir_name
     int 0x22
@@ -46,7 +43,7 @@ open_window:
     add si, ax
     mov ah, 0x11
     int 0x23
-    jc .ow_fail
+    jc .ow_mem_fail
     xor bh, bh
     mov bl, [.slot]
     mov [w_task + bx], al
@@ -61,12 +58,21 @@ open_window:
     call full_repaint
     popa
     ret
+.ow_mem_fail:
+    mov ah, 0x0F
+    int 0x22
+    mov si, err_oom_msg
+    call surf_okay_dialog
+    call full_repaint
+    popa
+    ret
 .ow_fail:
     mov ah, 0x0F
     int 0x22
     popa
     ret
-.slot db 0
+.slot       db 0
+err_oom_msg db 'Not enough memory', 0
 
 close_window:
     pusha

@@ -85,6 +85,7 @@ apply_font_idx:
     pop si
     jc .done
     call save_font_cfg
+    call rebuild_desktop_cache
 .done:
     popa
     ret

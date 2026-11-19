@@ -9,6 +9,7 @@
 %define SURF_INC
 
 %include "wm.inc"
+%include "pcx.inc"
 
 SURF_CLIP_MAX equ GFX_CLIP_MAX
 SURF_NO_RUN   equ 0xFFFF
@@ -707,6 +708,24 @@ surf_fill_circle:
 .x   dw 0
 .y   dw 0
 .d   dw 0
+
+; ========================================================================
+; surf_draw_pcx - Draw a 16-color *.PCX image
+; IN:  SI = pointer to filename (null-terminated)
+;      CX = X coordinate (relative to surface)
+;      DX = Y coordinate (relative to surface)
+; OUT: CF = 0 on success, CF = 1 on error
+; ========================================================================
+surf_pcx:
+surf_draw_pcx:
+    push cx
+    push dx
+    add cx, [surf_ox]
+    add dx, [surf_oy]
+    call pcx_draw
+    pop dx
+    pop cx
+    ret
 
 ; ========================================================================
 ; surf_print - draw a NUL-terminated string
@@ -1486,6 +1505,109 @@ surf_slider_val:
 .w   dw 0
 
 SURF_SLIDER_KW  equ 10
+SURF_BAR_BW     equ 6
+SURF_BAR_GAP    equ 2
+SURF_BAR_STEP   equ (SURF_BAR_BW + SURF_BAR_GAP)
+
+; ========================================================================
+; surf_bar - draw a segmented block progress/level bar
+; IN:  CX = x
+;      DX = y
+;      SI = width
+;      DI = height
+;      AX = current value (0..BP)
+;      BP = maximum value (100%)
+;      BL = active block colour (0..15)
+; OUT: nothing (all registers preserved)
+; ========================================================================
+surf_bar:
+    pusha
+    mov [.x], cx
+    mov [.y], dx
+    mov [.w], si
+    mov [.h], di
+    mov [.val], ax
+    mov [.max], bp
+    mov [.col], bl
+
+    mov al, 15
+    call surf_fill_rect
+    xor al, al
+    call surf_rect
+
+    mov ax, [.w]
+    sub ax, 6
+    jb .done
+    cmp ax, SURF_BAR_BW
+    jb .done
+    add ax, SURF_BAR_GAP
+    xor dx, dx
+    mov bx, SURF_BAR_STEP
+    div bx
+    test ax, ax
+    jz .done
+    mov [.total], ax
+
+    mov ax, [.h]
+    sub ax, 6
+    jle .done
+    mov [.ih], ax
+
+    mov bp, [.max]
+    mov ax, [.val]
+    test bp, bp
+    jz .zero
+    test ax, ax
+    jz .zero
+    cmp ax, bp
+    jae .full
+    mul word [.total]
+    div bp
+    test ax, ax
+    jnz .draw_blocks
+    mov ax, 1
+    jmp .draw_blocks
+.zero:
+    xor ax, ax
+    jmp .draw_blocks
+.full:
+    mov ax, [.total]
+
+.draw_blocks:
+    mov [.filled], ax
+    mov cx, [.x]
+    add cx, 3
+    mov dx, [.y]
+    add dx, 3
+    xor bx, bx
+.block:
+    cmp bx, [.total]
+    jae .done
+    mov al, [.col]
+    cmp bx, [.filled]
+    jb .paint_blk
+    mov al, 7
+.paint_blk:
+    mov si, SURF_BAR_BW
+    mov di, [.ih]
+    call surf_fill_rect
+    add cx, SURF_BAR_STEP
+    inc bx
+    jmp .block
+
+.done:
+    popa
+    ret
+.x      dw 0
+.y      dw 0
+.w      dw 0
+.h      dw 0
+.val    dw 0
+.max    dw 0
+.total  dw 0
+.filled dw 0
+.ih     dw 0
+.col    db 0
 
 ; ========================================================================
 ; surf_vbar - draw the knob of a vertical scroll bar
@@ -2627,7 +2749,9 @@ surf_pick:
 .one    times 13 db 0
 .field  times SURF_TF_SIZE db 0
 
+%ifndef surf_pick_list
 surf_pick_list times 8190 db 0
+%endif
 
 ; ========================================================================
 ; surf_path_go - enter the folders of a path from surf_pick
@@ -2692,5 +2816,136 @@ surf_path_back:
     ret
 
 %endif ; SURF_PICK
+
+; ========================================================================
+; surf_okay_dialog - show a centered message box with an OK button
+; IN:  SI = NUL-terminated message string
+; OUT: nothing (all registers preserved)
+; ========================================================================
+surf_okay_dialog:
+    pusha
+    mov [.msg], si
+    mov al, [surf_keys]
+    mov [.old_keys], al
+    mov byte [surf_keys], 1
+    mov byte [surf_mb_prev], 1
+
+    call surf_sync
+    call .draw
+.loop:
+    call surf_idle
+    call surf_sync
+    cmp byte [surf_close], 0
+    jne .done
+    cmp byte [surf_dirty], 0
+    je .check_in
+    call .draw
+.check_in:
+    call surf_input
+    mov ax, [surf_key]
+    cmp al, 13
+    je .done
+    cmp al, 27
+    je .done
+    cmp al, ' '
+    je .done
+    cmp byte [surf_mpress], 0
+    je .loop
+    mov cx, [.bx]
+    mov dx, [.by]
+    mov si, 48
+    mov di, 18
+    call surf_in_rect
+    jc .done
+    jmp .loop
+
+.done:
+    mov al, [.old_keys]
+    mov [surf_keys], al
+    popa
+    ret
+
+.draw:
+    mov si, [.msg]
+    call surf_text_w
+    mov [.tw], ax
+    add ax, 24
+    cmp ax, 120
+    jae .w_min_ok
+    mov ax, 120
+.w_min_ok:
+    mov bx, [surf_w]
+    sub bx, 8
+    cmp ax, bx
+    jle .w_max_ok
+    mov ax, bx
+.w_max_ok:
+    mov [.w], ax
+
+    mov cx, [surf_w]
+    sub cx, ax
+    sar cx, 1
+    mov [.x], cx
+
+    mov dx, [surf_h]
+    sub dx, 60
+    sar dx, 1
+    jns .y_ok
+    xor dx, dx
+.y_ok:
+    mov [.y], dx
+
+    mov ax, [.w]
+    sub ax, 48
+    shr ax, 1
+    add ax, [.x]
+    mov [.bx], ax
+    mov ax, [.y]
+    add ax, 34
+    mov [.by], ax
+
+    call surf_begin_paint
+    mov cx, [.x]
+    mov dx, [.y]
+    mov si, [.w]
+    mov di, 60
+    mov al, 15
+    call surf_fill_rect
+    xor al, al
+    call surf_rect
+
+    mov ax, [.w]
+    sub ax, [.tw]
+    jns .tx_ok
+    mov ax, 8
+.tx_ok:
+    shr ax, 1
+    add ax, [.x]
+    mov cx, ax
+    mov dx, [.y]
+    add dx, 10
+    mov si, [.msg]
+    xor al, al
+    call surf_print
+
+    mov cx, [.bx]
+    mov dx, [.by]
+    mov si, 48
+    mov di, 18
+    mov bx, .ok_lbl
+    xor al, al
+    call surf_button
+    call surf_end_paint
+    ret
+
+.msg      dw 0
+.tw       dw 0
+.x        dw 0
+.y        dw 0
+.w        dw 0
+.bx       dw 0
+.by       dw 0
+.old_keys db 0
+.ok_lbl   db 'OK', 0
 
 %endif ; SURF_INC

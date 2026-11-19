@@ -59,9 +59,11 @@ wtile_y         dw 30, 30, 240, 240, 135
 clip_n          db 0
 clip_rects      times MAX_CLIP * 4 dw 0
 
-menu_str        db 'x16-PRos GUI v0.1', 0
+menu_str        db 'x16-PRos GUI v0.2', 0
 pledir_name     db 'PLE.DIR', 0
 guidir_name     db 'GUI.DIR', 0
+imgdir_name     db 'IMAGES.DIR', 0
+wp_pick_title   db 'Select *.PCX image', 0
 
 file_list_buf   times 720          db 0
 icon_names      times MAX_ICONS*16 db 0
@@ -69,6 +71,10 @@ icon_has_logo   times MAX_ICONS    db 0
 
 ; background
 bg_style        db  0
+bg_is_pcx       db  1
+bg_cache_ready  db  0
+bg_pcx_path     db 'WALL.PCX', 0
+                times 64 - ($ - bg_pcx_path) db 0
 bg_pattern      db 0x88, 0x00, 0x22, 0x00, 0x88, 0x00, 0x22, 0x00
 
 bg_patterns:
@@ -83,7 +89,7 @@ bg_patterns:
 
 ; wallpaper menu
 wp_sel          db 0xFF
-wp_items        dw wp_i0, wp_i1, wp_i2, wp_i3, wp_i4, wp_i5, wp_i6, wp_i7
+wp_items        dw wp_i0, wp_i1, wp_i2, wp_i3, wp_i4, wp_i5, wp_i6, wp_i7, wp_i8
 wp_i0           db 'Dither', 0
 wp_i1           db 'Checker', 0
 wp_i2           db 'Diagonal', 0
@@ -92,3 +98,4 @@ wp_i4           db 'Bricks', 0
 wp_i5           db 'Dots', 0
 wp_i6           db 'Blocks', 0
 wp_i7           db 'Black', 0
+wp_i8           db 0x04, 'IMAGE', 0

@@ -6,10 +6,7 @@
 gui_enter_conf:
     mov ah, 0x0E
     int 0x22
-.toroot:
-    mov ah, 0x0A
-    int 0x22
-    jnc .toroot
+    call wp_to_root
 
     mov ah, 0x09
     mov si, cfg_conf_dir
@@ -220,47 +217,63 @@ gui_num_to_text:
     ret
 
 ; ========================================================================
-; APPLY_WALLPAPER - Copy the built-in bg_style names into bg_pattern and
-; keep it on config
+; GUI_ENTER_WALL_CONF - go to <X>:/CONF.DIR/GUI.DIR/WALL.DIR
+; IN : nothing
+; OUT : CF = 1 if the directory could not be entered
 ; ========================================================================
-apply_wallpaper:
-    pusha
-    push es
-
-    push ds
-    pop es
-    cld
-
-    mov al, [bg_style]
-    xor ah, ah
-    shl ax, 3
-    mov si, bg_patterns
-    add si, ax
-    mov di, bg_pattern
-    mov cx, 8
-    rep movsb
-
-    call save_wallpaper_cfg
-
-    pop es
-    popa
+gui_enter_wall_conf:
+    call gui_enter_conf
+    jc .out
+    mov ah, 0x09
+    mov si, cfg_wall_dir
+    int 0x22
+    jnc .ok
+    mov ah, 0x0B
+    mov si, cfg_wall_dir
+    int 0x22
+    jc .fail
+    mov ah, 0x09
+    mov si, cfg_wall_dir
+    int 0x22
+    jc .fail
+.ok:
+    clc
+    ret
+.fail:
+    mov ah, 0x0F
+    int 0x22
+    stc
+.out:
     ret
 
 ; ========================================================================
-; SAVE_WALLPAPER_CFG - store bg_pattern as eight decimal numbers
+; SAVE_WALLPAPER_CFG - Store VARIANT.CFG and PATERN.CFG or IMAGE.CFG
 ; ========================================================================
 save_wallpaper_cfg:
     pusha
     push es
 
-    call gui_enter_conf
+    call gui_enter_wall_conf
     jc .done
 
     push ds
     pop es
     cld
-    mov si, bg_pattern
+
+    mov byte [cfg_buf], '0'
+    cmp byte [bg_is_pcx], 0
+    je .write_variant
+    mov byte [cfg_buf], '1'
+.write_variant:
+    mov si, cfg_variant_file
+    mov cx, 1
+    call .write_file
+
     mov di, cfg_buf
+    cmp byte [bg_is_pcx], 0
+    jne .pcx
+
+    mov si, bg_pattern
     mov cx, 8
 .row:
     lodsb
@@ -268,20 +281,26 @@ save_wallpaper_cfg:
     mov al, 10
     stosb
     loop .row
+    mov si, cfg_patern_file
+    jmp .write
 
-    mov ax, di
-    sub ax, cfg_buf
-    mov [.len], ax
+.pcx:
+    mov si, bg_pcx_path
+.copy_path:
+    lodsb
+    test al, al
+    jz .end_path
+    stosb
+    jmp .copy_path
+.end_path:
+    mov al, 10
+    stosb
+    mov si, cfg_image_file
 
-    mov ah, 0x06
-    mov si, cfg_wall_file
-    int 0x22
-
-    mov ah, 0x03
-    mov si, cfg_wall_file
-    mov bx, cfg_buf
-    mov cx, [.len]
-    int 0x22
+.write:
+    mov cx, di
+    sub cx, cfg_buf
+    call .write_file
 
     mov ah, 0x0F
     int 0x22
@@ -290,10 +309,17 @@ save_wallpaper_cfg:
     pop es
     popa
     ret
-.len dw 0
+
+.write_file:
+    mov ah, 0x06
+    int 0x22
+    mov ah, 0x03
+    mov bx, cfg_buf
+    int 0x22
+    ret
 
 ; ========================================================================
-; LOAD_WALLPAPER_CFG - Read the pattern back
+; LOAD_WALLPAPER_CFG - Read VARIANT.CFG and PATERN.CFG or IMAGE.CFG
 ; ========================================================================
 load_wallpaper_cfg:
     pusha
@@ -303,8 +329,62 @@ load_wallpaper_cfg:
     pop es
     cld
 
+    mov ah, 0x09
+    mov si, cfg_wall_dir
+    int 0x22
+    jc .done
+
     mov ah, 0x02
-    mov si, cfg_wall_file
+    mov si, cfg_variant_file
+    mov cx, cfg_buf
+    int 0x22
+    jc .pcx
+
+    call gui_parse_num
+    jc .pcx
+    cmp ax, 0
+    je .pattern
+
+.pcx:
+    mov byte [bg_is_pcx], 1
+    mov ah, 0x02
+    mov si, cfg_image_file
+    mov cx, cfg_buf
+    int 0x22
+    jc .done
+
+    mov si, cfg_buf
+    mov di, bg_pcx_path
+    cmp bx, 63
+    jbe .copy_len_ok
+    mov bx, 63
+.copy_len_ok:
+    xor cx, cx
+.copy_pcx:
+    test bx, bx
+    jz .pcx_term
+    lodsb
+    cmp al, 13
+    je .pcx_term
+    cmp al, 10
+    je .pcx_term
+    test al, al
+    jz .pcx_term
+    stosb
+    inc cx
+    dec bx
+    jmp .copy_pcx
+.pcx_term:
+    test cx, cx
+    jz .done
+    xor al, al
+    stosb
+    jmp .done
+
+.pattern:
+    mov byte [bg_is_pcx], 0
+    mov ah, 0x02
+    mov si, cfg_patern_file
     mov cx, cfg_buf
     int 0x22
     jc .fallback
@@ -314,14 +394,7 @@ load_wallpaper_cfg:
     jnc .done
 
 .fallback:
-    mov al, [bg_style]
-    xor ah, ah
-    shl ax, 3
-    mov si, bg_patterns
-    add si, ax
-    mov di, bg_pattern
-    mov cx, 8
-    rep movsb
+    call set_style_pattern
 
 .done:
     pop es
@@ -336,7 +409,7 @@ load_wallpaper_cfg:
 load_gui_configs:
     pusha
     call gui_enter_conf
-    jc .done
+    jc .cache_wp
 
     mov si, cfg_round_file
     mov di, icon_round
@@ -352,15 +425,20 @@ load_gui_configs:
 
     mov ah, 0x0F
     int 0x22
-.done:
+
+.cache_wp:
+    call rebuild_desktop_cache
     popa
     ret
 
-cfg_conf_dir   db 'CONF.DIR', 0
-cfg_gui_dir    db 'GUI.DIR', 0
-cfg_round_file db 'IC_ROUND.CFG', 0
-cfg_gap_file   db 'NAME_GAP.CFG', 0
-cfg_wall_file  db 'WALLPAP.CFG', 0
+cfg_conf_dir     db 'CONF.DIR', 0
+cfg_gui_dir      db 'GUI.DIR', 0
+cfg_wall_dir     db 'WALL.DIR', 0
+cfg_round_file   db 'IC_ROUND.CFG', 0
+cfg_gap_file     db 'NAME_GAP.CFG', 0
+cfg_variant_file db 'VARIANT.CFG', 0
+cfg_patern_file  db 'PATERN.CFG', 0
+cfg_image_file   db 'IMAGE.CFG', 0
 
 icon_round     dw 2
 name_gap       dw 6

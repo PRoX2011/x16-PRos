@@ -144,15 +144,16 @@ ple_load:
     mov ax, [ple_base_seg]
     call mem_free
     mov si, ple_load_failed_msg
-    call print_string_red
-    call print_newline
-    stc
-    ret
+    jmp .err_msg
 
 .alloc_failed:
     mov si, ple_load_failed_msg
+.err_msg:
+    cmp byte [ple_bg_silent], 0
+    jne .err_silent
     call print_string_red
     call print_newline
+.err_silent:
     stc
     ret
 
@@ -240,10 +241,7 @@ ple_load:
     mov ax, [ple_base_seg]
     call mem_free
     mov si, ple_bad_sig_msg
-    call print_string_red
-    call print_newline
-    stc
-    ret
+    jmp .err_msg
 
 .bad_version:
     pop ds
@@ -251,10 +249,7 @@ ple_load:
     mov ax, [ple_base_seg]
     call mem_free
     mov si, ple_bad_version_msg
-    call print_string_red
-    call print_newline
-    stc
-    ret
+    jmp .err_msg
 
 .bad_table:
     pop ds
@@ -262,10 +257,7 @@ ple_load:
     mov ax, [ple_base_seg]
     call mem_free
     mov si, ple_bad_table_msg
-    call print_string_red
-    call print_newline
-    stc
-    ret
+    jmp .err_msg
 
 .bad_align:
     pop ds
@@ -273,10 +265,7 @@ ple_load:
     mov ax, [ple_base_seg]
     call mem_free
     mov si, ple_bad_align_msg
-    call print_string_red
-    call print_newline
-    stc
-    ret
+    jmp .err_msg
 
 ; =======================================================================
 ; PLE_EXECUTE - foreground launch.
@@ -356,7 +345,9 @@ ple_run_loaded:
 ; OUT : CF = 1 on failure, otherwise 0. AX = new task id on success.
 ; =======================================================================
 ple_execute_bg:
+    mov byte [ple_bg_silent], 1
     call ple_load
+    mov byte [ple_bg_silent], 0
     jc .load_failed
 
     mov al, TASK_F_BACKGROUND
@@ -375,9 +366,6 @@ ple_execute_bg:
 .no_slot:
     mov ax, [ple_base_seg]
     call mem_free
-    mov si, ple_no_slot_msg
-    call print_string_red
-    call print_newline
     stc
     ret
 
@@ -611,5 +599,6 @@ ple_pix_color        db 0
 ple_logo_row_buf     times 64 db 0
 ple_exec_flags       db 0
 ple_hdr_flags        db 0
+ple_bg_silent        db 0
 ple_param_ptr        dw ple_no_params
 ple_no_params        db 0

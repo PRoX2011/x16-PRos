@@ -10,6 +10,9 @@
 PLE_HEADER start, "GUI Settings", "PRoX-dev"
 PLE_LOGO          "logo/settings.raw"
 
+%define SURF_TEXT
+%define SURF_PICK
+
 MARGIN     equ 8
 ROW_H      equ 44
 SLIDER_H   equ 14
@@ -30,9 +33,10 @@ PREV_W     equ 32
 PREV_H     equ 32
 PREV_GAP   equ 10
 
-SCREEN_MENU equ 0
-SCREEN_MAIN equ 1
-SCREEN_WALL equ 2
+SCREEN_MENU      equ 0
+SCREEN_MAIN      equ 1
+SCREEN_WALL_MENU equ 2
+SCREEN_WALL_PAT  equ 3
 
 DRAG_NONE  equ 0xFF
 DRAG_ROUND equ 0
@@ -137,21 +141,24 @@ start:
 
     cmp byte [screen], SCREEN_MAIN
     je .press_main
-    jmp .press_wall
+    cmp byte [screen], SCREEN_WALL_MENU
+    je .press_wall_menu
+    jmp .press_wall_pat
 
 .press_menu:
-    mov cx, [nav_x]
-    mov dx, [nav1_y]
-    mov si, [nav_w]
-    mov di, NAV_H
-    call surf_in_rect
-    jc .open_main
-    mov cx, [nav_x]
-    mov dx, [nav2_y]
-    mov si, [nav_w]
-    mov di, NAV_H
-    call surf_in_rect
-    jc .open_wall
+    call nav_hit
+    test al, al
+    jz .open_main
+    cmp al, 1
+    je .open_wall_menu
+    jmp .pace
+
+.press_wall_menu:
+    call nav_hit
+    test al, al
+    jz .open_wall_img
+    cmp al, 1
+    je .open_wall_pat
     jmp .pace
 
 .press_main:
@@ -170,11 +177,12 @@ start:
     jc .grab_gap
     jmp .pace
 
-.press_wall:
+.press_wall_pat:
     call tile_hit
     jnc .pace
     call tile_toggle
     mov byte [drag_row], DRAG_TILE
+    mov byte [cfg_variant], 0
     mov byte [saved], 0
     call draw_all
     jmp .pace
@@ -183,12 +191,23 @@ start:
     mov al, SCREEN_MAIN
     call switch_screen
     jmp .pace
-.open_wall:
-    mov al, SCREEN_WALL
+.open_wall_menu:
+    mov al, SCREEN_WALL_MENU
+    call switch_screen
+    jmp .pace
+.open_wall_img:
+    call pick_wall_image
+    jmp .pace
+.open_wall_pat:
+    mov al, SCREEN_WALL_PAT
     call switch_screen
     jmp .pace
 .do_back:
     mov al, SCREEN_MENU
+    cmp byte [screen], SCREEN_WALL_PAT
+    jne .back_go
+    mov al, SCREEN_WALL_MENU
+.back_go:
     call switch_screen
     jmp .pace
 
@@ -203,7 +222,14 @@ start:
 .do_save:
     call save_round_cfg
     call save_gap_cfg
+    cmp byte [screen], SCREEN_WALL_PAT
+    je .save_pat
+    cmp byte [cfg_variant], 0
+    jne .save_done
+.save_pat:
+    mov byte [cfg_variant], 0
     call save_wall_cfg
+.save_done:
     mov byte [saved], 1
     call draw_all
     jmp .pace
@@ -267,6 +293,34 @@ switch_screen:
     popa
     ret
 
+nav_hit:
+    push cx
+    push dx
+    push si
+    push di
+    mov cx, [nav_x]
+    mov dx, [nav1_y]
+    mov si, [nav_w]
+    mov di, NAV_H
+    call surf_in_rect
+    jc .b0
+    mov dx, [nav2_y]
+    call surf_in_rect
+    jc .b1
+    mov al, 0xFF
+    jmp .out
+.b0:
+    xor al, al
+    jmp .out
+.b1:
+    mov al, 1
+.out:
+    pop di
+    pop si
+    pop dx
+    pop cx
+    ret
+
 compute_layout:
     pusha
     mov ax, [surf_h]
@@ -298,7 +352,7 @@ compute_layout:
 
     cmp byte [screen], SCREEN_MAIN
     je .main
-    cmp byte [screen], SCREEN_WALL
+    cmp byte [screen], SCREEN_WALL_PAT
     je .wall
 
     mov ax, [surf_w]
@@ -545,12 +599,17 @@ draw_all:
 
     cmp byte [screen], SCREEN_MAIN
     je .main
-    cmp byte [screen], SCREEN_WALL
+    cmp byte [screen], SCREEN_WALL_MENU
+    je .wall_menu
+    cmp byte [screen], SCREEN_WALL_PAT
     je .wall
     call draw_screen_menu
     jmp .bottom
 .main:
     call draw_screen_main
+    jmp .bottom
+.wall_menu:
+    call draw_screen_wall_menu
     jmp .bottom
 .wall:
     call draw_screen_wall
@@ -602,26 +661,41 @@ draw_all:
     popa
     ret
 
-; ========================================================================
-; draw_screen_menu - the screen selector
-; IN:  nothing
-; OUT: nothing
-; ========================================================================
 draw_screen_menu:
+    push bx
+    push dx
+    mov bx, str_nav_main
+    mov dx, str_nav_wall
+    call draw_nav_pair
+    pop dx
+    pop bx
+    ret
+
+draw_screen_wall_menu:
+    push bx
+    push dx
+    mov bx, str_wall_img
+    mov dx, str_wall_pat
+    call draw_nav_pair
+    pop dx
+    pop bx
+    ret
+
+draw_nav_pair:
     pusha
+    push dx
     mov cx, [nav_x]
     mov dx, [nav1_y]
     mov si, [nav_w]
     mov di, NAV_H
-    mov bx, str_nav_main
     xor al, al
     call surf_button
 
+    pop bx
     mov cx, [nav_x]
     mov dx, [nav2_y]
     mov si, [nav_w]
     mov di, NAV_H
-    mov bx, str_nav_wall
     xor al, al
     call surf_button
     popa
@@ -1057,6 +1131,36 @@ enter_gui_conf:
     ret
 
 ; ========================================================================
+; enter_wall_conf - move into <X>:/CONF.DIR/GUI.DIR/WALL.DIR, creating it
+; IN:  nothing
+; OUT: CF = 1 if the directory could not be entered
+; ========================================================================
+enter_wall_conf:
+    call enter_gui_conf
+    jc .out
+    mov ah, 0x09
+    mov si, wall_dir_name
+    int 0x22
+    jnc .ok
+    mov ah, 0x0B
+    mov si, wall_dir_name
+    int 0x22
+    jc .fail
+    mov ah, 0x09
+    mov si, wall_dir_name
+    int 0x22
+    jc .fail
+.ok:
+    clc
+    ret
+.fail:
+    mov ah, 0x0F
+    int 0x22
+    stc
+.out:
+    ret
+
+; ========================================================================
 ; leave_gui_conf - restore the directory saved by enter_gui_conf
 ; IN:  nothing
 ; OUT: nothing
@@ -1187,13 +1291,30 @@ parse_cfg_tile:
     ret
 
 ; ========================================================================
+; write_cfg_buf - overwrite SI in current dir with CX bytes from cfg_buf
+; ========================================================================
+write_cfg_buf:
+    push ax
+    push bx
+    push cx
+    mov ah, 0x06
+    int 0x22
+    mov ah, 0x03
+    mov bx, cfg_buf
+    int 0x22
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+; ========================================================================
 ; write_cfg_num - store AX as decimal text in the named file
 ; IN:  AX = value, SI = file name
 ; OUT: nothing
 ; ========================================================================
 write_cfg_num:
     pusha
-    mov [.name], si
+    push si
     call num_to_str
 
     mov si, num_buf
@@ -1209,21 +1330,10 @@ write_cfg_num:
     inc cx
     jmp .copy
 .copied:
-    mov [.len], cx
-
-    mov ah, 0x06
-    mov si, [.name]
-    int 0x22
-
-    mov ah, 0x03
-    mov si, [.name]
-    mov bx, cfg_buf
-    mov cx, [.len]
-    int 0x22
+    pop si
+    call write_cfg_buf
     popa
     ret
-.name dw 0
-.len  dw 0
 
 ; ========================================================================
 ; load_round_cfg - read IC_ROUND.CFG into cfg_round
@@ -1281,17 +1391,17 @@ load_gap_cfg:
 
 load_wall_cfg:
     pusha
-    call enter_gui_conf
+    call enter_wall_conf
     jc .done
 
     mov ah, 0x02
     mov si, wall_cfg_file
     mov cx, cfg_buf
     int 0x22
-    jc .leave
+    jc .check_var
 
     call parse_cfg_tile
-    jc .leave
+    jc .check_var
 
     mov si, wall_tmp
     mov di, cfg_wall
@@ -1302,6 +1412,18 @@ load_wall_cfg:
     inc si
     inc di
     loop .copy
+.check_var:
+    mov ah, 0x02
+    mov si, variant_cfg_file
+    mov cx, cfg_buf
+    int 0x22
+    jc .leave
+
+    call parse_cfg_num
+    jc .leave
+    cmp ax, 1
+    ja .leave
+    mov [cfg_variant], al
 .leave:
     call leave_gui_conf
 .done:
@@ -1344,7 +1466,7 @@ save_gap_cfg:
 
 save_wall_cfg:
     pusha
-    call enter_gui_conf
+    call enter_wall_conf
     jc .done
 
     mov di, cfg_buf
@@ -1372,31 +1494,119 @@ save_wall_cfg:
     jmp .row
 
 .write:
-    mov ax, di
-    sub ax, cfg_buf
-    mov [.len], ax
-
-    mov ah, 0x06
+    mov cx, di
+    sub cx, cfg_buf
     mov si, wall_cfg_file
-    int 0x22
+    call write_cfg_buf
 
-    mov ah, 0x03
-    mov si, wall_cfg_file
-    mov bx, cfg_buf
-    mov cx, [.len]
-    int 0x22
+    xor ax, ax
+    mov si, variant_cfg_file
+    call write_cfg_num
 
     call leave_gui_conf
 .done:
     popa
     ret
-.len dw 0
 
-conf_dir_name   db 'CONF.DIR', 0
-gui_dir_name    db 'GUI.DIR', 0
-round_cfg_file  db 'IC_ROUND.CFG', 0
-gap_cfg_file    db 'NAME_GAP.CFG', 0
-wall_cfg_file   db 'WALLPAP.CFG', 0
+; ========================================================================
+; save_image_cfg - store selected image name and VARIANT=1 in WALL.DIR
+; ========================================================================
+save_image_cfg:
+    pusha
+    call enter_wall_conf
+    jc .done
+
+    mov si, cfg_image
+    mov di, cfg_buf
+.copy:
+    lodsb
+    test al, al
+    jz .copied
+    stosb
+    jmp .copy
+.copied:
+    mov byte [di], 10
+    inc di
+    mov cx, di
+    sub cx, cfg_buf
+    mov si, image_cfg_file
+    call write_cfg_buf
+
+    mov ax, 1
+    mov si, variant_cfg_file
+    call write_cfg_num
+
+    call leave_gui_conf
+.done:
+    popa
+    ret
+
+; ========================================================================
+; pick_wall_image - choose a PCX file in IMAGES.DIR and persist config
+; ========================================================================
+pick_wall_image:
+    pusha
+    push es
+    push ds
+    pop es
+    cld
+
+    call .to_root
+    mov ah, 0x09
+    mov si, ple_dir_name
+    int 0x22
+    jc .at_root
+    mov ah, 0x09
+    mov si, gui_dir_name
+    int 0x22
+    jc .at_root
+    mov ah, 0x09
+    mov si, img_dir_name
+    int 0x22
+    jnc .pick
+.at_root:
+    call .to_root
+.pick:
+    mov byte [surf_mb_prev], 1
+    mov si, str_pick_title
+    mov di, cfg_buf
+    call surf_pick
+    pushf
+    call .to_root
+    popf
+    jc .redraw
+
+    mov si, cfg_buf
+    mov di, cfg_image
+.copy:
+    lodsb
+    stosb
+    test al, al
+    jnz .copy
+
+    mov byte [cfg_variant], 1
+    call save_image_cfg
+    mov byte [saved], 1
+.redraw:
+    call draw_all
+    pop es
+    popa
+    ret
+.to_root:
+    mov ah, 0x0A
+    int 0x22
+    jnc .to_root
+    ret
+
+conf_dir_name    db 'CONF.DIR', 0
+gui_dir_name     db 'GUI.DIR', 0
+wall_dir_name    db 'WALL.DIR', 0
+img_dir_name     db 'IMAGES.DIR', 0
+round_cfg_file   db 'IC_ROUND.CFG', 0
+gap_cfg_file     db 'NAME_GAP.CFG', 0
+wall_cfg_file    db 'PATERN.CFG', 0
+variant_cfg_file db 'VARIANT.CFG', 0
+image_cfg_file   db 'IMAGE.CFG', 0
 
 str_round       db 'Icon corner rounding', 0
 str_gap         db 'Icon to label gap', 0
@@ -1407,6 +1617,9 @@ str_back        db 'Back', 0
 str_done        db 'Saved successfully.', 0
 str_nav_main    db 'General settings', 0
 str_nav_wall    db 'Wallpaper', 0
+str_wall_img    db 'Image', 0
+str_wall_pat    db 'Pattern', 0
+str_pick_title  db 'Select *.PCX image', 0
 str_pattern     db 'Pattern', 0
 str_preview     db 'Preview', 0
 gui_file        db 'GUI.PLE', 0
@@ -1415,6 +1628,9 @@ task_name_buf   times 16 db 0
 
 cfg_round       dw 2
 cfg_gap         dw 6
+cfg_variant     db 1
+cfg_image       db 'WALL.PCX', 0
+                times 64 - ($ - cfg_image) db 0
 cfg_wall        db 0x88, 0x00, 0x22, 0x00, 0x88, 0x00, 0x22, 0x00
 wall_tmp        times TILE_N db 0
 

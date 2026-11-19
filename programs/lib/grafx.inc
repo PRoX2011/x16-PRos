@@ -143,6 +143,7 @@ gfx_pixel_raw:
     and cl, 7
     shr bx, 3
     add ax, bx
+    add ax, [gfx_vram_off]
     mov di, ax
     mov bh, 0x80
     shr bh, cl
@@ -213,8 +214,9 @@ gfx_plot_cur:
     pop ax
     ret
 
-gfx_col db 0
-gfx_xor db 0
+gfx_col      db 0
+gfx_xor      db 0
+gfx_vram_off dw 0
 
 ; ========================================================================
 ; gfx_reset_sr - restore the GC to plain CPU writes (Enable Set/Reset = 0)
@@ -377,6 +379,7 @@ gfx_hline_raw:
     mov ax, dx
     mov si, 80
     mul si
+    add ax, [gfx_vram_off]
     mov bp, ax
 
     mov dx, 0x3CE

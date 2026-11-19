@@ -15,7 +15,9 @@ MAX_ROWS        equ MAX_TASKS - 1
 TASK_S_PAUSED   equ 5
 PLE_LOGO_OFF    equ 0x40
 
+MEM_PANEL_H     equ 42
 HEADER_H        equ 20
+LIST_TOP        equ (MEM_PANEL_H + HEADER_H)
 ROW_H           equ 36
 ICON_SIZE       equ 32
 ICON_X          equ 4
@@ -27,7 +29,7 @@ KILL_W          equ 38
 PAUSE_W         equ 38
 BUTTON_H        equ 20
 WINDOW_W        equ 280
-WINDOW_H        equ 260
+WINDOW_H        equ 284
 REFRESH_TICKS   equ 18
 
 start:
@@ -133,7 +135,7 @@ compute_layout:
     mov [id_x], ax
 
     mov ax, [surf_h]
-    sub ax, HEADER_H
+    sub ax, LIST_TOP
     jbe .no_rows
     xor dx, dx
     mov bx, ROW_H
@@ -156,6 +158,7 @@ compute_layout:
 refresh_tasks:
     pusha
     mov byte [tasks_dirty], 0
+    call refresh_memory
     mov byte [row_count], 0
     mov byte [scan_id], 1
 .scan:
@@ -239,6 +242,139 @@ refresh_tasks:
     ret
 
 ; ========================================================================
+; refresh_memory - snapshot free/total KiB and update header text
+; ========================================================================
+refresh_memory:
+    pusha
+    push es
+
+    mov ah, 0x03
+    int 0x23
+    mov cl, 10
+    shr ax, cl
+    mov cl, 6
+    shl dx, cl
+    or ax, dx
+    mov [.free], ax
+
+    int 0x12
+    mov [.total], ax
+
+    mov ax, 0x4300
+    int 0x2F
+    cmp al, 0x80
+    jne .xms_done
+    mov ax, 0x4310
+    int 0x2F
+    mov [xms_entry], bx
+    mov [xms_entry + 2], es
+    push edx
+    push ecx
+    push eax
+    mov ah, 0x88
+    call far [xms_entry]
+    cmp bl, 0x80
+    je .xms_pop
+    cmp bl, 0x81
+    je .xms_pop
+    add [.free], dx
+    mov eax, ecx
+    inc eax
+    shr eax, 10
+    sub ax, 1024
+    add [.total], ax
+.xms_pop:
+    pop eax
+    pop ecx
+    pop edx
+.xms_done:
+    pop es
+
+    mov ax, [.free]
+    mov cx, [.total]
+    cmp ax, cx
+    jbe .free_ok
+    mov ax, cx
+.free_ok:
+    mov bx, cx
+    sub bx, ax
+
+    cmp ax, [mem_free_kb]
+    jne .changed
+    cmp cx, [mem_total_kb]
+    je .done
+.changed:
+    mov [mem_free_kb], ax
+    mov [mem_total_kb], cx
+    mov [mem_used_kb], bx
+    call format_mem_str
+    mov byte [tasks_dirty], 1
+.done:
+    popa
+    ret
+.free  dw 0
+.total dw 0
+
+; ========================================================================
+; format_mem_str - format mem_used_kb / mem_total_kb into mem_str_buf
+; ========================================================================
+format_mem_str:
+    pusha
+    push es
+    push ds
+    pop es
+    cld
+
+    mov di, mem_str_buf
+    mov si, str_mem_prefix
+    call .copy_str
+    mov ax, [mem_used_kb]
+    call .fmt_num
+    mov si, str_kib_sep
+    call .copy_str
+    mov ax, [mem_total_kb]
+    call .fmt_num
+    mov si, str_kib
+    call .copy_str
+    mov byte [di], 0
+
+    pop es
+    popa
+    ret
+
+.copy_str:
+    lodsb
+    test al, al
+    jz .cs_done
+    stosb
+    jmp .copy_str
+.cs_done:
+    ret
+
+.fmt_num:
+    push bx
+    push cx
+    push dx
+    mov bx, 10
+    xor cx, cx
+.div_loop:
+    xor dx, dx
+    div bx
+    push dx
+    inc cx
+    test ax, ax
+    jnz .div_loop
+.emit_loop:
+    pop ax
+    add al, '0'
+    stosb
+    loop .emit_loop
+    pop dx
+    pop cx
+    pop bx
+    ret
+
+; ========================================================================
 ; draw_all - repaint the process list and its controls
 ; ========================================================================
 draw_all:
@@ -250,11 +386,42 @@ draw_all:
     xor cx, cx
     xor dx, dx
     mov si, [surf_w]
-    mov di, HEADER_H
+    mov di, LIST_TOP
     mov al, 15
     call surf_fill_rect
+
+    mov cx, SIDE_MARGIN
+    mov dx, 3
+    mov si, mem_str_buf
+    xor al, al
+    call surf_print
+
+    mov si, [surf_w]
+    sub si, SIDE_MARGIN * 2
+    mov cx, SIDE_MARGIN
+    mov dx, 21
+    mov di, 16
+    mov ax, [mem_used_kb]
+    mov bp, [mem_total_kb]
+    mov bl, 2
+    cmp word [mem_free_kb], 64
+    jae .bar_col
+    mov bl, 4
+.bar_col:
+    call surf_bar
+
+    xor cx, cx
+    mov bx, [surf_w]
+    dec bx
+    mov dx, MEM_PANEL_H - 1
+    xor al, al
+    call surf_hline
+
+    mov dx, LIST_TOP - 1
+    call surf_hline
+
     mov cx, NAME_X
-    mov dx, 1
+    mov dx, MEM_PANEL_H + 2
     mov si, str_process
     xor al, al
     call surf_print
@@ -282,7 +449,7 @@ draw_all:
     mov ax, bx
     mov cx, ROW_H
     mul cx
-    add ax, HEADER_H
+    add ax, LIST_TOP
     mov [row_y], ax
 
     mov al, 15
@@ -362,7 +529,7 @@ draw_all:
     cmp byte [row_count], 0
     jne .done
     mov cx, NAME_X
-    mov dx, HEADER_H + 1
+    mov dx, LIST_TOP + 1
     mov si, str_empty
     xor al, al
     call surf_print
@@ -616,7 +783,7 @@ handle_press:
     mov ax, bx
     mov cx, ROW_H
     mul cx
-    add ax, HEADER_H + 8
+    add ax, LIST_TOP + 8
     mov [.y], ax
 
     mov cx, [kill_x]
@@ -668,16 +835,24 @@ handle_press:
 .id  db 0
 .y   dw 0
 
-str_process db 'PROCESS', 0
-str_id      db 'ID', 0
-str_end     db 'END', 0
-str_pr      db 'P/R', 0
-str_kill    db 'X', 0
-str_pause   db 'II', 0
-str_resume  db '>', 0
-str_empty   db 'No processes', 0
-gui_task_name db 'GUI.PLE', 0
-id_buf      db 0, 0
+str_process    db 'PROCESS', 0
+str_id         db 'ID', 0
+str_end        db 'END', 0
+str_pr         db 'P/R', 0
+str_kill       db 'X', 0
+str_pause      db 'II', 0
+str_resume     db '>', 0
+str_empty      db 'No processes', 0
+str_mem_prefix db 'Memory: ', 0
+str_kib_sep    db 'KiB / ', 0
+str_kib        db 'KiB', 0
+gui_task_name  db 'GUI.PLE', 0
+id_buf         db 0, 0
+mem_free_kb    dw 0xFFFF
+mem_total_kb   dw 0
+mem_used_kb    dw 0
+xms_entry      dd 0
+mem_str_buf    times 36 db 0
 
 self_id     db 0
 scan_id     db 0

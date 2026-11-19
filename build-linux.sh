@@ -207,94 +207,54 @@ mcopy -i disk_img/x16pros.img bin/KERNEL.BIN ::/
 check_error "Kernel copy failed"
 print_ok "Kernel copied successfully"
 
-# Create BIN directory
-print_splitline "Creating BIN directory..."
-print_info "Creating BIN directory..."
-mmd -i disk_img/x16pros.img ::/BIN.DIR
-check_error "Failed to create BIN directory"
-print_ok "BIN directory created successfully"
+# Create directories on disk images
+print_splitline "Creating directories..."
 
-# Create COM directory
-print_splitline "Creating COM directory..."
-print_info "Creating COM directory..."
-mmd -i disk_img/x16pros.img ::/COM.DIR
-check_error "Failed to create COM directory"
-print_ok "COM directory created successfully"
+dirs_disk_a=(
+    "BIN.DIR"
+    "COM.DIR"
+    "EXE.DIR"
+    "PLE.DIR"
+    "PLE.DIR/GUI.DIR"
+    "PLE.DIR/GUI.DIR/IMAGES.DIR"
+    "BMP.DIR"
+    "CONF.DIR"
+    "CONF.DIR/GUI.DIR"
+    "CONF.DIR/GUI.DIR/WALL.DIR"
+    "DOCS.DIR"
+    "MUSIC.DIR"
+    "FONTS.DIR"
+    "THEMES.DIR"
+    "ASM.DIR"
+)
 
-# Create EXE directory
-print_splitline "Creating EXE directory..."
-print_info "Creating EXE directory..."
-mmd -i disk_img/x16pros.img ::/EXE.DIR
-check_error "Failed to create EXE directory"
-print_ok "EXE directory created successfully"
+for dir in "${dirs_disk_a[@]}"; do
+    print_info "Creating $dir on x16pros.img..."
+    mmd -i disk_img/x16pros.img "::/$dir"
+    check_error "Failed to create $dir on x16pros.img"
+    print_ok "$dir created on x16pros.img"
+done
 
-# Create PLE directory
-print_splitline "Creating PLE directory..."
-print_info "Creating PLE directory..."
-mmd -i disk_img/x16pros.img ::/PLE.DIR
-check_error "Failed to create PLE directory"
-print_ok "PLE directory created successfully"
+dirs_disk_b=(
+    "MUSIC.DIR"
+)
 
-# Create PLE/GUI directory (windowed programs the GUI launches)
-print_info "Creating PLE/GUI directory..."
-mmd -i disk_img/x16pros.img ::/PLE.DIR/GUI.DIR
-check_error "Failed to create PLE/GUI directory"
-print_ok "PLE/GUI directory created successfully"
+for dir in "${dirs_disk_b[@]}"; do
+    print_info "Creating $dir on FLOPPY2.img..."
+    mmd -i disk_img/FLOPPY2.img "::/$dir"
+    check_error "Failed to create $dir on FLOPPY2.img"
+    print_ok "$dir created on FLOPPY2.img"
+done
 
-# Create BMP directory
-print_splitline "Creating BMP directory..."
-print_info "Creating BMP directory..."
-mmd -i disk_img/x16pros.img ::/BMP.DIR
-check_error "Failed to create BMP directory"
-print_ok "BMP directory created successfully"
+dirs_hdd=(
+)
 
-# Create CONF directory
-print_splitline "Creating CONF directory..."
-print_info "Creating CONF directory..."
-mmd -i disk_img/x16pros.img ::/CONF.DIR
-check_error "Failed to create CONF directory"
-print_ok "CONF directory created successfully"
-
-# Create CONF/GUI directory (settings SETTINGS.PLE writes)
-print_info "Creating CONF/GUI directory..."
-mmd -i disk_img/x16pros.img ::/CONF.DIR/GUI.DIR
-check_error "Failed to create CONF/GUI directory"
-print_ok "CONF/GUI directory created successfully"
-
-# Create DOCS directory
-print_splitline "Creating DOCS directory..."
-print_info "Creating DOCS directory..."
-mmd -i disk_img/x16pros.img ::/DOCS.DIR
-check_error "Failed to create DOCS directory"
-print_ok "DOCS directory created successfully"
-
-# Create MUSIC directory
-print_splitline "Creating MUSIC directory..."
-print_info "Creating MUSIC directory..."
-mmd -i disk_img/x16pros.img ::/MUSIC.DIR
-check_error "Failed to create MUSIC directory"
-print_ok "MUSIC directory created successfully"
-
-# Create FONTS directory
-print_splitline "Creating FONTS directory..."
-print_info "Creating FONTS directory..."
-mmd -i disk_img/x16pros.img ::/FONTS.DIR
-check_error "Failed to create FONTS directory"
-print_ok "FONTS directory created successfully"
-
-# Create THEMES directory
-print_splitline "Creating THEMES directory..."
-print_info "Creating THEMES directory..."
-mmd -i disk_img/x16pros.img ::/THEMES.DIR
-check_error "Failed to create THEMES directory"
-print_ok "THEMES directory created successfully"
-
-# Create ASM directory
-print_splitline "Creating ASM directory..."
-print_info "Creating ASM directory..."
-mmd -i disk_img/x16pros.img ::/ASM.DIR
-check_error "Failed to create ASM directory"
-print_ok "ASM directory created successfully"
+for dir in "${dirs_hdd[@]}"; do
+    print_info "Creating $dir on HDD.img..."
+    mmd -i disk_img/HDD.img "::/$dir"
+    check_error "Failed to create $dir on HDD.img"
+    print_ok "$dir created on HDD.img"
+done
 
 # Copy fonts
 print_info "Copying DEFAULT.FNT to disk..."
@@ -371,6 +331,15 @@ print_ok "IC_ROUND.CFG copied successfully"
 mcopy -i disk_img/x16pros.img src/kernel/configs/gui/NAME_GAP.CFG ::/CONF.DIR/GUI.DIR/
 check_error "NAME_GAP.CFG copy failed"
 print_ok "NAME_GAP.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/gui/wall/VARIANT.CFG ::/CONF.DIR/GUI.DIR/WALL.DIR/
+check_error "VARIANT.CFG copy failed"
+print_ok "VARIANT.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/gui/wall/PATERN.CFG ::/CONF.DIR/GUI.DIR/WALL.DIR/
+check_error "PATERN.CFG copy failed"
+print_ok "PATERN.CFG copied successfully"
+mcopy -i disk_img/x16pros.img src/kernel/configs/gui/wall/IMAGE.CFG ::/CONF.DIR/GUI.DIR/WALL.DIR/
+check_error "IMAGE.CFG copy failed"
+print_ok "IMAGE.CFG copied successfully"
 mcopy -i disk_img/x16pros.img src/kernel/configs/SYSTEM.CFG ::/
 check_error "SYSTEM.CFG copy failed"
 print_ok "SYSTEM.CFG copied successfully"
@@ -657,9 +626,14 @@ for file in "${image_files[@]}"; do
     print_ok "$file copied successfully"
 done
 
+print_info "Copying WALL.PCX to PLE.DIR/GUI.DIR/IMAGES.DIR..."
+mcopy -i disk_img/x16pros.img assets/images/WALL.PCX ::/PLE.DIR/GUI.DIR/IMAGES.DIR/
+check_error "WALL.PCX copy failed"
+print_ok "WALL.PCX copied successfully"
+
 # Copy music files
 if [ $FLAG_NO_MUSIC == 0 ]; then
-    print_splitline "Copying music files..."
+    print_splitline "Copying music files to disk A..."
     music_files=(
         "assets/IMF/RICK.IMF"
         "assets/IMF/SONIC.IMF"
@@ -673,12 +647,27 @@ if [ $FLAG_NO_MUSIC == 0 ]; then
         "assets/IMF/DF.IMF"
         "assets/IMF/TRUEHERO.IMF"
         "assets/IMF/CORE.IMF"
-        "assets/WAV/1985.WAV"
+        #"assets/WAV/1985.WAV"
     )
 
     for file in "${music_files[@]}"; do
         print_info "Copying $file..."
         mcopy -i disk_img/x16pros.img $file ::/MUSIC.DIR/
+        check_error "Copy of $file failed"
+        print_ok "$file copied successfully"
+    done
+fi
+
+# Copy music files
+if [ $FLAG_NO_MUSIC == 0 ]; then
+    print_splitline "Copying music files to disk B..."
+    music_files_dsk_b=(
+        "assets/WAV/1985.WAV"
+    )
+
+    for file in "${music_files_dsk_b[@]}"; do
+        print_info "Copying $file..."
+        mcopy -i disk_img/FLOPPY2.img $file ::/MUSIC.DIR/
         check_error "Copy of $file failed"
         print_ok "$file copied successfully"
     done

@@ -440,7 +440,6 @@ full_repaint:
     call draw_desktop_bg
     call font_init
     call draw_menubar
-    call draw_desktop_icons
     xor cx, cx
 .fw:
     cmp cx, MAX_WIN
@@ -469,74 +468,6 @@ full_repaint:
 .done:
     mov ah, 0x23
     int 0x23
-    ret
-
-draw_desktop_bg:
-    pusha
-    push es
-    cld
-    mov ax, 0xA000
-    mov es, ax
-    mov dx, 0x3CE
-    mov al, 0x01
-    out dx, al
-    inc dx
-    xor al, al
-    out dx, al
-    dec dx
-    mov al, 0x03
-    out dx, al
-    inc dx
-    xor al, al
-    out dx, al
-    dec dx
-    mov al, 0x05
-    out dx, al
-    inc dx
-    xor al, al
-    out dx, al
-    dec dx
-    mov al, 0x08
-    out dx, al
-    inc dx
-    mov al, 0xFF
-    out dx, al
-    mov dx, 0x3C4
-    mov al, 0x02
-    out dx, al
-    inc dx
-    mov al, 0x0F
-    out dx, al
-
-    mov bp, MENUBAR_H
-.row:
-    cmp bp, 480
-    jae .done
-    mov ax, bp
-    mov bx, 80
-    mul bx
-    mov di, ax
-
-    mov bx, bp
-    and bx, 7
-    mov al, [bg_pattern + bx]
-    mov cx, 80
-    rep stosb
-
-    inc bp
-    jmp .row
-.done:
-    pop es
-    popa
-    ret
-
-cycle_wallpaper:
-    inc byte [bg_style]
-    cmp byte [bg_style], BG_STYLE_COUNT
-    jb .done
-    mov byte [bg_style], 0
-.done:
-    call apply_wallpaper
     ret
 
 draw_outline:
