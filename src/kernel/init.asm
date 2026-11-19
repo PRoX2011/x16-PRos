@@ -227,6 +227,8 @@ run_setup_wizard:
 
     mov word si, [param_list]
     call launch_bin_program
+    mov al, [current_drive_char]
+    mov [sys_drive_char], al
     ret
 
 .setup_failed:

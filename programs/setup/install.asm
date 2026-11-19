@@ -1,8 +1,9 @@
-INSTALL_FILE_SEG     equ 0x3000
+INSTALL_FILE_SEG     equ 0x4000
 INSTALL_FILE_MAX_HI  equ (0xA000 - INSTALL_FILE_SEG) >> 12
 INSTALL_MAX_ENTRIES  equ 224
 INSTALL_LIST_BYTES   equ INSTALL_MAX_ENTRIES * 18
-INSTALL_MAX_DEPTH    equ 3
+INSTALL_MAX_DEPTH    equ 6
+INSTALL_LISTS_OFF    equ 0x0000
 INSTALL_ROOT_ENTS    equ 224
 INSTALL_ROOT_SECS    equ 14
 INSTALL_FAT12_MAX    equ 4084
@@ -180,8 +181,17 @@ install_probe_drives:
     mov dl, 0x80
     int 0x13
     pop es
-    jc .probe_done
+    jc .hdd_count_bda
     movzx cx, dl
+    jmp .hdd_count_ready
+.hdd_count_bda:
+    push ds
+    xor ax, ax
+    mov ds, ax
+    mov al, [0x0475]
+    pop ds
+    movzx cx, al
+.hdd_count_ready:
     test cx, cx
     jz .probe_done
     cmp cx, INSTALL_MAX_HDD
@@ -245,15 +255,27 @@ install_probe_one:
     push es
     push ds
     pop es
+    mov si, 3
+.read_boot:
     mov ax, 0x0201
     mov cx, 0x0001
     xor dh, dh
+    mov dl, [.in_dl]
     mov bx, install_sector_buf
     stc
     int 0x13
+    jnc .read_boot_ok
+    xor ah, ah
+    mov dl, [.in_dl]
+    int 0x13
+    dec si
+    jnz .read_boot
     pop es
     pop bx
-    jc .floppy_letter
+    jmp .floppy_letter
+.read_boot_ok:
+    pop es
+    pop bx
     cmp word [install_sector_buf + 11], 512
     jne .floppy_letter
     cmp byte [install_sector_buf + 21], 0xF8
@@ -270,21 +292,17 @@ install_probe_one:
 .floppy_letter:
     mov al, 'A'
     add al, [.in_dl]
+    mov ah, 1
     jmp .set_letter
 .hdd_letter:
     mov al, [install_next_hdd]
     inc byte [install_next_hdd]
+    mov ah, 2
 .set_letter:
     mov [bx+0], al
     mov dl, [.in_dl]
     mov [bx+1], dl
-
-    mov al, 1
-    cmp dl, 0x80
-    jb .set_type
-    mov al, 2
-.set_type:
-    mov [bx+2], al
+    mov [bx+2], ah
     mov byte [bx+3], 0
 
     mov al, [.r_ch]
@@ -843,11 +861,14 @@ install_clone_disk:
 .src_found:
     mov al, [bx+1]
     mov [install_source_bios], al
+    mov al, [bx+2]
+    mov [install_src_type], al
     movzx ax, byte [bx+6]
     mov [install_src_heads], ax
     movzx ax, byte [bx+7]
     mov [install_src_spt], ax
     mov ax, [bx+8]
+    mov [install_src_total], ax
     mov [install_total], ax
 
     movzx bx, byte [install_index]
@@ -875,6 +896,17 @@ install_clone_disk:
     add bx, install_table
     cmp byte [bx+2], 2
     je .hdd_install
+    cmp byte [install_src_type], 1
+    jne .hdd_install
+    mov ax, [install_src_heads]
+    cmp ax, [install_tgt_heads]
+    jne .hdd_install
+    mov ax, [install_src_spt]
+    cmp ax, [install_tgt_spt]
+    jne .hdd_install
+    mov ax, [install_src_total]
+    cmp ax, [install_tgt_total]
+    jne .hdd_install
 
 .copy:
     mov ax, [install_lba]
@@ -886,79 +918,16 @@ install_clone_disk:
     mov ax, [install_src_spt]
     mov [install_chs_spt], ax
     mov ax, [install_lba]
-    call install_lba_to_chs
+    call install_read_source
+    jc .fail
 
-    mov ax, [install_chs_cyl]
-    mov ch, al
-    mov ah, ah
-    shl ah, 6
-    or ah, [install_chs_sec]
-    mov cl, ah
-    mov dh, [install_chs_head]
-    mov dl, [install_source_bios]
-    mov bx, install_sector_buf
-    mov ax, 0x0201
-    mov si, 3
-.try_read:
-    int 0x13
-    jnc .read_ok
-    dec si
-    jz .fail
-    xor ah, ah
-    int 0x13
-    push si
-    mov ax, [install_chs_cyl]
-    mov ch, al
-    mov ah, ah
-    shl ah, 6
-    or ah, [install_chs_sec]
-    mov cl, ah
-    mov dh, [install_chs_head]
-    mov dl, [install_source_bios]
-    mov bx, install_sector_buf
-    mov ax, 0x0201
-    pop si
-    jmp .try_read
-.read_ok:
     mov ax, [install_tgt_heads]
     mov [install_chs_heads], ax
     mov ax, [install_tgt_spt]
     mov [install_chs_spt], ax
     mov ax, [install_lba]
-    call install_lba_to_chs
-
-    mov ax, [install_chs_cyl]
-    mov ch, al
-    mov ah, ah
-    shl ah, 6
-    or ah, [install_chs_sec]
-    mov cl, ah
-    mov dh, [install_chs_head]
-    mov dl, [install_target_bios]
-    mov bx, install_sector_buf
-    mov ax, 0x0301
-    mov si, 3
-.try_write:
-    int 0x13
-    jnc .write_ok
-    dec si
-    jz .fail
-    xor ah, ah
-    int 0x13
-    push si
-    mov ax, [install_chs_cyl]
-    mov ch, al
-    mov ah, ah
-    shl ah, 6
-    or ah, [install_chs_sec]
-    mov cl, ah
-    mov dh, [install_chs_head]
-    mov dl, [install_target_bios]
-    mov bx, install_sector_buf
-    mov ax, 0x0301
-    pop si
-    jmp .try_write
-.write_ok:
+    call install_write_target
+    jc .fail
 
     inc word [install_lba]
 
@@ -1046,6 +1015,14 @@ install_format_target:
     call install_read_source
     jc .fail
 
+    mov byte [install_fmt_media], 0xF8
+    cmp byte [install_target_bios], 0x80
+    jae .media_set
+    cmp word [install_tgt_total], 5760
+    ja .media_set
+    mov byte [install_fmt_media], 0xF0
+.media_set:
+
     mov word [install_sector_buf + 11], 512
     mov ax, [install_fmt_spc]
     mov [install_sector_buf + 13], al
@@ -1054,7 +1031,8 @@ install_format_target:
     mov word [install_sector_buf + 17], INSTALL_ROOT_ENTS
     mov ax, [install_tgt_total]
     mov [install_sector_buf + 19], ax
-    mov byte [install_sector_buf + 21], 0xF8
+    mov al, [install_fmt_media]
+    mov [install_sector_buf + 21], al
     mov ax, [install_fmt_spf]
     mov [install_sector_buf + 22], ax
     mov ax, [install_tgt_spt]
@@ -1088,7 +1066,8 @@ install_format_target:
     mov [install_fmt_lba], ax
 
     call install_blank_buf
-    mov byte [install_sector_buf + 0], 0xF8
+    mov al, [install_fmt_media]
+    mov [install_sector_buf + 0], al
     mov byte [install_sector_buf + 1], 0xFF
     mov byte [install_sector_buf + 2], 0xFF
     mov word [install_fmt_left], 0
@@ -1165,12 +1144,14 @@ install_sector_io:
     push cx
     push dx
     push si
+    push di
     mov [.op], bh
     mov [.drive], bl
     call install_lba_to_chs
+    mov di, 3
+.retry:
     mov ax, [install_chs_cyl]
     mov ch, al
-    mov ah, ah
     shl ah, 6
     or ah, [install_chs_sec]
     mov cl, ah
@@ -1179,7 +1160,22 @@ install_sector_io:
     mov bx, install_sector_buf
     mov ah, [.op]
     mov al, 1
+    stc
     int 0x13
+    jnc .ok
+    dec di
+    jz .fail
+    xor ah, ah
+    mov dl, [.drive]
+    int 0x13
+    jmp .retry
+.ok:
+    clc
+    jmp .done
+.fail:
+    stc
+.done:
+    pop di
     pop si
     pop dx
     pop cx
@@ -1295,6 +1291,8 @@ install_copy_tree:
     mov word [install_skipped], 0
     mov byte [install_skip_name], 0
     call install_copy_level
+    call install_sel_target
+    call install_enter_path
     call install_sel_source
     call install_enter_path
     popa
@@ -1305,10 +1303,12 @@ install_copy_level:
 
     call install_sel_source
     call install_enter_path
+    jc .done
     call install_list_base
     mov si, di
     mov ah, 0x01
     int 0x22
+    jc .done
 
     call install_depth_slot
     mov [install_counts + bx], dx
@@ -1349,6 +1349,10 @@ install_copy_level:
 .fits:
     call install_sel_source
     call install_enter_path
+    jnc .src_dir_ok
+    call install_note_skip
+    jmp .advance
+.src_dir_ok:
     mov si, install_name
     xor cx, cx
     mov dx, INSTALL_FILE_SEG
@@ -1361,6 +1365,10 @@ install_copy_level:
 .loaded:
     call install_sel_target
     call install_enter_path
+    jnc .tgt_dir_ok
+    call install_note_skip
+    jmp .advance
+.tgt_dir_ok:
     mov si, install_name
     xor cx, cx
     mov dx, INSTALL_FILE_SEG
@@ -1373,20 +1381,25 @@ install_copy_level:
     jmp .advance
 
 .subdir:
-    mov al, [install_depth]
-    cmp al, INSTALL_MAX_DEPTH - 1
-    jae .advance
-
     call install_sel_target
     call install_enter_path
+    jc .subdir_skip
     mov si, install_name
     mov ah, 0x0B
     int 0x22
+
+    mov al, [install_depth]
+    cmp al, INSTALL_MAX_DEPTH - 1
+    jae .advance
 
     call install_push_path
     inc byte [install_depth]
     call install_copy_level
     dec byte [install_depth]
+    jmp .advance
+.subdir_skip:
+    call install_note_skip
+    jmp .advance
 
 .advance:
     call install_depth_slot
@@ -1433,7 +1446,7 @@ install_list_base:
     mov al, [install_depth]
     mov dx, INSTALL_LIST_BYTES
     mul dx
-    mov di, install_lists
+    mov di, INSTALL_LISTS_OFF
     add di, ax
     pop dx
     pop ax
@@ -1470,7 +1483,7 @@ install_enter_path:
     xor cx, cx
 .walk:
     cmp cl, [install_depth]
-    jae .done
+    jae .ok
     mov al, 13
     mul cl
     mov si, install_path
@@ -1479,10 +1492,16 @@ install_enter_path:
     mov ah, 0x09
     int 0x22
     pop cx
+    jc .fail
     inc cl
     jmp .walk
-.done:
+.ok:
     popa
+    clc
+    ret
+.fail:
+    popa
+    stc
     ret
 
 install_push_path:
@@ -1570,6 +1589,8 @@ install_current_letter   db 'A'
 install_chosen_letter    db 'A'
 install_source_bios      db 0
 install_target_bios      db 0
+install_src_type         db 1
+install_src_total        dw 2880
 install_letter_buf       db 0, 0
 
 install_src_heads        dw 2
@@ -1618,6 +1639,7 @@ install_fmt_data         dw 33
 install_fmt_lba          dw 0
 install_fmt_left         dw 0
 install_fmt_copy         dw 0
+install_fmt_media        db 0xF8
 
 install_depth            db 0
 install_skipped          dw 0
@@ -1628,7 +1650,6 @@ install_name             times 16 db 0
 install_path             times INSTALL_MAX_DEPTH * 13 db 0
 install_counts           times INSTALL_MAX_DEPTH dw 0
 install_idxs             times INSTALL_MAX_DEPTH dw 0
-install_lists            times INSTALL_MAX_DEPTH * INSTALL_LIST_BYTES db 0
 
 install_table            times INSTALL_MAX_DRIVES * INSTALL_ENTRY_BYTES db 0
 install_sector_buf       times 512 db 0

@@ -97,22 +97,22 @@ setup:
     call string_move_cursor
 
     ; Get username input
-    mov di, 43008
+    mov di, setup_input_buf
     mov byte [di], 0
     mov ax, di
     mov cx, SETUP_FIELD_MAX
     call string_input_string
 
-    mov byte [43008 + 31], 0
+    mov byte [setup_input_buf + 31], 0
 
     ; Check length
-    mov si, 43008
+    mov si, setup_input_buf
     call string_string_length
     cmp ax, 0
     je .skip_copy_user
 
     ; Copy input to 'user' variable
-    mov si, 43008
+    mov si, setup_input_buf
     mov di, user
     mov cx, 31
     call string_string_copy
@@ -164,20 +164,20 @@ setup:
     mov dl, 5
     call string_move_cursor
 
-    mov di, 43008
+    mov di, setup_input_buf
     mov byte [di], 0
     mov ax, di
     mov cx, SETUP_FIELD_MAX
     call string_input_string
 
-    mov byte [43008 + 31], 0
+    mov byte [setup_input_buf + 31], 0
 
-    mov si, 43008
+    mov si, setup_input_buf
     call string_string_length
     cmp ax, 0
     je .encrypt_pass ; use default empty pass
 
-    mov si, 43008
+    mov si, setup_input_buf
     mov di, password
     mov cx, 31
     call string_string_copy
@@ -226,20 +226,20 @@ setup:
     mov dl, 5
     call string_move_cursor
 
-    mov di, 43008
+    mov di, setup_input_buf
     mov byte [di], 0
     mov ax, di
     mov cx, SETUP_FIELD_MAX
     call string_input_string
 
-    mov byte [43008 + 31], 0
+    mov byte [setup_input_buf + 31], 0
 
-    mov si, 43008
+    mov si, setup_input_buf
     call string_string_length
     cmp ax, 0
     je .save_timezone
 
-    mov si, 43008
+    mov si, setup_input_buf
     mov di, timezone
     mov cx, 31
     call string_string_copy
@@ -283,13 +283,13 @@ setup:
     mov dl, 5
     call string_move_cursor
 
-    mov di, 43008
+    mov di, setup_input_buf
     mov byte [di], 0
     mov ax, di
     mov cx, SETUP_FIELD_MAX
     call string_input_string
 
-    mov si, 43008
+    mov si, setup_input_buf
     call string_to_int
     cmp ax, 0
     je .theme_default
@@ -323,7 +323,7 @@ setup:
 
 .save_theme:
     ; Copy to buffer
-    mov di, 43008
+    mov di, setup_input_buf
     push cx
     rep movsb
     pop cx
@@ -335,7 +335,7 @@ setup:
 
     mov ah, 0x03
     mov si, theme_cfg_file
-    mov bx, 43008
+    mov bx, setup_input_buf
     int 0x22
 
     mov ah, 0x0A
@@ -365,13 +365,13 @@ setup:
     mov dl, 5
     call string_move_cursor
 
-    mov di, 43008
+    mov di, setup_input_buf
     mov byte [di], 0
     mov ax, di
     mov cx, SETUP_FIELD_MAX
     call string_input_string
 
-    mov si, 43008
+    mov si, setup_input_buf
     call string_to_int
 
     cmp ax, 0
@@ -426,15 +426,15 @@ setup:
     jmp .save_prompt
 
 .save_prompt:
-    mov di, 43008
+    mov di, setup_input_buf
     xor al, al
     mov cx, 64
     rep stosb
 
-    mov di, 43008
+    mov di, setup_input_buf
     call string_string_copy
 
-    mov ax, 43008
+    mov ax, setup_input_buf
     call string_string_length
     inc ax
     mov cx, ax
@@ -446,7 +446,7 @@ setup:
 
     mov ah, 0x03
     mov si, prompt_cfg_file
-    mov bx, 43008
+    mov bx, setup_input_buf
     int 0x22
 
     mov ah, 0x0A
@@ -488,13 +488,13 @@ setup:
     mov dl, 5
     call string_move_cursor
 
-    mov di, 43008
+    mov di, setup_input_buf
     mov byte [di], 0
     mov ax, di
     mov cx, SETUP_FIELD_MAX
     call string_input_string
 
-    mov si, 43008
+    mov si, setup_input_buf
     call string_to_int
     cmp ax, 2
     je .essential_programs
@@ -536,10 +536,10 @@ setup:
     int 0x22
 
     mov ah, 0x03
-    mov byte [43008], '0'
-    mov byte [43009], 0
+    mov byte [setup_input_buf], '0'
+    mov byte [setup_input_buf + 1], 0
     mov si, first_boot_file
-    mov bx, 43008
+    mov bx, setup_input_buf
     mov cx, 2
     int 0x22
 
@@ -833,3 +833,4 @@ minimal_remove_list:
     db 0
 
 setup_stage_current db 0
+setup_input_buf     times 256 db 0
