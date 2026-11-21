@@ -3325,8 +3325,19 @@ fs_change_directory:
 fs_change_directory_body:
     pusha
 
-    ; Save uppercased name before 8.3 conversion
     mov si, ax
+    cmp word [si], '..'
+    jne .not_parent
+    cmp byte [si + 2], 0
+    jne .not_parent
+    call fs_parent_directory
+    jc .failure
+    popa
+    clc
+    ret
+.not_parent:
+
+    ; Save uppercased name before 8.3 conversion
     mov di, .cd_orig_name
     call string_string_copy
     mov ax, .cd_orig_name
